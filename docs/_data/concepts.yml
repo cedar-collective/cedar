@@ -1,0 +1,107 @@
+# What each section means, in a chair's words: one short paragraph a section.
+#
+# The app shows a section's paragraph at the top of its "How this is counted"
+# dialog, above the counts for the view on screen (cedar_method_panel(concept =)).
+# It is also the reference for development: a section's code should do what its
+# paragraph says, and a change to what a section means starts here.
+#
+# Rules for a paragraph: say what the picture is and how to read it; say what it
+# cannot tell you; no procedure, table names or thresholds (those are the live
+# notes beneath it). Keys are <page>.<section>.
+schema_version: 1
+concepts:
+  first-year.entering-classes: >-
+    Take everyone who started in the same term and follow them as one class.
+    Each line asks the same question a semester later: how much of the class is
+    still here? A student who has graduated counts as still here, because
+    finishing is not leaving. The space between two lines is the part of the
+    class lost between those two semesters, so a widening gap shows when
+    students are going.
+  first-year.first-spring-summer: >-
+    Some students take a course in the summer after their first spring, and
+    most do not. This compares how often each group is enrolled again in the
+    fall. Expect the summer students to return more often: a student who signs
+    up for summer has usually already decided to stay. So read this as a
+    description of who takes summer courses, not as proof that a summer course
+    keeps a student.
+  retention.return-rate: >-
+    Of the students enrolled in a term, what share is enrolled again the next
+    fall or spring? Students who finished their degree are taken out first,
+    since they did not leave. Each point is one term's students, and the dashed
+    line says whether the share has been moving up or down over the terms or is
+    only wobbling as it usually does.
+  retention.warning-signs: >-
+    By the end of a term two things are already known about a student: whether
+    they withdrew from a course late, and whether they got a D, F or other
+    non-passing grade. This shows how often students with each sign came back,
+    beside students without it, and how much of the group that did not come
+    back carried the sign. A sign marks who to reach, not why they left.
+  retention.groups: >-
+    The same return rate, read separately for each classification and for each
+    college, so you can see whether a change is everywhere or in one place. The
+    small line in each row is that group's own history.
+  retention.class-pace: >-
+    Staying is not the same as finishing on time. This follows each fall's new
+    students and, as each year begins, puts every one of them in a single
+    place: graduated, enrolled and earning credits fast enough to finish in
+    four years, enrolled and on a six-year pace, enrolled but slower, or not
+    enrolled. If more of a class stays but the on-pace share does not grow,
+    students are being kept without moving forward.
+  retention.pace-summer: >-
+    A student who finishes the spring short of 15 credits a term can make up
+    the difference in the summer. This counts, after each spring, the students
+    who were short, how many of them took summer courses, and how many of
+    those ended the summer back on a four-year pace. It shows how much of the
+    gap summer is closing now, and what those students are taking.
+  retention.dfw-courses: >-
+    In most courses, students who do not pass come back a little less often
+    than students who do. This lists the courses where that difference is
+    largest and affects the most students. It points to where a failed course
+    goes together with leaving; it does not show the course caused it, since
+    students who fail one course are often struggling in several.
+  retention.gpa-band-courses: >-
+    Students with lower GPAs fail more often everywhere, so a high failure rate
+    alone says little about a course. This compares how those students do in a
+    course with how the same students do in their other courses that term, and
+    sets that beside the same comparison for the course's other students. A
+    course on the first list is harder on lower-GPA students than their own
+    term predicts; a course on the second is one where they hold their own.
+  graduation.left-far-along: >-
+    These are students who stopped enrolling and have no degree. The bars sort
+    them by how many credits they had earned when they stopped. The bars on the
+    right are the ones to look at: students who had most of a degree's credits
+    and left without it.
+  graduation.term-by-term: >-
+    The same far-along students, by the last term they were enrolled. A student
+    counts as gone once two fall or spring terms pass without them. Some of
+    those students do come back later, so the newest bars are marked not final
+    and will shrink a little.
+  graduation.standing: >-
+    For each credit band, what was true of the students when they stopped: had
+    they ever been eligible for a Pell grant, was their GPA below 2.0, had they
+    attempted 160 credits or more. The last two are general standards for
+    financial aid. The data does not hold anyone's aid, so this shows who would
+    no longer have met a standard, not who lost aid.
+  graduation.college-major: >-
+    Which colleges and majors the far-along students were in when they
+    stopped. Larger programs will have more of them; the columns beside the
+    count show how many were at 120 credits or more and how many no longer met
+    an aid standard.
+  graduation.required-courses: >-
+    For students who left far along, this looks at each course their degree
+    plan names and asks what they had done in it: passed it here, tried it here
+    and never passed, or never took it here. A course many of them tried and
+    never passed is a place where students who were close got stuck. It does
+    not show the course is why they left.
+  graduation.credit-ceiling: >-
+    Financial aid generally stops paying after 160 attempted credits. This
+    finds the students who passed that mark without a degree and shows where
+    the credits came from (brought from elsewhere, earned here, or attempted
+    here without earning) and what happened in the terms after: graduated,
+    still enrolled, or gone.
+  graduation.summer-finishers: >-
+    Some spring students do not graduate in May but finish over the summer.
+    This counts them each year, shows how much they took that summer, what
+    they took, and which majors they were in. A major whose summer finishers
+    mostly carried a full load is a program built to end in summer. Finishers
+    who took one course, or none, were completing a last requirement.

@@ -214,8 +214,16 @@ strips, open blue boxes, open definition notes, caveat lines), and by November
    reads ("credit hours in this department's courses, whoever takes them").
    It never carries procedure: no DESR, class list, Academic Studies, census
    proxy, SD, crosslist handling, threshold values or helper names.
-3. **The method slot, collapsed** (`method =` on the three section helpers,
-   rendered by `cedar_method_panel()`). Scope, denominator, exclusions,
+3. **The method slot, behind a link** (`method =` on the three section
+   helpers, rendered by `cedar_method_panel()`): a small "How this is counted"
+   link after the sentence that opens a dialog in reading-size type
+   (`www/cedar-method-dialog.js`). With `concept = "<page>.<section>"` the
+   dialog opens on the section's paragraph from `docs/_data/concepts.yml`
+   (what the picture is, how to read it, what it cannot tell you), with the
+   view's own notes under "In this view". Write the paragraph first: it is
+   also the statement the section's code is held to. `test-definitions.R`
+   fails on a concept no page uses or a page naming one that does not exist.
+   Scope, denominator, exclusions,
    thresholds, the edge used (`cedar_edge_note()`), small-cell guards, what a
    shaded or blank cell means, and the definition links. A run-specific count
    (rows dropped, codes in scope) goes here too, through a `uiOutput()` inside
@@ -225,7 +233,7 @@ strips, open blue boxes, open definition notes, caveat lines), and by November
 
 Rules:
 
-- **Blue is for method, and method is collapsed.** An open box is for a caveat
+- **Blue is for method, and method is behind its link.** An open box is for a caveat
   that changes the reading of the numbers below it (a term in progress, a data
   window cut short), stated in one line. `test-architecture.R` ratchets open
   `alert alert-info` / `alert-box--info` boxes per file (M43); fold one into a

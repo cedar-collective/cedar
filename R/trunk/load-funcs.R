@@ -79,6 +79,9 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   assign("CEDAR_DEFINITIONS", read_definition_registry(
     file.path(cedar_base_dir, "docs", "_data", "definitions.yml")
   ), envir = .GlobalEnv)
+  assign("CEDAR_SECTION_CONCEPTS", read_section_concepts(
+    file.path(cedar_base_dir, "docs", "_data", "concepts.yml")
+  ), envir = .GlobalEnv)
 
   # 3. Branches (reusable cedar domain computations — called by multiple cones/features)
   message("[load-funcs.R] Loading branches...")
@@ -119,6 +122,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("branches/population.R")
   source_file("branches/major-change-detection.R")  # detect_major_changes(); consumed by the major-change cones
   source_file("branches/retention-context.R")       # retention lookups + retained_1..n flags; consumed by the retention cones
+  source_file("branches/summer-terms.R")      # what a group took in a summer: credit bands, course list
   source_file("branches/relative-terms.R")          # assign_relative_terms(); consumed by the timing and pair cones
   source_file("branches/comparison.R")         # treatment/control group builder for observational analyses
   source_file("branches/pathways.R")           # pure helpers for Pathways module analysis scoping
@@ -144,6 +148,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("cones/stopout.R")
   source_file("cones/return-rates.R")  # how often enrolled students come back the next regular term
   source_file("cones/summer-finishers.R")  # students who finish before the next regular term: what they took
+  source_file("cones/summer-after-spring.R")    # a spring's students in the summer after, and in the fall
   source_file("cones/entering-class-retention.R")  # each entering class's share still here 1..n regular terms later
   source_file("cones/exit-credits.R")  # students who left without a degree, by credits at their last term
   source_file("cones/exit-requirements.R")  # of those students, who passed each course their plan requires
@@ -204,6 +209,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
   source_file("features/retention-dashboard.R")  # Bird's Eye > Retention payload
+  source_file("features/summer-sections.R")     # the summer question on First Year and Retention
   source_file("features/graduation-dashboard.R")  # Bird's Eye > Graduation payload
   source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor

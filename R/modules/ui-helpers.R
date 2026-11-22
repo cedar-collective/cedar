@@ -89,12 +89,38 @@ cedar_definition_panel <- function(ids, title = "What this view counts") {
 }
 
 # The method slot of a section: scope, exclusions, thresholds, the edge used
-# and the definition links, collapsed. A section's visible sentence says what
-# it answers in a reader's words; how it is counted goes here (ISSUES M43;
-# docs/developers/shiny-modules.md#explaining-a-section). NULL renders nothing.
-cedar_method_panel <- function(method, title = "How this is counted") {
-  if (is.null(method)) return(NULL)
-  info_panel(title, method, class = "cedar-method-panel")
+# and the definition links. A section's visible sentence says what it answers
+# in a reader's words; how it is counted goes here (ISSUES M43;
+# docs/developers/shiny-modules.md#explaining-a-section).
+#
+# It shows as a small link after the section's sentence and opens as a dialog
+# (www/cedar-custom.css, www/cedar-method-dialog.js). The content stays in the
+# page as a <details>, so an output inside it is filled as before.
+# concept   a key of docs/_data/concepts.yml: the section's plain paragraph,
+#           shown first, with the view's own counts under "In this view".
+# NULL method and no concept renders nothing.
+cedar_method_panel <- function(method, title = "How this is counted", concept = NULL) {
+  idea <- if (!is.null(concept)) cedar_section_concept(concept)
+  if (is.null(method) && is.null(idea)) return(NULL)
+  tags$details(
+    class = "cedar-info-panel cedar-method-panel",
+    tags$summary(tags$span(class = "cedar-info-summary-copy",
+                           tags$span(class = "cedar-info-summary-title", title))),
+    tags$div(
+      class = "panel-body", role = "dialog", `aria-label` = title, tabindex = "-1",
+      tags$div(class = "cedar-method-head",
+               tags$span(class = "cedar-method-title", title),
+               tags$button(type = "button", class = "cedar-method-close", "Close")),
+      if (!is.null(idea)) tags$p(class = "cedar-method-idea", idea),
+      if (!is.null(idea) && !is.null(method)) tags$p(class = "cedar-method-label", "In this view"),
+      method)
+  )
+}
+
+# A section's sentence with its method link after it, on one line of text.
+cedar_section_lede <- function(description_tag, method_panel, class = NULL) {
+  if (is.null(description_tag) && is.null(method_panel)) return(NULL)
+  div(class = paste(c("cedar-section-lede", class), collapse = " "), description_tag, method_panel)
 }
 
 # Shared compact metric card. Keep the card itself column-agnostic so callers
@@ -472,14 +498,13 @@ subtab_header <- function(title, description = NULL, ..., method = NULL, class =
   div(
     class = paste(c("cedar-subtab-header", class), collapse = " "),
     tags$h2(class = "cedar-subtab-title", title),
-    description_tag,
-    cedar_method_panel(method, title = "What this view counts")
+    cedar_section_lede(description_tag, cedar_method_panel(method, title = "What this view counts"))
   )
 }
 
 # Dashboard sections need a stronger hierarchy than regular tab sections:
 # a broad group heading, optional short copy, then one or more compact panels.
-dashboard_section_header <- function(title, description = NULL, ..., class = NULL) {
+dashboard_section_header <- function(title, description = NULL, ..., class = NULL, method_panel = NULL) {
   description_parts <- Filter(Negate(is.null), c(list(description), list(...)))
   description_tag <- NULL
   if (length(description_parts) > 0) {
@@ -502,7 +527,7 @@ dashboard_section_header <- function(title, description = NULL, ..., class = NUL
   div(
     class = paste(c("cedar-dashboard-section-header", class), collapse = " "),
     tags$h2(class = "cedar-dashboard-section-title", title),
-    description_tag
+    cedar_section_lede(description_tag, method_panel, class = "cedar-dashboard-section-lede")
   )
 }
 
@@ -513,11 +538,12 @@ dashboard_section_header <- function(title, description = NULL, ..., class = NUL
 # that already ran on its defaults runs again (ISSUES I66).
 cedar_click_count <- function(value) as.integer(value %||% 0L)
 
-dashboard_section <- function(title, description = NULL, ..., method = NULL, class = NULL) {
+# concept   a key of docs/_data/concepts.yml (see cedar_method_panel()).
+dashboard_section <- function(title, description = NULL, ..., method = NULL, class = NULL, concept = NULL) {
   div(
     class = paste(c("cedar-dashboard-section", class), collapse = " "),
-    dashboard_section_header(title, description),
-    div(class = "cedar-dashboard-section-body", cedar_method_panel(method), ...)
+    dashboard_section_header(title, description, method_panel = cedar_method_panel(method, concept = concept)),
+    div(class = "cedar-dashboard-section-body", ...)
   )
 }
 
@@ -536,8 +562,7 @@ dashboard_subsection <- function(title, description = NULL, ..., method = NULL,
   div(
     class = paste(c("cedar-dashboard-subsection", class), collapse = " "),
     tags$h3(class = paste(c("cedar-dashboard-subsection-title", tone), collapse = " "), title),
-    description_tag,
-    cedar_method_panel(method),
+    cedar_section_lede(description_tag, cedar_method_panel(method)),
     ...
   )
 }
@@ -898,6 +923,24 @@ cedar_pot_coldef <- function(name = "PoT", maxWidth = 52, align = "center") {
 cedar_count_coldef <- function(name, ...) {
   reactable::colDef(name = name, align = "right", na = "\u2014",
                     format = reactable::colFormat(separators = TRUE), ...)
+}
+
+# The courses a group of students took most (summer_course_list()'s `courses`):
+# code, title, the campus that taught it, students, and their share of the group.
+# titles   describe_courses() output for the listed courses.
+cedar_course_share_table <- function(courses, titles, share_label) {
+  if (NROW(courses) == 0L) return(reactable::reactable(
+    data.frame(Message = "No course was taken by enough of these students to list."),
+    theme = cedar_tbl_theme, compact = TRUE))
+  shown <- data.frame(course = courses$subject_course,
+                      title = titles$title[match(courses$subject_course, titles$subject_course)],
+                      campus = courses$campus, n = courses$n_students, share = courses$share_pct / 100,
+                      stringsAsFactors = FALSE)
+  reactable::reactable(shown, theme = cedar_tbl_theme, compact = TRUE, striped = TRUE, defaultPageSize = 15,
+    columns = list(course = reactable::colDef(name = "Course", minWidth = 110),
+                   title = reactable::colDef(name = "Title", minWidth = 220, na = "\u2014"),
+                   campus = reactable::colDef(name = "Campus"),
+                   n = cedar_count_coldef("Students"), share = cedar_percent_coldef(share_label)))
 }
 
 cedar_percent_coldef <- function(name, ...) {

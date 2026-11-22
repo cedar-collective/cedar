@@ -38,6 +38,7 @@ The page builds as soon as it opens; there is no run button.
 | **Who Isn't Coming Back** | For a late withdrawal and for a DFW grade: how many students had it, how often they came back against those without it, and what share of the students who did not come back had it. |
 | **By Classification and College** | Each classification and each primary-major college: its latest rate, its rate over the terms and its terms as a small line with the trend. |
 | **Still Here, and Moving Forward?** | Each fall's new students as each year begins: awarded a degree, enrolled and on pace for four or six years, enrolled and slower, or not enrolled. [More below](#still-here-and-moving-forward). |
+| **Summer and Staying on Pace** | First-time students behind a 15-credit pace after each spring: how many took no summer course, took one and stayed behind, or caught up; and the courses they took. Credit brought from elsewhere is not counted, so some students shown as behind are not. |
 | **Courses Where a DFW Costs the Most** | Over the latest three terms with posted grades, the courses where students who got a DFW came back much less often than those who passed: the 25 largest gaps. |
 
 Each section's **How this is counted** gives its thresholds and the edge it reads to.

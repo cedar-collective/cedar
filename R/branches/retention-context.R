@@ -168,6 +168,70 @@ between_term_finishers <- function(anchors, degrees, degree_edge) {
     transmute(student_id, term, finish_term = degree_term, basis)
 }
 
+#' The students of each entering class
+#'
+#' Who is new, and in which term: the one definition the entering-class
+#' follow-ups share (get_entering_class_retention(), the summer sections).
+#' `entry = "all"` is each student's first enrolled term at the level in
+#' scope, the table's first term left out (no one can be called new in it);
+#' `"first_time"` and `"transfer"` are the first enrolled term the
+#' registrar's record calls the student that (student_term_entry_type()), a
+#' first-time summer starter enrolled that fall counted in the fall class.
+#'
+#' @param student_terms `cedar_student_terms`.
+#' @param programs `cedar_programs`, for `entry` other than `"all"`.
+#' @param edge The settled enrollment edge.
+#' @param opt `entry`, `student_level`, `term_type`, `campus` (home campus in
+#'   the entering term), `classification`, `time_status`; NULL keeps all.
+#' @return list(`entering` (one student-term row a student: their entering
+#'   term's row), `enrolled` (every enrolled student-term to the edge),
+#'   `first_term`, `n_first_term`, `n_summer_starts`).
+entering_students <- function(student_terms, programs, edge, opt = list()) {
+  enrolled <- student_terms %>% filter(enrolled, term <= edge) %>% mutate(term = as.integer(term))
+  if (nrow(enrolled) == 0L) {
+    stop("[retention-context.R] entering_students: no enrolled student-term at or before the settled edge.", call. = FALSE)
+  }
+  first_term <- min(enrolled$term)
+
+  # Each student's entering term at the level in scope: the first enrolled
+  # term among that level's rows.
+  at_level <- if (is.null(opt$student_level)) enrolled else enrolled %>% filter(student_level %in% opt$student_level)
+  n_summer_starts <- 0L
+  entry <- opt$entry %||% "all"
+  if (entry == "all") {
+    entering <- at_level %>%
+      arrange(student_id, term) %>%
+      distinct(student_id, .keep_all = TRUE)
+    n_first_term <- sum(entering$term == first_term)
+    entering <- entering %>% filter(term > first_term)
+  } else {
+    # The first enrolled term the record calls the student new in.
+    arrivals <- student_term_entry_type(programs) %>% filter(entry_type == entry)
+    entering <- at_level %>%
+      semi_join(arrivals, by = c("student_id", "term")) %>%
+      arrange(student_id, term) %>%
+      distinct(student_id, .keep_all = TRUE)
+    n_first_term <- 0L
+    if (entry == "first_time") {
+      # A summer starter enrolled that fall is in the fall class, described
+      # by their fall row.
+      summer <- entering %>%
+        filter(get_term_type(term) == "summer") %>%
+        transmute(student_id, term = advance_term(term, 1L))
+      moved <- at_level %>% semi_join(summer, by = c("student_id", "term"))
+      n_summer_starts <- nrow(moved)
+      entering <- bind_rows(entering %>% filter(!student_id %in% moved$student_id), moved)
+    }
+  }
+  if (!is.null(opt$term_type)) entering <- entering %>% filter(get_term_type(term) %in% opt$term_type)
+  entering <- entering %>% filter(get_term_type(term) %in% c("fall", "spring", "summer"))
+  if (!is.null(opt$campus)) entering <- entering %>% filter(student_campus %in% opt$campus)
+  if (!is.null(opt$classification)) entering <- entering %>% filter(student_classification %in% opt$classification)
+  if (!is.null(opt$time_status)) entering <- entering %>% filter(time_status %in% opt$time_status)
+  list(entering = entering, enrolled = enrolled, first_term = first_term, n_first_term = n_first_term,
+       n_summer_starts = n_summer_starts)
+}
+
 #' Where each student is at each regular term after a starting term
 #'
 #' The follow-up these analyses share (a class past 160 credits, a major's

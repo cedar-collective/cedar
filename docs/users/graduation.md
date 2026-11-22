@@ -98,7 +98,10 @@ shown as a trend.
 ## Finishing in the Summer
 
 The spring students who were awarded a degree that summer, a bar a year, split
-by the credits they took here that summer, and the courses they took most.
+by the credits they took here that summer, the courses they took most, and
+the majors they were in. A major most of whose summer finishers carried 7
+credits or more is a program that ends in summer; one whose finishers took a
+course or none is students completing a last requirement.
 These are the students Retention's spring return rate counts as finished.
 Where a summer's degrees are not posted yet, the bar shows students who have
 applied to graduate then, and is marked. What a student took is not what they

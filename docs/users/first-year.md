@@ -33,6 +33,12 @@ The page builds as soon as it opens; there is no run button.
 
 One line for each of a class's 2nd, 3rd, 4th and 5th semesters, with a point for each entering class. The entering term is the 1st semester, so a year on is the 3rd, the one retention is usually quoted at. The gap between two lines is the share lost between them.
 
+## The Summer After the First Spring
+
+For the students of each class who were enrolled in its first spring: how often those who took a course here that summer were back in the fall, beside those who did not, and the courses they took most.
+
+This shows what summer goes with, not what it causes. A student who signs up for summer has usually already decided to come back.
+
 ## Reading it
 
 - **Still enrolled means enrolled in that later term on any campus, or awarded a degree by then.** A student away one term and back the next is missing from the first and counted in the second.

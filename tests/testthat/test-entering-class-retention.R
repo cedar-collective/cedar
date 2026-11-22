@@ -84,7 +84,7 @@ test_that("get_entering_class_retention() stops without its edge, its columns or
                "at least 1")
 })
 
-test_that("EC01: a step is named by its distance and season, and the sentence reads the latest class a year on", {
+test_that("EC01: a step is named by its distance and season, and the sentence reads every class a year on", {
   expect_equal(retention_milestone_label(1:4, c(202110L, 202180L, 202210L, 202280L)),
                c("2nd semester (spring)", "3rd semester (fall)", "4th semester (spring)", "5th semester (fall)"))
   expect_equal(retention_milestone_label(c(10L, 11L, 20L), 202080L),

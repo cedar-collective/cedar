@@ -19,10 +19,9 @@
 #   Not a claim   that the summer courses were required: the data holds what
 #                 a student took, not their audit.
 #
-# Depends on: between_term_finishers(), get_term_type() (trunk/utils.R)
-
-SUMMER_FINISHER_CREDIT_BREAKS <- c(1, 4, 7)
-SUMMER_FINISHER_BANDS <- c("No course here", "1 to 3 credits", "4 to 6 credits", "7 credits or more")
+# Depends on: between_term_finishers() (branches/retention-context.R),
+#             summer_credit_band(), summer_course_list() (branches/summer-terms.R),
+#             get_term_type() (trunk/utils.R)
 
 #' Students who finished before the next regular term, by what they took
 #'
@@ -37,7 +36,10 @@ SUMMER_FINISHER_BANDS <- c("No course here", "1 to 3 credits", "4 to 6 credits",
 #' @return list(`by_term` one row per anchor term and credit band: `term`,
 #'   `finish_term`, `basis`, `band`, `n`; `courses` one row per course and
 #'   campus: `subject_course`, `campus`, `n_students`, `share_pct` of the
-#'   finishers in those terms; `meta`).
+#'   finishers in those terms; `by_major` (with `primary_major_code` on
+#'   `student_terms`: the awarded finishers by the major on the anchor term's
+#'   record: `n`, `n_no_course`, `n_full` in the top credit band; majors under
+#'   `min_n` left out, counted in `meta$n_majors_small`); `meta`).
 get_summer_finishers <- function(student_terms, degrees, attempts, opt = list()) {
   need <- list(student_terms = c("student_id", "term", "enrolled", "student_level", "student_campus",
                                  "attempted_unm_credits"),
@@ -67,29 +69,56 @@ get_summer_finishers <- function(student_terms, degrees, attempts, opt = list())
     transmute(student_id, finish_term = as.integer(term), credits = as.numeric(attempted_unm_credits))
   placed <- finishers %>%
     left_join(took, by = c("student_id", "finish_term"), relationship = "many-to-one") %>%
-    mutate(credits = dplyr::coalesce(credits, 0),
-           band = factor(SUMMER_FINISHER_BANDS[findInterval(credits, SUMMER_FINISHER_CREDIT_BREAKS) + 1L],
-                         levels = SUMMER_FINISHER_BANDS))
+    mutate(band = summer_credit_band(credits))
   by_term <- placed %>% count(term, finish_term, basis, band, name = "n", .drop = FALSE) %>% filter(n > 0L)
 
-  read_terms <- sort(unique(placed$finish_term[placed$finish_term <= graded_edge]), decreasing = TRUE)
-  read_terms <- sort(head(read_terms, course_terms))
-  in_read <- placed %>% filter(finish_term %in% read_terms)
-  courses <- attempts %>%
-    mutate(finish_term = as.integer(term)) %>%
-    inner_join(in_read %>% select(student_id, finish_term), by = c("student_id", "finish_term"),
-               relationship = "many-to-one") %>%
-    group_by(subject_course, campus) %>%
-    summarize(n_students = n_distinct(student_id), .groups = "drop") %>%
-    filter(n_students >= min_n) %>%
-    mutate(share_pct = 100 * n_students / nrow(in_read)) %>%
-    arrange(desc(n_students), subject_course, campus)
+  listed <- summer_course_list(placed %>% transmute(student_id, summer_term = finish_term), attempts, graded_edge,
+                               course_terms, min_n)
 
-  list(by_term = by_term, courses = courses,
+  # By the major on the anchor term's record: which programs end in a summer
+  # by design (most of their finishers carry a full summer load) and which
+  # students are picking up a last course. Awarded degrees only.
+  by_major <- NULL
+  n_majors_small <- NULL
+  if ("primary_major_code" %in% names(student_terms)) {
+    majors <- placed %>%
+      filter(basis == "awarded") %>%
+      left_join(anchors %>% transmute(student_id, term = as.integer(term), primary_major_code),
+                by = c("student_id", "term"), relationship = "many-to-one") %>%
+      group_by(primary_major_code) %>%
+      summarize(n = n(), n_no_course = sum(band == SUMMER_CREDIT_BANDS[[1]]),
+                n_full = sum(band == SUMMER_CREDIT_BANDS[[length(SUMMER_CREDIT_BANDS)]]), .groups = "drop") %>%
+      arrange(desc(n), primary_major_code)
+    n_majors_small <- sum(majors$n < min_n)
+    by_major <- majors %>% filter(n >= min_n)
+  }
+
+  list(by_term = by_term, courses = listed$courses, by_major = by_major,
        meta = list(term_type = opt$term_type, student_level = opt$student_level, campus = opt$campus,
                    edge = edge, graded_edge = graded_edge, degree_edge = opt$data_edges[["last_degree"]],
-                   n_finishers = nrow(placed), course_terms = read_terms, n_course_finishers = nrow(in_read),
-                   min_n = min_n))
+                   n_finishers = nrow(placed), course_terms = listed$terms, n_course_finishers = listed$n_students_read,
+                   min_n = min_n, n_majors_small = n_majors_small))
+}
+
+#' Summer finishing in one sentence, over every summer with degrees posted
+#'
+#' @param result get_summer_finishers() output.
+#' @return One sentence; character(0) when no summer's degrees are posted.
+summer_finishers_sentence <- function(result) {
+  full <- SUMMER_CREDIT_BANDS[[length(SUMMER_CREDIT_BANDS)]]
+  by <- result$by_term %>%
+    filter(basis == "awarded") %>%
+    group_by(finish_term) %>%
+    summarize(total = sum(n), full_pct = 100 * sum(n[band == full]) / sum(n),
+              none_pct = 100 * sum(n[band == SUMMER_CREDIT_BANDS[[1]]]) / sum(n), .groups = "drop")
+  if (nrow(by) == 0L) return(character(0))
+  span <- function(x, f) if (f(min(x)) == f(max(x))) f(x[[1]]) else paste(f(min(x)), "to", f(max(x)))
+  pct <- function(x) sprintf("%.1f%%", x)
+  paste0(if (nrow(by) == 1L) paste0("In ", fmt_term(by$finish_term[[1]]), ", ")
+         else paste0("In each of the ", nrow(by), " summers with degrees posted, "),
+         span(by$total, fmt_count), " spring students finished their degree. ",
+         span(by$full_pct, pct), " of them took ", tolower(full), " here that summer, and ",
+         span(by$none_pct, pct), " took no course here.")
 }
 
 # ── Plotting ─────────────────────────────────────────────────────────────────
@@ -109,10 +138,10 @@ plot_summer_finishers <- function(result) {
     terms$term)
   colours <- stats::setNames(
     # Amounts, not good and bad: the reference grey for none, then the palette.
-    c(CEDAR_SEMANTIC_COLORS[["reference"]], unname(unlist(CEDAR_PALETTE[1:3]))), SUMMER_FINISHER_BANDS)
+    c(CEDAR_SEMANTIC_COLORS[["reference"]], unname(unlist(CEDAR_PALETTE[1:3]))), SUMMER_CREDIT_BANDS)
   totals <- b %>% group_by(term) %>% summarize(total = sum(n), .groups = "drop")
   fig <- plotly::plot_ly()
-  for (band in SUMMER_FINISHER_BANDS) {
+  for (band in SUMMER_CREDIT_BANDS) {
     rows <- terms %>% select(term) %>%
       left_join(b[b$band == band, c("term", "n")], by = "term", relationship = "one-to-one") %>%
       left_join(totals, by = "term", relationship = "one-to-one") %>%

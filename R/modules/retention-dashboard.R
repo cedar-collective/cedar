@@ -44,21 +44,21 @@ retentionDashboardUI <- function(id, campuses) {
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading who came back…",
     dashboard_section(
       "How Often Students Come Back",
-      "Is the share of students who come back the next regular term rising or falling?",
-      method = uiOutput(ns("method_overall")),
+      "Is the share of students who come back the next fall or spring rising or falling?",
+      method = uiOutput(ns("method_overall")), concept = "retention.return-rate",
       uiOutput(ns("overall_finding")),
       plotly::plotlyOutput(ns("overall_plot"), height = "340px")
     ),
     dashboard_section(
       "Who Isn't Coming Back",
-      "How often students with each warning sign came back, and how many of those who did not had it.",
-      method = uiOutput(ns("method_signs")),
+      "How often do students with a warning sign by the end of the term come back, and how many of those who left had one?",
+      method = uiOutput(ns("method_signs")), concept = "retention.warning-signs",
       reactable::reactableOutput(ns("signs_table"))
     ),
     dashboard_section(
       "By Classification and College",
-      "Whether each classification and college is moving the same way.",
-      method = uiOutput(ns("method_groups")),
+      "Is the return rate moving the same way in every classification and college?",
+      method = uiOutput(ns("method_groups")), concept = "retention.groups",
       fluidRow(
         column(6, dashboard_subsection("Classification", "The student's classification that term.",
                                        reactable::reactableOutput(ns("classification_table")))),
@@ -69,7 +69,7 @@ retentionDashboardUI <- function(id, campuses) {
     dashboard_section(
       "Still Here, and Moving Forward?",
       "Of each fall's new students, how many are still enrolled as each year begins, and are they earning credits fast enough to finish?",
-      method = uiOutput(ns("method_pace")),
+      method = uiOutput(ns("method_pace")), concept = "retention.class-pace",
       fluidRow(
         column(7, radioButtons(ns("pace_started"), "Students who started as",
                                choices = c("First-time students" = "first_time",
@@ -87,24 +87,35 @@ retentionDashboardUI <- function(id, campuses) {
         plotly::plotlyOutput(ns("accumulation_plot"), height = "400px"))
     ),
     dashboard_section(
+      "Summer and Staying on Pace",
+      "Of the students behind on credits after each spring, how many take summer courses, and does it bring them back onto pace?",
+      method = uiOutput(ns("method_pace_summer")), concept = "retention.pace-summer",
+      uiOutput(ns("pace_summer_finding")),
+      plotly::plotlyOutput(ns("pace_summer_plot"), height = "360px"),
+      dashboard_subsection(
+        "Their Summer Courses",
+        "The courses students behind on credits took most that summer.",
+        reactable::reactableOutput(ns("pace_summer_courses")))
+    ),
+    dashboard_section(
       "Courses Where a DFW Costs the Most",
       "In which courses do students who did not pass (a grade below C, or a withdrawal) come back much less often than those who passed?",
-      method = uiOutput(ns("method_courses")),
+      method = uiOutput(ns("method_courses")), concept = "retention.dfw-courses",
       reactable::reactableOutput(ns("courses_table"))
     ),
     dashboard_section(
       "Courses Harder on Students with Lower GPAs",
       "Which courses do students with lower GPAs fail by more than they fail the rest of their term, and in which do they hold their own?",
-      method = uiOutput(ns("method_bands")),
+      method = uiOutput(ns("method_bands")), concept = "retention.gpa-band-courses",
       radioButtons(ns("band_by"), "Students", choices = RETENTION_BAND_CHOICES, selected = "entering", inline = TRUE),
       uiOutput(ns("bands_finding")),
       dashboard_subsection(
         "Harder on Them",
-        "Their DFW rate here is further above the rest of their term than the course's other students' is.",
+        "They fail this course more often than their other courses that term, by a wider margin than the course's other students do.",
         reactable::reactableOutput(ns("bands_harder"))),
       dashboard_subsection(
         "Where They Hold Their Own",
-        "Their DFW rate here is closer to, or below, the rest of their term, by more than for the course's other students.",
+        "They do about as well here as in their other courses that term, or better, where the course's other students do worse.",
         reactable::reactableOutput(ns("bands_easier")))
     ))
   )
@@ -165,7 +176,8 @@ RETENTION_BAND_CHOICES <- c("Continuing students, by GPA entering the term" = "e
 
 # student_terms, attempts, degrees, dims, edges   the loaded tables and edges.
 # active   reactive: TRUE while the tab is open.
-retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active) {
+retentionDashboardServer <- function(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active,
+                                     course_dim, course_codes) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
     payload <- reactive({
@@ -340,6 +352,59 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        "them, so a line can rise because slower students left.")))
     })
 
+
+    # Students behind on credits each spring, and what the summer did.
+    pace_summer <- reactive({
+      req(isTRUE(active()), input$level)
+      cedar_shared_result(list("pace_summer", input$level, input$campus), function() tryCatch(
+        build_pace_summer(student_terms, attempts, degrees, programs, list(
+          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          data_edges = edges)),
+        error = function(e) {
+          showNotification(paste("Summer and pace:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        }))
+    })
+    pace_summer_rows <- reactive({ s <- pace_summer(); req(s); summer_catch_up_by_term(s) })
+    output$pace_summer_finding <- renderUI({
+      s <- pace_summer()
+      if (is.null(s)) return(empty_state("The summer figures could not be built; the notification says why."))
+      sentence <- summer_catch_up_sentence(pace_summer_rows(), s$meta$pace_credits)
+      if (length(sentence) == 0L) return(empty_state("No spring in this scope has a graded summer after it to read."))
+      lead_text(sentence)
+    })
+    output$pace_summer_plot <- plotly::renderPlotly({
+      rows <- pace_summer_rows(); req(any(rows$n_behind > 0L)); plot_summer_catch_up(rows)
+    })
+    output$pace_summer_courses <- reactable::renderReactable({
+      s <- pace_summer(); req(s)
+      # `course_dim`, not `courses`: that name is this page's DFW course list.
+      cedar_course_share_table(s$courses, describe_courses(s$courses$subject_course, course_dim, course_codes),
+                               "Of those behind who took a summer course")
+    })
+    output$method_pace_summer <- renderUI({
+      s <- pace_summer(); req(s)
+      m <- s$meta
+      rows <- pace_summer_rows()
+      tags$ul(
+        tags$li(paste0("First-time students who entered in a fall, read at the spring that ends each of their first ",
+                       "four years, if enrolled that spring. A student awarded a degree that spring is left out (",
+                       fmt_count(sum(rows$n_finished)), " over these springs).")),
+        tags$li(paste0("Behind means fewer than ", m$pace_credits, " credits completed here for each fall and spring ",
+                       "since entering, the pace that finishes in four years. Credit brought from elsewhere (test, ",
+                       "dual or transfer credit) is not counted, so a student who arrived with credit is further ",
+                       "along than shown and some counted as behind are not.")),
+        tags$li(paste0("Caught up means the credits completed here that summer bring the total to that pace. A course ",
+                       "attempted and not passed adds nothing. A spring is read once its summer's grades are posted ",
+                       "(grades are posted through ", fmt_term(m$graded_edge), ").")),
+        tags$li(paste0(fmt_count(sum(rows$n_unknown)), " students over these springs have a record that began before ",
+                       "the class lists, so their total cannot be added up; they are in no bar.")),
+        tags$li(if (length(m$course_terms) == 0L) "No summer in this scope has posted grades, so no course is listed."
+                else paste0("Courses are graded attempts in ", paste(vapply(m$course_terms, fmt_term, character(1)), collapse = ", "),
+                            ", by the campus that taught them, as a share of the ", fmt_count(m$n_course_students),
+                            " students behind who took a course in those summers. A course taken by fewer than ",
+                            m$min_n, " of them is not listed.")))
+    })
 
     output$signs_table <- reactable::renderReactable({
       p <- payload(); req(p, NROW(p$signs) > 0L)
