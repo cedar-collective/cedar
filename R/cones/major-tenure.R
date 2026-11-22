@@ -15,9 +15,18 @@
 # A student already in the major when the data begin has no entry to count
 # from, and is counted in `meta$n_unclear`, not placed.
 #
+# How a student arrived (`opt$arrival`, with `programs`) is what the record
+# says of them in the term they entered the major (student_term_entry_type()):
+#   "first_time"    new to UNM that term as a first-time student
+#   "transfer"      new to UNM that term as a transfer student
+#   "already_here"  anything else: continuing, readmitted, a change of level.
+#                   They were at UNM before they entered this major.
+# The groups differ in how often they stay enrolled, so the whole population's
+# bars are a blend of them.
+#
 # Sections: calculation, plot prep, plot, text.
 # Depends on: advance_term() (branches/cedar-terms.R), validate_population(),
-#   fmt_term() (trunk/utils.R).
+#   fmt_term() (trunk/utils.R), student_term_entry_type() (branches/population.R).
 
 # The states a student can be in at a step, in drawing order: column, label.
 MAJOR_TENURE_STATES <- c(
@@ -26,6 +35,13 @@ MAJOR_TENURE_STATES <- c(
   n_no_major = "Enrolled, major not on record",
   n_degree = "Awarded a degree",
   n_not_enrolled = "Not enrolled that semester")
+
+# How students arrived: value, the page's choice label.
+MAJOR_TENURE_ARRIVALS <- c(
+  all = "All students",
+  first_time = "New first-time students",
+  transfer = "New transfer students",
+  already_here = "Already at UNM")
 
 # ── Calculation ─────────────────────────────────────────────────────────────
 
@@ -37,14 +53,19 @@ MAJOR_TENURE_STATES <- c(
 #' @param degrees `cedar_degrees`: `student_id`, `term`.
 #' @param opt `program_codes` (the focal major codes; required), `data_edges`
 #'   (required: `last_enrolled_complete`, `last_degree`), `n_terms` (steps
-#'   after entry, default 8).
+#'   after entry, default 8), `arrival` (one name of `MAJOR_TENURE_ARRIVALS`,
+#'   default `"all"`; any other needs `programs`).
+#' @param programs `cedar_programs` (`student_id`, `term`,
+#'   `student_population`), or NULL. With it, entrants are labelled by how
+#'   they arrived and `meta$by_arrival` counts each group.
 #' @return list(`steps`: `step` 0..n_terms, `n_observed` and one count per
 #'   state of `MAJOR_TENURE_STATES`, which add to it; `meta`: `n_entered`
 #'   (entered after the data begin and by both edges; the first step's count),
 #'   `n_unclear` (in the major when the data begin), `n_no_entry` (no
 #'   `first_unit_term`), `first_entry`, `last_entry`, `settled_edge`,
-#'   `degree_edge`, `n_terms`, `program_codes`).
-get_major_tenure <- function(population, student_terms, degrees, opt = list()) {
+#'   `degree_edge`, `n_terms`, `program_codes`, `arrival`, `by_arrival`
+#'   (`arrival`, `n` over every entrant; NULL without `programs`)).
+get_major_tenure <- function(population, student_terms, degrees, opt = list(), programs = NULL) {
   validate_population(population, "major-tenure.R")
   need <- list(population = "first_unit_term", student_terms = c("student_id", "term", "enrolled", "primary_major_code"),
                degrees = c("student_id", "term"))
@@ -62,6 +83,13 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list()) {
     stop("[major-tenure.R] opt$data_edges must name the settled and degree edges.", call. = FALSE)
   }
   n_terms <- as.integer(opt$n_terms %||% 8L)
+  arrival <- opt$arrival %||% "all"
+  if (length(arrival) != 1L || !arrival %in% names(MAJOR_TENURE_ARRIVALS)) {
+    stop("[major-tenure.R] opt$arrival must be one of ", paste(names(MAJOR_TENURE_ARRIVALS), collapse = ", "), ".", call. = FALSE)
+  }
+  if (arrival != "all" && is.null(programs)) {
+    stop("[major-tenure.R] opt$arrival needs programs (the record of how each student arrived).", call. = FALSE)
+  }
   data_start <- min(as.integer(student_terms$term))
 
   entrants <- population %>% distinct(student_id, .keep_all = TRUE) %>%
@@ -73,6 +101,22 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list()) {
   # count of entrants is the first step's count.
   entrants <- entrants %>% filter(entry > data_start, entry <= settled, entry <= degree_edge)
 
+  by_arrival <- NULL
+  if (!is.null(programs)) {
+    # One arrival per student-term; a term recorded both ways reads first-time.
+    arrivals <- student_term_entry_type(programs) %>%
+      arrange(entry_type) %>%
+      distinct(student_id, term, .keep_all = TRUE)
+    entrants <- entrants %>%
+      left_join(arrivals, by = c("student_id", "entry" = "term"), relationship = "many-to-one") %>%
+      mutate(arrival = dplyr::coalesce(entry_type, "already_here")) %>%
+      select(-entry_type)
+    by_arrival <- tibble::tibble(arrival = setdiff(names(MAJOR_TENURE_ARRIVALS), "all")) %>%
+      left_join(entrants %>% count(arrival, name = "n"), by = "arrival", relationship = "one-to-one") %>%
+      mutate(n = dplyr::coalesce(n, 0L))
+    if (arrival != "all") entrants <- entrants[entrants$arrival == arrival, ]
+  }
+
   here <- student_terms %>%
     filter(enrolled %in% TRUE, student_id %in% entrants$student_id) %>%
     distinct(student_id, target_term = as.integer(term), major = primary_major_code)
@@ -81,8 +125,9 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list()) {
   }
   first_degree <- degrees %>%
     filter(student_id %in% entrants$student_id) %>%
-    group_by(student_id) %>%
-    summarize(degree_term = min(as.integer(term)), .groups = "drop")
+    transmute(student_id, degree_term = as.integer(term)) %>%
+    arrange(degree_term) %>%
+    distinct(student_id, .keep_all = TRUE)
 
   placed <- bind_rows(lapply(0:n_terms, function(k) {
     entrants %>%
@@ -115,7 +160,8 @@ get_major_tenure <- function(population, student_terms, degrees, opt = list()) {
        meta = list(n_entered = nrow(entrants), n_unclear = n_unclear, n_no_entry = n_no_entry,
                    first_entry = if (nrow(entrants)) min(entrants$entry) else NA_integer_,
                    last_entry = if (nrow(entrants)) max(entrants$entry) else NA_integer_,
-                   settled_edge = settled, degree_edge = degree_edge, n_terms = n_terms, program_codes = codes))
+                   settled_edge = settled, degree_edge = degree_edge, n_terms = n_terms, program_codes = codes,
+                   arrival = arrival, by_arrival = by_arrival))
 }
 
 # A count as page text: whole, with separators.
@@ -154,7 +200,10 @@ major_tenure_lead <- function(tenure, major_name, min_n = 10L) {
            " were still in it, ", sprintf("%.1f%%", row$other_major_pct), " were enrolled in another major and ",
            sprintf("%.1f%%", row$not_enrolled_pct), " were not enrolled (of ", tenure_count(row$n_observed), " who can be followed that far).")
   }
-  paste(c(paste0(tenure_count(m$n_entered), " students entered ", major_name, " between ", fmt_term(m$first_entry), " and ",
+  how <- c(all = "", first_time = " in their first term at UNM, as first-time students,",
+           transfer = " in their first term at UNM, as transfer students,",
+           already_here = " when they were already at UNM")[[m$arrival %||% "all"]]
+  paste(c(paste0(tenure_count(m$n_entered), " students entered ", major_name, how, " between ", fmt_term(m$first_entry), " and ",
                  fmt_term(m$last_entry), "."), one(2L), one(4L)), collapse = " ")
 }
 
@@ -175,7 +224,7 @@ plot_major_tenure <- function(tenure, min_n = 10L) {
     share <- s[[sub("^n_", "", paste0(state, "_pct"))]]
     fig <- plotly::add_trace(fig, x = s$when, y = share, type = "bar", name = MAJOR_TENURE_STATES[[state]],
                              marker = list(color = unname(colours[[state]])),
-                             text = if_else(share >= 4, sprintf("%.0f%%", share), ""), textposition = "inside", textangle = 0,
+                             text = if_else(share >= 7, sprintf("%.0f%%", share), ""), textposition = "inside", textangle = 0,
                              hovertext = paste0(s$when, "<br>", MAJOR_TENURE_STATES[[state]], ": ", tenure_count(s[[state]]), " of ",
                                                 tenure_count(s$n_observed), " (", sprintf("%.1f%%", share), ")"), hoverinfo = "text")
   }

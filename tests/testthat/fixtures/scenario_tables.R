@@ -2185,6 +2185,9 @@ xc01 <- local({
 #   M-D  enters Fall 2021: UNDC, Spring 2022 UNDC. Two steps can be read.
 #   M-E  UNDC in Spring 2020, when the data begin: no entry to count from.
 #   M-F  Fall 2020 UNDC, Spring 2021 enrolled with no major on record, then away.
+# How the record says each arrived, in the term they entered (`programs`):
+#   M-A and M-D first-time, M-B a new transfer; M-C continuing and M-F
+#   readmitted, so already at UNM.
 mt01 <- local({
   row <- function(id, term, major) tibble::tibble(student_id = id, term = term, enrolled = TRUE, primary_major_code = major)
   list(
@@ -2198,6 +2201,11 @@ mt01 <- local({
       row("M-E", 202010L, "UNDC"), row("M-E", 202080L, "UNDC"),
       row("M-F", 202080L, "UNDC"), row("M-F", 202110L, NA_character_)),
     degrees = tibble::tibble(student_id = "M-C", term = 202180L),
+    programs = tibble::tibble(
+      student_id = c("M-A", "M-B", "M-C", "M-D", "M-F", "M-A"),
+      term = c(202080L, 202080L, 202080L, 202180L, 202080L, 202110L),
+      student_population = c("First Time/Beginning Freshman", "New Transfer from NM Inst", "Continuing",
+                             "First Time/Beginning Freshman", "Readmit", "Continuing")),
     opt = list(program_codes = "UNDC", n_terms = 3L,
                data_edges = list(last_enrolled_complete = 202210L, last_degree = 202210L)))
 })

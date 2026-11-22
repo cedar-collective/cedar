@@ -1,3 +1,10 @@
+# MT01: entrants by how they arrived
+
+    Code
+      cat(major_tenure_lead(first, "Undecided", min_n = 1L))
+    Output
+      2 students entered Undecided in their first term at UNM, as first-time students, between Fall 2020 and Fall 2021. By their third semester, 0.0% were still in it, 100.0% were enrolled in another major and 0.0% were not enrolled (of 1 who can be followed that far).
+
 # MT01: the page's view of it
 
     Code
