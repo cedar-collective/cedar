@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M65 | Improvement | See [Improvements](#improvements) |
+| M1–M66 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4396,6 +4396,19 @@ one cold session tried, so there the race is possible, not certain.
 passed cold. *Done when:* `lib.mjs` has one helper that loads a Course Dynamics
 course and waits for the picker to hold it, and every suite that needs a course
 uses it.
+
+**M66 — Nothing stops two fetches from running at once.** `update-data.sh`
+starts its mrgather container (`cedar-mrgather-fetch-<pid>`) without looking
+for another, and every fetch on a machine signs in through the same saved
+browser profile. Chrome keeps a lock in a profile for exactly this, and
+mrgather removes that lock when it starts, because a fetch stopped part-way
+leaves one behind. So a refresh started by hand while the scheduled one is
+fetching (or twice by hand) puts two browsers in one profile and writes two
+sets of exports to one folder. Found 2026-11-23 reading mrgather's code; not
+seen to happen. *Done when:* the fetch step fails with "another fetch is
+running" when a `cedar-mrgather-fetch-*` container is already up, checked
+through `docker ps` so that a fetch that died leaves nothing to clear, and
+`test-data-update-pipeline.R` covers it.
 
 ### Architecture rules (`AGENTS.md`)
 
