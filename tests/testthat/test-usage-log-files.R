@@ -68,4 +68,9 @@ test_that("preview limits do not truncate the usage summary", {
   expect_equal(preview$session_id[[1]], "600")
   expect_equal(get_usage_stats(logs = logs)$total_sessions, 600L)
   expect_equal(nrow(logs), 600L)
+  # The Admin page reads the log once for its dashboard and its event log: the
+  # dashboard counts the rows it is handed, not a second read by date (these
+  # dates hold no log).
+  overview <- get_usage_overview("1900-01-01", "1900-01-01", logs = logs)
+  expect_equal(c(overview$total_events, overview$sessions_opened), c(600L, 600L))
 })

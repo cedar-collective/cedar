@@ -965,13 +965,13 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
       });
     }
 
-    await withStep(page, [], 'Usage Overview renders', async () => {
+    await withStep(page, [], 'Usage renders', async () => {
       await openReport(page, 'Data & Usage', 'data-usage');
-      await clickSubTabIn(page, 'data_usage_tabs', 'Usage Overview');
+      await clickSubTabIn(page, 'data_usage_tabs', 'Usage');
       await waitForIdle(page, { timeout: 120000 }).catch(() => {});
       await click(page, 'refresh_usage_overview');
       await waitForIdle(page, { timeout: 120000 }).catch(() => {});
-      await waitForOutput(page, 'Usage Overview dashboard', [
+      await waitForOutput(page, 'Usage dashboard', [
         {
           type: 'text',
           id: 'usage_overview_ui',
