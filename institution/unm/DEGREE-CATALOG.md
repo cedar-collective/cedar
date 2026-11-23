@@ -47,7 +47,8 @@ catalog publishes this semester arrangement. Its `row_group` values also author
 visual course families: related courses align horizontally after scheduling.
 These families do not create requirements or prerequisite links. `degree_roadmap_starts.csv` stores
 common placement identifiers, English routes, and explicitly completed credits
-kept separate from placement. `degree_roadmap_math_routes.csv` selects the math
+kept separate from placement. Its `opens` column marks the one start of each
+track the page's pickers open on: College Algebra (MATH 1220) and Composition I. `degree_roadmap_math_routes.csv` selects the math
 sequence per program and placement. CS/Biology/Physics use calculus; Business
 uses required MATH 1350. History/Philosophy/Anthropology use MATH 1350 as an
 illustrative Gen Ed choice, explicitly marked as such. Their intermediate entry

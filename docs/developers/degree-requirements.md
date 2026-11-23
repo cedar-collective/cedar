@@ -24,7 +24,7 @@ by `R/lists/degree_catalog.R` at startup:
 | `degree_catalog_evidence.csv` | Exact excerpt, catalog year, program/course page, section path, retrieval date, transcription/review/conflict status and explanatory note |
 | `degree_roadmap_basis.csv` | One program/node membership: degree, prerequisite preparation or illustrative general route, with a citation and explanation |
 | `degree_roadmap_plans.csv` | Degree credit target, usual/maximum loads, baseline semesters, first upper-level semester, usual allowance-slot credits, Gen Ed source URL, target citation and workload assumption |
-| `degree_roadmap_starts.csv` | Common math/English placement identifiers, English course routes and explicitly completed degree credits |
+| `degree_roadmap_starts.csv` | Common math/English placement identifiers, English course routes, explicitly completed degree credits, and the one start of each track the page's pickers open on (`opens`) |
 | `degree_roadmap_math_routes.csv` | One route per program/math placement identifier, with program-specific labels and ordered shared course IDs; no calculus fallback |
 | `degree_roadmap_conditions.csv` | Course-count pools and permission conditions, target, minimum, eligible single-course slots, visible label and course-page evidence; separate from named-course edges |
 | `pathway_subject_groups.csv` | One descriptive group per subject prefix, with consistent labels |

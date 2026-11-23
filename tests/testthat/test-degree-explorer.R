@@ -906,6 +906,24 @@ test_that("allowance cards fill every semester between math/writing and the prog
 
 # ── Programs: routes, conditions, choices and citations ──────────────────────
 
+test_that("each picker opens on the start the institution's file marks, one per track", {
+  # degree_roadmap_starts.csv marks College Algebra and Composition I.
+  expect_equal(degree_start_default(test_degree_roadmaps, "math"), "algebra")
+  expect_equal(degree_start_default(test_degree_roadmaps, "english"), "composition")
+  # Every degree has a route from the math start the picker opens on.
+  for (id in test_degree_catalog$catalogs$catalog_id) {
+    expect_true(degree_start_default(test_degree_roadmaps, "math") %in%
+                  degree_math_start_choices(test_degree_roadmaps, id), info = id)
+  }
+  # A track with none marked, with two, or with a value that is neither is refused.
+  bad <- test_degree_roadmaps; bad$starts$opens[bad$starts$track == "math"] <- "FALSE"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "exactly one starting point with opens TRUE: math")
+  bad <- test_degree_roadmaps; bad$starts$opens[bad$starts$track == "english"] <- "TRUE"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "exactly one starting point with opens TRUE: english")
+  bad <- test_degree_roadmaps; bad$starts$opens[1] <- "yes"
+  expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "opens must be TRUE or FALSE")
+})
+
 test_that("a statistics major takes its own math route and never inherits calculus", {
   h <- roadmap_plan(HISTORY, "intermediate")
   expect_equal(h$nodes$code[h$nodes$track == "math"], c("MATH 1215", "MATH 1350"))

@@ -128,6 +128,24 @@ degree_math_start_choices <- function(roadmaps, catalog_id) {
   stats::setNames(routes$start_id, routes$label)
 }
 
+#' The starting point a track's picker opens on
+#'
+#' The institution names it: the one row of `degree_roadmap_starts.csv` in the
+#' track whose `opens` is TRUE (the validator holds it to one). Every degree
+#' has a math route for every math start, so the same start opens each.
+#'
+#' @param roadmaps The roadmap tables ([read_degree_roadmaps()]).
+#' @param track "math" or "english".
+#' @return The `start_id`.
+degree_start_default <- function(roadmaps, track) {
+  starts <- roadmaps$starts
+  opens <- starts$start_id[starts$track == track & starts$opens == "TRUE"]
+  if (length(opens) != 1L) {
+    stop("[degree-requirements.R] No single opening starting point for track: ", track, call. = FALSE)
+  }
+  opens
+}
+
 #' One row per rule; nested alternatives retain their depth and timing language
 degree_rule_outline <- function(catalog, catalog_ids) {
   if (!length(catalog_ids) || any(!catalog_ids %in% catalog$catalogs$catalog_id)) {
