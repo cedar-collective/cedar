@@ -22,7 +22,7 @@
 #   plot_exit_bands(), plot_exit_series(), plot_exit_required()
 #   format_graduation_dashboard()  the text preview
 
-GRADUATION_LINES <- c(90, 115, 120)
+GRADUATION_LINES <- c(90, 105, 120)
 
 # The moments a fall class is read at: regular terms since entering.
 GRADUATION_PACE_STEPS <- c("second" = 2L, "third" = 4L, "fourth" = 6L, "fifth" = 8L)

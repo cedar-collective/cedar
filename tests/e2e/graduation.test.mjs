@@ -46,6 +46,8 @@ try {
   ok(level === 'UG', `the page opens on undergraduates (${level})`);
   const lineAt = await page.$eval(`input[name="${NS}line"]:checked`, (el) => el.value);
   ok(lineAt === '90', `far along opens at 90 credits (${lineAt})`);
+  const lines = await page.$$eval(`input[name="${NS}line"]`, (els) => els.map((el) => el.value));
+  ok(lines.join() === '90,105,120', `far along can mean 90, 105 or 120 credits (${lines})`);
 
   const lead = await page.$eval(`#${NS}headline`, (el) => el.innerText);
   ok(/left without one/.test(lead) && /had 90 credits or more/.test(lead), `the lead counts who left and who was far along (${lead.slice(0, 70)})`);
@@ -53,6 +55,7 @@ try {
   const bands = await bars('bands_plot');
   ok(bands && bands.x.length >= 6 && bands.x[0] === 'Under 30' && bands.x.includes('120 or more'),
      `one bar a credit band (${bands?.x})`);
+  ok(bands?.x.includes('90 to 104') && bands?.x.includes('105 to 119'), 'the bands break at each line');
   ok(bands?.text.length === bands?.x.length, 'each bar is labelled with its count');
   const series = await bars('series_plot');
   ok(series && series.x.length >= 2 && /90 credits or more/.test(series.title), `a bar for each last term (${series?.x.length}; ${series?.title})`);

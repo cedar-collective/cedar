@@ -98,8 +98,8 @@
         Under 30             1   14.3%      --       0.0%       0.0%     0.0%
         30 to 59             0    0.0%      --         --         --       --
         60 to 89             1   14.3%    0.0%       0.0%       0.0%     0.0%
-        90 to 114            1   14.3%  100.0%       0.0%       0.0%     0.0%
-        115 to 119           1   14.3%  100.0%         --       0.0%       --
+        90 to 104            1   14.3%  100.0%       0.0%       0.0%     0.0%
+        105 to 119           1   14.3%  100.0%         --       0.0%       --
         120 or more          2   28.6%   50.0%      50.0%      50.0%    50.0%
         Not recorded         1   14.3%      --         --         --       --
         1 total includes the last term's own credits, added because the record was pulled before the next term began.

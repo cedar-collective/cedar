@@ -15,7 +15,7 @@ nav_order: 17
 Graduation is the institution-wide view of the students who stopped enrolling
 and hold no degree. It lives under **Bird's Eye > Graduation** and builds when
 you open it. Choose a student level, the students' home campuses, and how many
-credits count as far along: 90, 115 or 120.
+credits count as far along: 90, 105 or 120.
 
 ## Who is counted
 

@@ -2114,7 +2114,7 @@ ec01 <- local({
 # Enrollment is settled and degrees are posted through Fall 2022. ABQ unless
 # said. Each student's last term, and what the declarations table stamped on it:
 #   X-A  Spring 2021; 100 earned, 110 attempted, GPA 2.5, Pell; two
-#        declarations that term, stamped alike. 90 to 114.
+#        declarations that term, stamped alike. 90 to 104.
 #   X-B  Spring 2021; 108 earned, 150 attempted, GPA 1.8, pulled 2021-03-01,
 #        before Fall 2021 began: the term's own 12 completed and 12 attempted
 #        credits are added. 120 earned, 162 attempted: below the floor, past
@@ -2129,7 +2129,7 @@ ec01 <- local({
 #   X-I  Spring 2021, home campus EA; 65 earned, GPA 2.0 (at the floor, not
 #        under it). 60 to 89.
 #   X-J  Spring 2020, away, back in Spring 2021 and gone; 118 earned, no GPA.
-#        115 to 119.
+#        105 to 119.
 #   X-K  Spring 2021; 125 earned; a degree dated Spring 2023, past the degree
 #        edge, so not yet a degree. 120 or more.
 # Eight judged last terms: one with a degree, seven left. X-B and X-K are
