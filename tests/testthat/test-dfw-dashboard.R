@@ -161,6 +161,110 @@ test_that("section spread tests course-terms with three sections and finds the u
   expect_false(any(grepl("instructor", c(names(s$sections), names(s$course_terms), names(s$courses)))))
 })
 
+test_that("the spread between sections is read in points beyond chance, over every term in scope", {
+  s <- get_dfw_section_spread(df_attempts, df01_fall_opt)
+  # Every fall, not the three-fall window the uneven count reads.
+  expect_equal(nrow(s$spread_terms), 8L)
+  expect_equal(nrow(s$course_terms), 6L)
+  math_terms <- s$spread_terms[s$spread_terms$subject_course == "MATH 1220", ]
+  expect_equal(math_terms$term, c(201980L, 202080L, 202180L, 202280L))
+  # Fall 2021, 0, 4 and 8 of 10: chi-square 40 / 3 on 2 degrees of freedom,
+  # at a rate of 40%, over a weight of 30 - 300 / 30.
+  expect_equal(math_terms$spread_weight, rep(20, 4))
+  expect_equal(math_terms$spread_var[3], (40 / 3 - 2) * 40 * 60 / 20)
+  expect_equal(math_terms$spread_se[3], sqrt(2 * (2 + 2 * (40 / 3 - 2))) * 40 * 60 / 20)
+  expect_equal(math_terms$spread_pts[3], sqrt(1360))
+  # Fall 2019, 2 of 10 in each section: closer than chance would put them.
+  expect_equal(math_terms$spread_var[1], -2 * 20 * 80 / 20)
+  expect_equal(math_terms$spread_pts[1], 0)
+
+  courses <- s$spread_courses
+  expect_equal(courses$subject_course, c("MATH 1220", "ENGL 1110"))
+  math <- courses[1, ]
+  # The average is the four falls pooled, the negative ones as they are.
+  expect_equal(math$spread_var, mean(math_terms$spread_var))
+  expect_equal(math$spread_pts, sqrt(mean(math_terms$spread_var)))
+  expect_equal(c(math$terms_read, math$sections_per_term, math$lo_pct, math$hi_pct), c(4, 3, 17.5, 57.5))
+  expect_equal(c(math$n_attempts, math$n_dfw), c(120L, 43L))
+  expect_equal(courses$direction, c("rising", "steady"))
+  expect_equal(c(math$first_spread_pts, courses$spread_pts[2]), c(0, 0))
+  expect_gt(math$last_spread_pts, math$spread_pts)
+
+  overall <- s$overall
+  expect_equal(overall$terms$n_courses, rep(2L, 4))
+  # Fall 2021 pools the two courses by weight. ENGL 1110's four sections, 2,
+  # 2, 1 and 1 of 10: chi-square 40 / 51 on 3 degrees of freedom at 15%, over
+  # a weight of 40 - 400 / 40.
+  engl_2021 <- (40 / 51 - 3) * 15 * 85 / 30
+  expect_equal(overall$terms$spread_var[3], (20 * 1360 + 30 * engl_2021) / 50)
+  expect_equal(overall$trend$direction, "rising")
+  expect_equal(c(s$meta$min_trend_terms, s$meta$n_without_spread), c(4L, 0L))
+})
+
+test_that("sections of different sizes are weighed by what their sizes leave to tell them apart", {
+  # The change: MATH 1220 ABQ's first Fall 2021 section is twice the size, its
+  # ten passing students copied under new ids: 20, 10 and 10 attempts with 0,
+  # 4 and 8 DFW, a rate of 30%.
+  first_section <- dplyr::filter(df_attempts, crn == "DFMATHABQ2180a")
+  unequal <- dplyr::rows_append(df_attempts, dplyr::mutate(first_section, student_id = paste0(student_id, "_2")))
+  s <- get_dfw_section_spread(unequal, df01_fall_opt)
+  fall_2021 <- s$spread_terms[s$spread_terms$subject_course == "MATH 1220" & s$spread_terms$term == 202180L, ]
+  chisq <- 6^2 / (20 * 0.21) + 1^2 / (10 * 0.21) + 5^2 / (10 * 0.21)
+  expect_equal(fall_2021$n_attempts, 40L)
+  expect_equal(fall_2021$spread_weight, 40 - (20^2 + 10^2 + 10^2) / 40)
+  expect_equal(fall_2021$spread_var, (chisq - 2) * 30 * 70 / 25)
+})
+
+test_that("one course's sections can draw together on one campus and apart on another", {
+  # The change: MATH 1220 ABQ's falls copied onto campus GA in reverse order
+  # (2019 for 2022, 2020 for 2021), so GA's sections start far apart and end
+  # together while ABQ's do the opposite.
+  falls <- dplyr::filter(df_attempts, subject_course == "MATH 1220", campus == "ABQ",
+                         term %in% c(201980L, 202080L, 202180L, 202280L))
+  two_campuses <- dplyr::rows_append(
+    df_attempts, dplyr::mutate(falls, campus = "GA", term = 201980L + 202280L - term))
+  p <- build_dfw_dashboard(two_campuses, test_dims, df01_fall_opt)
+  math <- p$sections$spread_courses[p$sections$spread_courses$subject_course == "MATH 1220", ]
+  expect_equal(stats::setNames(math$direction, math$campus)[c("ABQ", "GA")], c(ABQ = "rising", GA = "falling"))
+  expect_equal(math$spread_pts[math$campus == "GA"], math$spread_pts[math$campus == "ABQ"])
+  expect_equal(math$terms_read, c(4L, 4L))
+  # Three courses a fall, and the two campuses cancel: no direction overall.
+  expect_equal(p$sections$overall$terms$n_courses, rep(3L, 4))
+  expect_equal(p$sections$overall$trend$direction, "steady")
+  testthat::local_edition(3)
+  expect_snapshot(cat(.dfw_dash_spread(p$sections, 15L), sep = "\n"))
+})
+
+test_that("a short history has an average and no direction, and an unreadable term is left out", {
+  three_falls <- get_dfw_section_spread(df_attempts, modifyList(df01_fall_opt, list(from_term = 202080L)))
+  expect_equal(nrow(three_falls$spread_terms), 6L)
+  expect_equal(three_falls$spread_courses$direction, rep("too_few_terms", 2))
+  expect_true(all(is.na(three_falls$spread_courses$last_spread_pts)))
+  expect_equal(three_falls$spread_courses$terms_read, c(3L, 3L))
+  expect_gt(three_falls$spread_courses$spread_pts[1], 0)
+  expect_equal(three_falls$overall$trend$direction, "too_few_terms")
+  testthat::local_edition(3)
+  expect_snapshot(cat(.dfw_dash_spread(three_falls, 15L), sep = "\n"))
+
+  # A campus whose courses have one section a term: nothing to read, no line.
+  ea <- get_dfw_section_spread(df_attempts, modifyList(df01_fall_opt, list(campus = "EA")))
+  expect_equal(c(nrow(ea$spread_terms), nrow(ea$spread_courses), nrow(ea$overall$terms), nrow(ea$overall$trend)),
+               rep(0L, 4))
+  expect_snapshot(cat(.dfw_dash_spread(ea, 15L), sep = "\n"))
+
+  # The change: ENGL 1110's three Fall 2022 DFW attempts removed, so no
+  # student in its four sections (9, 9, 10 and 9 attempts) got a DFW; read
+  # with sections of 9 or more.
+  no_dfw <- dplyr::filter(df_attempts, !(subject_course == "ENGL 1110" & term == 202280L & outcome == "dfw"))
+  s <- get_dfw_section_spread(no_dfw, modifyList(df01_fall_opt, list(min_section_n = 9L)))
+  fall_2022 <- s$course_terms[s$course_terms$subject_course == "ENGL 1110" & s$course_terms$term == 202280L, ]
+  expect_equal(c(fall_2022$n_sections, fall_2022$n_dfw), c(4L, 0L))
+  expect_true(is.na(fall_2022$spread_var) && is.na(fall_2022$spread_se) && is.na(fall_2022$spread_pts))
+  expect_equal(s$meta$n_without_spread, 1L)
+  expect_equal(s$spread_courses$terms_read[s$spread_courses$subject_course == "ENGL 1110"], 3L)
+  expect_snapshot(cat(.dfw_dash_spread(s, 15L), sep = "\n"))
+})
+
 test_that("the dashboard names colleges and agrees on its window", {
   p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)
   expect_s3_class(p, "dfw_dashboard")

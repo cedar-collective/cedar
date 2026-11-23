@@ -73,6 +73,11 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
 .dfw_dash_direction <- c(rising = "rising (worse)", falling = "falling (better)", steady = "steady",
                          too_few_terms = "too few terms for a trend")
 
+# What the direction of a course's spread between sections is called
+# (get_dfw_section_spread()'s `direction`).
+DFW_SPREAD_DIRECTIONS <- c(rising = "spreading", falling = "consolidating", steady = "no clear change",
+                           too_few_terms = "too few terms for a direction")
+
 # A group's trend line in one sentence: its first and last rate, the slope a
 # year, and what chance and the terms' scatter give. Shared with the page.
 dfw_trend_sentence <- function(t, min_terms) {
@@ -164,7 +169,49 @@ dfw_trend_sentence <- function(t, min_terms) {
            " the sections' rates differed more than chance allows."),
     paste0("  Uneven in two or more terms: ", sum(s$courses$terms_uneven >= 2L), " course",
            if (sum(s$courses$terms_uneven >= 2L) == 1L) "" else "s", if (length(detail)) ":" else "."),
-    detail)
+    detail,
+    .dfw_dash_spread(s, n_list))
+}
+
+# How far apart sections are over every term in scope: every course pooled,
+# term by term, then each course's average and its direction, widest first.
+# A course read in too few terms for a direction is one or two terms, not an
+# average: counted, not listed.
+.dfw_dash_spread <- function(s, n_list) {
+  pts <- function(x) sprintf("%.1f", x)
+  terms <- s$overall$terms
+  if (nrow(terms) == 0L) {
+    return("  How far apart: no course-term in scope has a spread between sections to read.")
+  }
+  between <- function(t) {
+    if (t$direction == "too_few_terms") return(DFW_SPREAD_DIRECTIONS[["too_few_terms"]])
+    paste0(DFW_SPREAD_DIRECTIONS[[t$direction]], ", the fitted line from ", pts(t$first_spread_pts), " to ",
+           pts(t$last_spread_pts))
+  }
+  listed <- s$spread_courses[s$spread_courses$direction != "too_few_terms", , drop = FALSE]
+  n_short <- nrow(s$spread_courses) - nrow(listed)
+  courses <- utils::head(listed, n_list)
+  c(paste0("  How far apart, in points beyond what chance gives sections of their sizes (",
+           fmt_term(min(terms$term)), " to ", fmt_term(max(terms$term)), "; a direction is read from ",
+           s$meta$min_trend_terms, " or more terms):"),
+    paste0("    Every course, by term: ", paste(pts(terms$spread_pts), collapse = ", "), " (",
+           paste(terms$n_courses, collapse = ", "), " courses): ", between(s$overall$trend), "."),
+    vapply(seq_len(nrow(courses)), function(i) {
+      r <- courses[i, ]
+      paste0("    ", sprintf("%-18s", .dfw_dash_course_label(r)), " ", pts(r$spread_pts), " over ", r$terms_read,
+             " term", if (r$terms_read == 1L) "" else "s", " (", pts(r$sections_per_term),
+             " sections a term; lowest ", .dfw_dash_pct(r$lo_pct), ", highest ", .dfw_dash_pct(r$hi_pct),
+             " on average): ", between(r), ".")
+    }, character(1)),
+    if (n_short > 0L) {
+      paste0("    Not listed: ", fmt_count(n_short), " course", if (n_short == 1L) "" else "s",
+             " read in fewer than ", s$meta$min_trend_terms, " terms.")
+    },
+    if (s$meta$n_without_spread > 0L) {
+      paste0("    Left out: ", fmt_count(s$meta$n_without_spread), " course-term",
+             if (s$meta$n_without_spread == 1L) "" else "s",
+             " in which no student, or every student, got a DFW grade.")
+    })
 }
 
 .dfw_dash_groups <- function(series, label_col, title) {
