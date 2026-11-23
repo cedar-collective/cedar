@@ -12,7 +12,7 @@
 # Examples:
 #   restart-cedar.sh                       # Restart only (default)
 #   restart-cedar.sh --update -s 202610 desr cl   # Fetch desr+cl then restart
-#   restart-cedar.sh --update -s 202610 -e 202680 # All reports, two terms, restart
+#   restart-cedar.sh --update -s 202610 -e 202680 # Default reports, two terms, restart
 
 PIPELINE_SUCCESS=true
 UPDATE_PARTIAL=false
@@ -66,7 +66,8 @@ Reload the CEDAR Shiny app. Pass --update to fetch fresh data first.
 Data update options (require --update):
   -s START_TERM    Starting term code (e.g. 202610 for Spring 2026)
   -e END_TERM      Ending term code (defaults to START_TERM)
-  REPORTS          Reports to fetch: desr deg as cl (default: all)
+  REPORTS          Reports to fetch: $(report_codes)
+                   (default: $(report_daily_codes))
 
 Restart options:
   --update         Run update-data.sh before restarting
@@ -86,12 +87,21 @@ Env overrides (same as update-data.sh):
 Examples:
   $(basename "$0")                                      # Restart only (default)
   $(basename "$0") --update -s 202610 desr cl           # Fetch desr+cl then restart
-  $(basename "$0") --update -s 202610 -e 202680         # All reports, two terms, restart
+  $(basename "$0") --update -s 202610 -e 202680         # Default reports, two terms, restart
   $(basename "$0") --hard-restart                       # Full container restart
-  $(basename "$0") --update -s 202610 --hard-restart    # Fetch all, full restart
+  $(basename "$0") --update -s 202610 --hard-restart    # Fetch the default reports, full restart
 EOF
     exit 0
 }
+
+# ── The reports (the registry update-data.sh reads) ───────────────────────────
+REPORT_REGISTRY_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/report-registry.sh"
+if [[ ! -f "$REPORT_REGISTRY_FILE" ]]; then
+    log_error "Report registry not found: $REPORT_REGISTRY_FILE"
+    exit 1
+fi
+# shellcheck source=scripts/report-registry.sh
+source "$REPORT_REGISTRY_FILE"
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 RUN_UPDATE=false
@@ -122,10 +132,14 @@ while [[ $# -gt 0 ]]; do
         -s)             START_TERM="$2"; shift 2 ;;
         -e)             END_TERM="$2"; shift 2 ;;
         -h|--help)      usage ;;
-        desr|deg|as|cl) REPORTS+=("$1"); shift ;;
         *)
-            log_error "Unknown option: $1"
-            usage
+            # A report is any code in the registry update-data.sh reads.
+            if report_is_known "$1"; then
+                REPORTS+=("$1"); shift
+            else
+                log_error "Unknown option or report: $1 (reports: $(report_codes))"
+                usage
+            fi
             ;;
     esac
 done

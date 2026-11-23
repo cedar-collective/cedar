@@ -349,6 +349,72 @@ transform and the analyses that used it.
 
 ---
 
+## 6. `cedar_holds` (Student Holds)
+
+**Purpose:** every hold placed on a student's record (advisement, bursar,
+admissions, registrar and the rest), with the dates it ran from and to. Built
+by the transform's `holds` stage (`transform_holds()`) from the Student Holds
+report. **No page reads it yet, and the app does not load it**; read it with
+`qs2::qs_read()` from the data directory. It is there for the question of
+whether holds go with stopping out, with not returning, and with registering
+late.
+
+**Grain:** one row per hold, as the most recent pull that listed it saw it.
+The report has no hold id. Two rows of different pulls are the same hold when
+they share the student, the hold code, the start date, the explanation and
+the originating office; the end date is left out because ending a hold
+changes it. One pull can list the same hold twice with two end dates (2,393
+times in the Fall 2026 pull, mostly advisement holds), and both rows are kept.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `student_id` | string | Hashed as in every other table (`encrypt_if_needed()`); joins `cedar_student_terms` |
+| `hold_code`, `hold` | string | The hold type and its name (`AV` Advisement, `BP` Bursar, Past Due Amt, `OR` Orientation, …; 31 codes in Fall 2026) |
+| `hold_explanation` | string | The reason typed or stamped on the hold. About 80 stock phrases cover nine rows in ten ("Mandatory Freshman Advisement", "Payment Due"); the rest is free text typed by staff and can name people. Group on it; never show it on a page. `NA` when blank |
+| `origin_office_code`, `origin_office` | string | The office that placed it. `NA` when blank |
+| `created_by` | string | The username that placed it, hashed (md5). Five accounts place 94% of holds: they are batch jobs |
+| `hold_from_date`, `hold_to_date` | date | When the hold ran from and to |
+| `open_ended` | logical | The end date is Banner's 2099-12-31: nobody has ended the hold |
+| `pull_term` | integer | The term whose pull this row came from |
+| `as_of_date` | date | The day that pull was made |
+| `in_latest_pull` | logical | FALSE for a hold the student's own most recent pull no longer lists |
+
+Its `pulls` attribute (`attr(cedar_holds, "pulls")`) lists the terms pulled:
+`pull_term`, `as_of_date`, and the students and rows each pull held.
+
+### Reading it
+
+- **The report's title says "Active". It is not.** A pull lists every hold a
+  student has had, ended or not: of 251,795 rows in the Fall 2026 pull,
+  235,955 had ended and 15,577 had no end date. A hold in force on a day is
+  `hold_from_date <= day & hold_to_date >= day`.
+- **A term picks students, not holds.** Pulling a term returns the students
+  registered in it, each with their whole hold history, so the raw file
+  (`student_holds`) repeats a hold once for every pulled term the student was
+  registered in. `pull_term` says which pull a row came from; it does not say
+  the hold belongs to that term.
+- **A hold's dates are known only up to its `as_of_date`.** A hold still open
+  then may have ended since. For a student still being pulled the next pull
+  says so; for a student who left, nothing does. Before reading "the hold was
+  never lifted" into an open hold on a student who stopped out, compare
+  `as_of_date` with the date in question.
+- **No row means no hold only for a pulled student.** 94% of Fall 2026's
+  enrolled students appear in its pull; the rest had no hold in the window.
+  A student none of whose terms is in `pulls` was never asked about.
+- **The window is ten years.** The report keeps holds that began on or after
+  a date the form requires, and the form allows ten years back from the day
+  of the pull. A hold that began earlier is not listed.
+- **`in_latest_pull = FALSE`** means the hold was listed for the student once
+  and is not now: removed from Banner, changed in a field that identifies it,
+  or begun before the latest pull's window. Filter to `TRUE` for the
+  student's record as last seen.
+- **Which holds stop a student registering is not in the report.** Banner
+  records it per hold code; CEDAR has no file for it yet (ROADMAP).
+- The student's major, college and population on the report are not carried:
+  `cedar_student_terms` describes the student.
+
+---
+
 ## Relationships Between Tables
 
 ```

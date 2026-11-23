@@ -249,6 +249,34 @@ HR data returns, build a faculty table fresh from the new report.
 
 ---
 
+## 5a. `cedar_holds` ← `student_holds`
+
+Supplementary: no page reads it yet. One row per hold, as the most recent pull
+listing it saw it ([data-model.md](data-model.md#6-cedar_holds-student-holds)
+has the grain and the reading rules).
+
+| CEDAR column | source column | notes |
+|---|---|---|
+| `student_id` | `ID` | md5 at parse, then `encrypt_if_needed()`, as every student ID |
+| `hold_code` | `Hold Code` | |
+| `hold` | `Hold` | the code's name |
+| `hold_explanation` | `Hold Explanation` | blank → `NA`; partly free text |
+| `origin_office_code` | `Hold Originating Office Code` | blank → `NA` |
+| `origin_office` | `Hold Originating Office` | blank → `NA` |
+| `created_by` | `Hold User Creator` | md5 at parse; the username is never stored |
+| `hold_from_date` | `Hold From Date` | `YYYY/MM/DD` text → date |
+| `hold_to_date` | `Hold To Date` | `YYYY/MM/DD` text → date; `2099/12/31` is no end date |
+| `pull_term` | `Academic Period Code` | the term pulled, which selects students |
+| `as_of_date` | (file name) | the download's date |
+| `open_ended`, `in_latest_pull` | derived | |
+
+Dropped at parse: `Student Full Name (LFMI)`, `Confidentiality Indicator`,
+`Email Address`, `Phone Number`. Kept in the parsed file and not carried to
+the table: the student's major, concentrations, college and population for
+the pulled term, and `Registered Indicator`.
+
+---
+
 ## 6a. The overlap: one MyReports concept, several CEDAR tables
 
 MyReports exposes the same student attribute on more than one extract, so the

@@ -1958,6 +1958,62 @@ scaffold_mapping_files <- list(
 # attach_unit() (R/branches/dims.R) resolves them at every start.
 scaffold_dims <- build_cedar_dims(scaffold_mapping_files)
 
+# HD01: the Student Holds report as parse-data.R stores it (student_holds),
+# three pulls of three terms. A pull lists the whole hold history of the
+# students registered in its term, so a hold repeats across pulls, each time
+# as it stood that day.
+#
+#   pull  term    pulled      students
+#   P1    202510  2026-11-20  HD-A, HD-B
+#   P2    202580  2026-11-22  HD-A, HD-C
+#   P3    202610  2026-11-22  HD-C          (the same day as P2)
+#
+#   H1  HD-A  AV  from 2025/01/10  open in P1, ended 2025/03/01 in P2
+#             -> one row, as P2 saw it
+#   H2  HD-A  BP  from 2025/02/01  in P1 only: gone from the student's later pull
+#             -> one row, as P1 saw it, in_latest_pull FALSE
+#   H3  HD-A  AV  from 2025/09/01  listed twice by P2, ended 2025/09/20 and open
+#             -> two rows
+#   H4  HD-B  BP  from 2025/04/15  in P1, the student's only pull; no
+#             explanation, no office -> one row, in_latest_pull TRUE
+#   H5  HD-C  RG  from 2025/08/20  open in P2, ended 2025/12/01 in P3
+#             -> one row, as P3 saw it: the later term breaks the same-day tie
+#
+# 8 stored rows -> 6 holds; 3 with no end date (H2, H3's second, H4); 1 not in
+# the student's latest pull (H2). Pulls: 202510 2 students 3 rows, 202580
+# 2 students 4 rows, 202610 1 student 1 row. Major Code stands for the
+# student's description on the report, which the table does not carry.
+student_holds_hd01 <- tibble::tribble(
+  ~ID,    ~`Academic Period Code`, ~`Hold Code`, ~Hold,                  ~`Hold Explanation`,             ~`Hold Originating Office Code`, ~`Hold Originating Office`, ~`Hold From Date`, ~`Hold To Date`, ~as_of_date,
+  "HD-A", 202510L,                 "AV",         "Advisement",           "Mandatory Freshman Advisement", "UC",                            "University College",       "2025/01/10",      "2099/12/31",    "2026-11-20",
+  "HD-A", 202510L,                 "BP",         "Bursar, Past Due Amt", "Payment Due",                   "BU",                            "Bursar",                   "2025/02/01",      "2099/12/31",    "2026-11-20",
+  "HD-B", 202510L,                 "BP",         "Bursar, Past Due Amt", "",                              "",                              "",                         "2025/04/15",      "2099/12/31",    "2026-11-20",
+  "HD-A", 202580L,                 "AV",         "Advisement",           "Mandatory Freshman Advisement", "UC",                            "University College",       "2025/01/10",      "2025/03/01",    "2026-11-22",
+  "HD-A", 202580L,                 "AV",         "Advisement",           "Pre-Major Advisement",          "UC",                            "University College",       "2025/09/01",      "2025/09/20",    "2026-11-22",
+  "HD-A", 202580L,                 "AV",         "Advisement",           "Pre-Major Advisement",          "UC",                            "University College",       "2025/09/01",      "2099/12/31",    "2026-11-22",
+  "HD-C", 202580L,                 "RG",         "Registrar",            "Missing Transcript",            "RO",                            "Registrar",                "2025/08/20",      "2099/12/31",    "2026-11-22",
+  "HD-C", 202610L,                 "RG",         "Registrar",            "Missing Transcript",            "RO",                            "Registrar",                "2025/08/20",      "2025/12/01",    "2026-11-22"
+) %>%
+  dplyr::mutate(`Hold User Creator` = "staff-1", `Major Code` = "HIST",
+                as_of_date = as.Date(as_of_date))
+
+# ── test-report-specs.R ─────────────────────────────────────────────────────────
+
+# A Student Holds export as xlsx2csv writes it: the report's title, a blank
+# line, the column names on line 3, two holds, a blank line and the line
+# saying when the report ran. The ID opens with a zero, which a numeric read
+# would lose.
+holds_export_lines <- c(
+  "Active Student Holds,,,",
+  ",,,",
+  "ID,Student Full Name (LFMI),Hold Code,Hold From Date",
+  "012345678,\"Lovelace, Ada\",AV,2025/01/10",
+  "012345678,\"Lovelace, Ada\",BP,2025/02/01",
+  ",,,",
+  "\"s_student_holds ran on Nov 22, 2026  at 10.43.26\",,,",
+  ",,,"
+)
+
 # ── test-dfw-dashboard.R ────────────────────────────────────────────────────────
 
 # DF01's attempt table, built to its edges (graded through Fall 2022).
