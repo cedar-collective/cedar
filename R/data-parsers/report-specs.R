@@ -152,6 +152,89 @@ find_report_header_line <- function(csv_file, first_col, max_lines = 50L) {
 }
 
 
+#' Convert a report's .xlsx to a CSV: the whole sheet, or an error
+#'
+#' A converter that fails or is killed part-way leaves the lines it had
+#' written, and `system2()` reports that as a warning and a `status`
+#' attribute, which stops nothing. Until 2026-11-23 parse-data.R asked only
+#' that a non-empty file existed, so a conversion cut short was read and
+#' stored as a smaller report (ISSUES.md I79). Here a converter that does not
+#' exit 0 is an error, and what it had written, which is the export unhashed,
+#' is removed.
+#'
+#' What the converter printed is left out of the error: it can quote a cell.
+#'
+#' @param xlsx_file The export as downloaded.
+#' @param csv_file Where the CSV is written.
+#' @param converter Path to xlsx2csv.
+#' @return `csv_file`, invisibly; an error when the converter did not exit 0,
+#'   or left no file or an empty one.
+convert_report_export <- function(xlsx_file, csv_file, converter) {
+  # The status is read from the attribute, so the warning that repeats it
+  # (and the whole command line) is not needed.
+  said <- suppressWarnings(system2(converter, args = shQuote(c(xlsx_file, csv_file)),
+                                   stdout = TRUE, stderr = TRUE))
+  status <- attr(said, "status")
+  if (!is.null(status) && status != 0L) {
+    unlink(csv_file)
+    stop("[report-specs.R] ", basename(converter), " ended with status ", status,
+         " while converting ", basename(xlsx_file), ". What it had written was removed ",
+         "and nothing was stored. Run it by hand on that file to see what it says.",
+         call. = FALSE)
+  }
+  if (!file.exists(csv_file)) {
+    stop("[report-specs.R] ", basename(converter), " wrote no file for ",
+         basename(xlsx_file), ".", call. = FALSE)
+  }
+  if (file.size(csv_file) == 0) {
+    unlink(csv_file)
+    stop("[report-specs.R] ", basename(converter), " wrote an empty file for ",
+         basename(xlsx_file), ".", call. = FALSE)
+  }
+  invisible(csv_file)
+}
+
+
+#' Read a converted export: every row as written, or an error
+#'
+#' `fread()` warns and carries on when a line does not fit the table. It
+#' returns only the rows above a line with too many cells ("Stopped early on
+#' line N"), drops a last line cut off inside a cell ("Discarded single-line
+#' footer"), and keeps a last line cut off after one as a row with its cells
+#' in the wrong columns ("Found and resolved improper quoting"). Each result
+#' looks like a report and is not the one MyReports sent (ISSUES.md I79). Any
+#' warning from the read is an error here: no export CEDAR parses raises one
+#' when it is whole.
+#'
+#' A warning quotes the line it is about, between `<<` and `>>`: a person's
+#' row as MyReports wrote it, name and unhashed ID included. The error repeats
+#' the warning only up to that mark, so the row never reaches a log.
+#'
+#' @param csv_file Path to the CSV xlsx2csv wrote.
+#' @param id_cols Columns read as text (`ID_col`): a numeric read loses an
+#'   ID's leading zeros.
+#' @param skip Lines above the header row.
+#' @return The export as a data.table; an error when the read raised a
+#'   warning.
+read_report_export <- function(csv_file, id_cols = NULL, skip = 0L) {
+  col_classes <- if (length(id_cols) > 0) list(character = id_cols) else NULL
+  warned <- character(0)
+  export <- withCallingHandlers(
+    data.table::fread(csv_file, colClasses = col_classes, skip = skip),
+    warning = function(w) {
+      warned <<- c(warned, trimws(sub("(?s)<<.*$", "", conditionMessage(w), perl = TRUE)))
+      invokeRestart("muffleWarning")
+    }
+  )
+  if (length(warned) > 0) {
+    stop("[report-specs.R] ", basename(csv_file), " was not read as written, so nothing ",
+         "was stored. The reader returned ", nrow(export), " row(s) and said: ",
+         paste(unique(warned), collapse = " | "), call. = FALSE)
+  }
+  export
+}
+
+
 #' Drop the lines of an export that are not rows of the report
 #'
 #' A MyReports export can end with blank lines and a line saying when it ran.

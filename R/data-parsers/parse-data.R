@@ -440,19 +440,10 @@ for (report in report_list) {
     }
     message("Using xlsx2csv at: ", xlsx2csv_cmd)
 
-    # Run the conversion with error checking
+    # Run the conversion: the whole sheet, or an error. A converter that stops
+    # part-way leaves a shorter file that reads as a smaller report (I79).
     tryCatch({
-      result <- system2(xlsx2csv_cmd, args = c(xlsx_file, csv_file),
-                       stdout = TRUE, stderr = TRUE)
-
-      # Check if CSV was created and has content
-      if (!file.exists(csv_file)) {
-        stop("xlsx2csv did not create output file: ", csv_file)
-      }
-
-      if (file.size(csv_file) == 0) {
-        stop("xlsx2csv created empty file: ", csv_file)
-      }
+      convert_report_export(xlsx_file, csv_file, xlsx2csv_cmd)
 
       message("Successfully converted xlsx to csv (",
               round(file.size(csv_file) / 1024 / 1024, 2), " MB)")
@@ -475,11 +466,6 @@ for (report in report_list) {
     # join. That is exactly how academic_studies and degrees ended up split at
     # 202480 — see ISSUES.md I1. Pinning the type here is what stops it recurring.
     id_cols <- report_spec$ID_col
-    col_classes <- if (!is.null(id_cols) && length(id_cols) > 0) {
-      list(character = id_cols)
-    } else {
-      NULL
-    }
     # An export with a title above its table has its column names further down.
     skip_lines <- 0L
     if (!is.null(report_spec$header_first_col)) {
@@ -490,8 +476,10 @@ for (report in report_list) {
     # The CSV is the export unhashed, names and all: it goes the moment it has
     # been read, whether or not the read worked. Until 2026-11-22 it was left
     # beside the hashed file after every parse (ISSUES.md I77).
+    # read_report_export() stops when the read does not reach the end of the
+    # file: fread() alone returns the rows above the line it stopped on.
     new_data <- tryCatch(
-      fread(file.path(csv_file), colClasses = col_classes, skip = skip_lines),
+      read_report_export(file.path(csv_file), id_cols = id_cols, skip = skip_lines),
       finally = unlink(csv_file)
     )
     if (file.exists(csv_file)) {
