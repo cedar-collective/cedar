@@ -528,6 +528,10 @@ init_logging()
 # ── Preload ─────────────────────────────────────────────────────────────────
 # The home campuses the student pages offer (First Year, Retention, Graduation).
 cedar_home_campuses <- sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus)))
+# What the DFW Rates page offers: the teaching campuses and the graded terms.
+# ui.R and the preload below both read them here.
+cedar_dfw_rates_offers <- list(campuses = cedar_campus_choices(data_objects[["cedar_attempts"]]),
+                               terms = unique(data_objects[["cedar_attempts"]]$term))
 # Graduation opens on the same view for everyone, and building it is the
 # longest wait in the app (about 25 seconds on production, during which R
 # answers no one). It is built here instead, in the background once the app is
@@ -535,12 +539,19 @@ cedar_home_campuses <- sort(unique(stats::na.omit(data_objects[["cedar_student_t
 # and its summer finishers. Any other scope is built when first asked for.
 # Nothing is saved to disk: the results live in this process, like the tables
 # they are counted from (cedar_preload_shared_results(), R/modules/ui-helpers.R).
-cedar_preload_shared_results(graduation_preload_jobs(
-  list(student_terms = data_objects[["cedar_student_terms"]], programs = data_objects[["cedar_programs"]],
-       degrees = data_objects[["cedar_degrees"]], terms = data_objects[["cedar_terms"]],
-       dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
-       attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS),
-  cedar_home_campuses))
+# DFW Rates opens on one view too (12 seconds on production), and is built
+# after Graduation: the jobs run one at a time.
+cedar_preload_shared_results(c(
+  graduation_preload_jobs(
+    list(student_terms = data_objects[["cedar_student_terms"]], programs = data_objects[["cedar_programs"]],
+         degrees = data_objects[["cedar_degrees"]], terms = data_objects[["cedar_terms"]],
+         dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
+         attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS),
+    cedar_home_campuses),
+  dfw_rates_preload_jobs(
+    list(attempts = data_objects[["cedar_attempts"]], dims = data_objects[["cedar_dims"]],
+         edges = data_objects[["cedar_edges"]]),
+    campuses = cedar_dfw_rates_offers$campuses, terms = cedar_dfw_rates_offers$terms)))
 
 message("[global.R] Loading ui.R and server.R...")
 source("ui.R")

@@ -1807,8 +1807,7 @@ nav_panel(
     nav_panel(
       title = "DFW Rates",
       icon = icon("percent"),
-      dfwRatesUI("dfw_rates", cedar_campus_choices(data_objects[["cedar_attempts"]]),
-                 terms = unique(data_objects[["cedar_attempts"]]$term))
+      dfwRatesUI("dfw_rates", cedar_dfw_rates_offers$campuses, terms = cedar_dfw_rates_offers$terms)
     ), # end DFW Rates nav_panel
 
     nav_panel(

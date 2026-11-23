@@ -9,12 +9,16 @@
 # The module holds no analysis: it collects the term type, campuses and term
 # range, calls
 # build_dfw_dashboard() (features/dfw-dashboard.R), and lays out what
-# features/dfw-dashboard-view.R computes from it. It builds only while the tab
-# is open, once per scope a session asks for.
+# features/dfw-dashboard-view.R computes from it. A scope's result is the
+# same for every session, so it is built once and shared, and the scope the
+# page opens on is built in the background when the app starts
+# (dfw_rates_preload_jobs(), called from global.R).
 #
 # Exported functions:
 #   dfwRatesUI(id, campuses, terms)
 #   dfwRatesServer(id, attempts, dims, edges, active)
+#   dfw_rates_payload_job()                          a shared result's key and build
+#   dfw_rates_preload_jobs(tables, campuses, terms)  the opening scope's, for the preload
 
 DFW_RATES_TERM_TYPES <- c(Fall = "fall", Spring = "spring", Summer = "summer")
 
@@ -29,19 +33,21 @@ dfwRatesUI <- function(id, campuses, terms) {
   ns <- NS(id)
   terms <- sort(unique(as.integer(terms)))
   term_choices <- stats::setNames(terms, vapply(terms, fmt_term, character(1)))
+  # The opening values are the scope the preload builds: one source for both.
+  opens_on <- dfw_rates_default_scope(campuses, terms)
   tagList(
     filter_bar(
       "DFW Rates",
       "How lower-division courses are doing on D, F and withdrawal grades, and where to act.",
       fluidRow(
         column(3, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
-                               selected = "fall", inline = TRUE)),
+                               selected = opens_on$term_type, inline = TRUE)),
         column(3, selectInput(ns("dr_campus"), "Campus", multiple = TRUE, choices = campuses,
-                              selected = intersect(CEDAR_CAMPUS_DEFAULT, campuses))),
+                              selected = opens_on$campus)),
         column(2, selectizeInput(ns("dr_from_term"), "From term", choices = term_choices,
-                                 selected = unname(utils::head(term_choices, 1L)))),
+                                 selected = opens_on$from_term)),
         column(2, selectizeInput(ns("dr_to_term"), "To term", choices = term_choices,
-                                 selected = unname(utils::tail(term_choices, 1L)))),
+                                 selected = opens_on$to_term)),
         column(2, filter_actions(cedar_link_menu(ns("dr_copy_url"))))
       )
     ),
@@ -313,44 +319,66 @@ dfwRatesUI <- function(id, campuses, terms) {
   )
 }
 
+# ── Shared results ───────────────────────────────────────────────────────────
+#
+# A scope's payload is the same for every session, so it is built once and
+# shared (cedar_shared_result()). A job is the result's key and its build. The
+# server's reactive and the startup preload make their jobs here, so the
+# result built ahead is the one the page asks for.
+#
+# tables   named list: attempts, dims, edges (as dfwRatesServer() takes them).
+
+DFW_RATES_TABLES <- c("attempts", "dims", "edges")
+
+# The payload for one term type, teaching campuses and term range.
+dfw_rates_payload_job <- function(tables, term_type, campus, from_term, to_term) {
+  missing <- setdiff(DFW_RATES_TABLES, names(tables)[!vapply(tables, is.null, logical(1))])
+  if (length(missing) > 0L) {
+    stop("[dfw-rates.R] The DFW Rates page needs: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  scope <- dfw_rates_page_scope(term_type, campus, from_term, to_term)
+  list(key = list("dfw_dashboard", scope$term_type, scope$campus, scope$from_term, scope$to_term),
+       build = function() build_dfw_dashboard(tables$attempts, tables$dims,
+                                              dfw_rates_page_opt(scope, tables$edges)))
+}
+
+# What the preload builds: the scope the page opens on.
+dfw_rates_preload_jobs <- function(tables, campuses, terms) {
+  opens_on <- dfw_rates_default_scope(campuses, terms)
+  list(dfw_rates_payload_job(tables, opens_on$term_type, opens_on$campus, opens_on$from_term, opens_on$to_term))
+}
+
 # ── Server ───────────────────────────────────────────────────────────────────
 
 # attempts, dims, edges  cedar_attempts, cedar_dims and the data edges.
 # active                 reactive: TRUE while DFW Rates is the open tab.
 dfwRatesServer <- function(id, attempts, dims, edges, active) {
   moduleServer(id, function(input, output, session) {
-    built <- new.env(parent = emptyenv())
+    tables <- list(attempts = attempts, dims = dims, edges = edges)
 
     cedar_copy_url_observer(input, session, "dr_copy_url", spec_title = "DFW Rates",
                             values_fn = function() list(term_type = input$dr_term_type, campus = input$dr_campus,
                                                         from_term = input$dr_from_term, to_term = input$dr_to_term))
 
+    # Shared by every session: the tables are fixed for the life of the process.
+    # The opening scope is already there (the startup preload); another is
+    # built here, behind the overlay, the first time anyone asks for it. No
+    # campus picked reads every campus.
     payload <- reactive({
       req(isTRUE(active()), input$dr_term_type, input$dr_from_term, input$dr_to_term)
-      # No campus picked reads every campus.
-      campus <- if (length(input$dr_campus) == 0L) NULL else sort(input$dr_campus)
-      from_term <- as.integer(input$dr_from_term)
-      to_term <- as.integer(input$dr_to_term)
-      if (from_term > to_term) {
+      if (as.integer(input$dr_from_term) > as.integer(input$dr_to_term)) {
         showNotification("DFW Rates: the From term is after the To term.", type = "warning",
                          duration = 6, id = "dfw_rates_term_order")
         req(FALSE)
       }
-      key <- paste(input$dr_term_type, paste(campus, collapse = "+"), from_term, to_term)
-      if (!is.null(built[[key]])) return(built[[key]])
-      p <- cedar_with_loading(session, session$ns("load"), report_type = "dfw_dashboard", {
-        tryCatch(
-          build_dfw_dashboard(attempts, dims, list(term_type = input$dr_term_type, campus = campus,
-                                                   from_term = from_term, to_term = to_term,
-                                                   data_edges = edges)),
-          error = function(e) {
-            showNotification(paste("DFW Rates:", conditionMessage(e)), type = "error", duration = 10)
-            NULL
-          }
-        )
-      })
-      if (!is.null(p)) assign(key, p, envir = built)
-      p
+      job <- dfw_rates_payload_job(tables, input$dr_term_type, input$dr_campus,
+                                   input$dr_from_term, input$dr_to_term)
+      cedar_shared_result(job$key, function() cedar_with_loading(session, session$ns("load"), report_type = "dfw_dashboard", {
+        tryCatch(job$build(), error = function(e) {
+          showNotification(paste("DFW Rates:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        })
+      }))
     })
 
     output$caveat <- renderUI({

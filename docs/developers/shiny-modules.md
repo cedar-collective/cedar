@@ -185,6 +185,12 @@ Measured 2026-11-22: Graduation's build averaged 25 seconds on production
 (the longest wait of any page) and about 5 on a development machine;
 Retention's averaged 11 on production and is the next candidate.
 
+DFW Rates is built ahead too, after Graduation (`dfw_rates_payload_job()`,
+`dfw_rates_preload_jobs()`, with its scope in `dfw_rates_default_scope()` and
+`dfw_rates_page_scope()`). Until 2026-11-23 each session built its own copy.
+Its one timed build on production took 12 seconds; on a development machine
+it takes 7 to 16.
+
 ## URL deep links & shareable state
 
 One registry, `CEDAR_SHARE_SPECS` in `R/trunk/url-state.R`, drives BOTH directions of the shareable-URL round-trip so they cannot drift. Each entry is keyed by the exact navbar tab title and declares `slug` (the `?tab=` value), `prefix`/`sep` (how a namespaced input id is built), ordered `fields` (the only URL keys accepted, with dependency order such as campus before department), `run` (the ordinary run button), optional per-key `types`, optional `aliases`, and an optional early-loading `overlay`.
