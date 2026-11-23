@@ -1,5 +1,7 @@
 # cedar_shared_result() (R/modules/ui-helpers.R): a result shared by every
 # session stores a built value and nothing else (ISSUES I75).
+# cedar_preload_shared_results(): the same results built ahead of their first
+# reader, one job at a time, after the app has started.
 
 testthat::local_edition(3)
 
@@ -20,4 +22,40 @@ test_that("a shared result is built once, and a failed build is not kept", {
   expect_error(cedar_shared_result(list("page", "MED"), function() stop("not ready"), cache), "not ready")
   expect_equal(cedar_shared_result(list("page", "MED"), build(5), cache), 5)
   expect_error(cedar_shared_result(list("page"), build(1), cache = NULL), "needs the app's cache")
+})
+
+test_that("a preload builds each job once, in order, and a job that fails stops nothing", {
+  cache <- cachem::cache_mem()
+  waits <- numeric(0)
+  # A scheduler that runs its callback at once and records the wait asked for.
+  at_once <- function(callback, delay) { waits <<- c(waits, delay); callback() }
+  ran <- character(0)
+  job <- function(name, value) list(key = list("page", name), build = function() { ran <<- c(ran, name); value })
+  jobs <- list(job("first", 1), list(key = list("page", "broken"), build = function() stop("no such table")),
+               job("empty", NULL), job("last", 4))
+  log <- testthat::capture_messages(
+    expect_equal(cedar_preload_shared_results(jobs, start_after = 10, gap = 1, schedule = at_once,
+                                              cache = function() cache), 4L))
+  expect_equal(ran, c("first", "empty", "last"))
+  # The loop's start, the wait before the first job, then a gap before each later one.
+  expect_equal(waits, c(0, 10, 1, 1, 1))
+  # A page that asks afterwards reads what was built: its own build does not run.
+  expect_equal(cedar_shared_result(list("page", "first"), function() stop("built twice"), cache), 1)
+  expect_equal(cedar_shared_result(list("page", "last"), function() stop("built twice"), cache), 4)
+  # The job that failed and the one that returned nothing stored nothing: the
+  # page builds them when asked, and the failure is in the log.
+  expect_equal(cedar_shared_result(list("page", "broken"), function() 2, cache), 2)
+  expect_equal(cedar_shared_result(list("page", "empty"), function() 3, cache), 3)
+  expect_equal(grepl("no such table", log, fixed = TRUE), c(FALSE, TRUE, FALSE, FALSE))
+
+  # A result someone already built is left as it is.
+  ran <- character(0)
+  testthat::capture_messages(cedar_preload_shared_results(list(job("first", 9)), schedule = at_once,
+                                                          cache = function() cache))
+  expect_equal(ran, character(0))
+  expect_equal(cedar_shared_result(list("page", "first"), function() 0, cache), 1)
+
+  expect_equal(cedar_preload_shared_results(list(), schedule = function(...) stop("nothing to schedule")), 0L)
+  expect_error(cedar_preload_shared_results(list(list(key = "page", build = function() 1)), schedule = at_once),
+               "jobs of list(key, build)", fixed = TRUE)
 })

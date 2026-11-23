@@ -1814,22 +1814,19 @@ nav_panel(
     nav_panel(
       title = "First Year",
       icon = icon("seedling"),
-      firstYearUI("first_year",
-                  sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+      firstYearUI("first_year", cedar_home_campuses)
     ), # end First Year nav_panel
 
     nav_panel(
       title = "Retention",
       icon = icon("user-check"),
-      retentionDashboardUI("retention_dashboard",
-                           sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+      retentionDashboardUI("retention_dashboard", cedar_home_campuses)
     ), # end Retention nav_panel
 
     nav_panel(
       title = "Graduation",
       icon = icon("graduation-cap"),
-      graduationUI("graduation",
-                   sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus))))
+      graduationUI("graduation", cedar_home_campuses)
     ), # end Graduation nav_panel
 
     nav_panel(

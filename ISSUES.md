@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M63 | Improvement | See [Improvements](#improvements) |
+| M1–M64 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4618,6 +4618,16 @@ entering term on) for both its rates and its pace columns.
 `.compute_retention()` stays for the course cohorts, and its header says why:
 a student is in a course's cohort once for each term they took it, and its
 callers read one wide row with NA past the data.
+
+**M64 — `get_exit_requirement_progress()` warns when no student is far along.**
+With an empty `students` table, `max(as.integer(students$exit_term))`
+(`R/cones/exit-requirements.R`) is a maximum of nothing: R warns and returns
+`-Inf`. The result is still right (no plan is listed), so this is noise in the
+app's log for a scope with no far-along leaver, such as a small level on one
+campus. Found 2026-11-22 while testing the Graduation preload. *Reproduce:*
+`build_graduation_dashboard()` on XC01 with `attempts` and `boards`, given
+`parts` whose `exit$students` has no rows. *Done when:* the cone returns its
+empty result before it reads the last term, and a test covers the empty scope.
 
 ### Documentation and naming
 

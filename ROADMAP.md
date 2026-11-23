@@ -268,6 +268,10 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
 
 ## Platform
 
+- [ ] **Retention opens without a wait.** Graduation's opening view is built
+  in the background when the app starts (2026-11-22); Retention's first build
+  averages 11 seconds on production and is the next page to give the same
+  treatment ([built ahead](docs/developers/shiny-modules.md#results-shared-by-every-session-and-built-ahead)).
 - [ ] **Code history by unit.** Admin → Mappings → Code history lists every
   `code_history.csv` row with when each code was offered. Still to do: each
   unit's program codes and course subjects with when each was in use, and the
