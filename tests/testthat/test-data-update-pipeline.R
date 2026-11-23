@@ -152,13 +152,18 @@ test_that("a report that arrived is still refreshed when another did not", {
 # 2026-10-11 cron run sat there 12 days), and the fetch had no time limit.
 test_that("a fetch nobody can answer, or one that overruns, is stopped and its container removed", {
   asked <- run_fetch_step(
-    fetch = "echo 'Please enter the 2FA code (or press Enter to take another screenshot): '; exec sleep 60")
+    fetch = "echo 'Please enter the 2FA code (or press Enter to stop): '; exec sleep 60")
   expect_equal(asked$step, paste0(
     "FAILED|2FA required and nobody at a terminal to enter the code; ",
     "no file from today for: cl desr; see mrgather output"))
   # The container removed is the one the fetch was started as.
   expect_match(asked$removed, "^cedar-mrgather-fetch-[0-9]+$")
   expect_true(grepl(paste("--name", asked$removed), asked$args, fixed = TRUE))
+  # With nobody at a terminal, mrgather is told so, and it then stops at a 2FA
+  # prompt before a text message is asked for. The flag is the last word: a
+  # mrgather that does not know it reads a following word as the flag's value,
+  # and a report code after it would be lost.
+  expect_match(asked$args, "node mrgather\\.js cl desr -s 202480 -e 202510 --unattended$")
 
   hung <- run_fetch_step(fetch = "exec sleep 60", time_limit = 2L)
   expect_match(hung$step, "^FAILED\\|stopped after the 2s time limit; no file from today for: cl desr")
