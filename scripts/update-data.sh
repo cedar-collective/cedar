@@ -436,8 +436,16 @@ else
         ) > /dev/null 2>&1 &
         FETCH_WATCHDOG=$!
     fi
+    # With nobody at a terminal, mrgather is told so (--unattended): it then
+    # stops at a 2FA prompt without asking for a code, and no text message is
+    # sent. mrgather cannot tell by itself, because its output is piped here
+    # and its container has no terminal either way. The flag goes last: a
+    # mrgather that does not know it (production's, until it is updated) reads
+    # a word after an unknown flag as that flag's value.
+    FETCH_ARGS=("${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM")
+    [[ "$FETCH_INTERACTIVE" != true ]] && FETCH_ARGS+=(--unattended)
     run_cmd "$FETCH_DOCKER" compose -f "$FETCH_COMPOSE_FILE" run --rm --name "$FETCH_CONTAINER" mrgather \
-        node mrgather.js "${REPORTS[@]}" -s "$START_TERM" -e "$END_TERM" 2>&1 | tee "$FETCH_OUT"
+        node mrgather.js "${FETCH_ARGS[@]}" 2>&1 | tee "$FETCH_OUT"
     FETCH_RC=${PIPESTATUS[0]}
     if [[ -n "$FETCH_WATCHDOG" ]]; then
         kill "$FETCH_WATCHDOG" 2>/dev/null
