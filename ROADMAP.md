@@ -234,7 +234,8 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   areas a program can override. Math and writing stay in the first year, and
   one science Gen Ed is placed by the end of the second year.
 - [ ] **Minors.** Pilot list (English, Spanish, History, …), placed in the top
-  band, with authored overlap rules.
+  band, with authored overlap rules. Asked again 2026-11-23, as a minor
+  picker on the map.
 - [ ] **Elective guidance.** Reviewed, major-specific suggestions kept apart
   from catalog rules, perhaps as institution Markdown files.
 - [ ] **Advising-reviewed audit.** Conditional alternatives, transfer, grades,
@@ -407,4 +408,9 @@ deletes it.
 - **Reassess field reliability** (2026-11-20): the page states verdicts more firmly than it documents how each was measured. Restate each field's verdict with its measurement, re-measure on two current pulls, and test the departed-student exception against a second pull.
 - **Retention built before the first reader arrives**: the page is shared by every session once built, and the first reader after a start still waits about 25 seconds. Build it at start or at deploy.
 - **Prepared for It on the same footing as Against Non-Takers** ([M60](ISSUES.md)): the same matching cells and the same check of the matching.
+- **A summer page?** (to-do, 2026-11-23). Summer is read in pieces today: finishing in the summer on Graduation, catching up on credits in the summer on Retention, and a Summer term type on DFW Rates. Open: what one page would answer that those do not (who takes summer courses, what they take, what it changes for them), and for whom.
+- **Degree Map: cards for the key figures in place of prose** (to-do, 2026-11-23). Open: which figures lead (total credits, semesters, the first math and writing courses, credits left to choose), and what prose stays.
+- **Degree Map: make the credit-level need clear** (to-do, 2026-11-23). Where a degree needs credits at a level (upper-division hours, 400-level work from a given semester), the map should say so where the reader plans those semesters. Open: which needs, and where on the map.
+- **Return rate by how students started** (found 2026-11-23, [#393](https://github.com/cedar-collective/cedar/pull/393)). Retention's opening view counts first-time students, transfer students and students whose start is not on record together, and the three return at different rates. Open: show the rate for each on the overall section, or leave it to the entering-class sections.
+- **Dept Dashboard: retention and graduation more prominent** (to-do, 2026-11-23). Open: which figures (the majors' return rate and its trend, degrees awarded, how far along the students who leave are) and where they sit beside enrollment and credit hours.
 
