@@ -52,12 +52,126 @@ cedar_degrees.qs (14 columns)
 
 ## MyReports → CEDAR Mapping
 
-| MyReports Report | MyReports File | → | CEDAR Table |
-|------------------|----------------|---|-------------|
-| **DESR** (Department Enrollment Status Report) | DESRs.qs | → | `cedar_sections` |
-| **Class Lists** | class_lists.qs | → | `cedar_registrations` |
-| **Academic Study Detail** | academic_studies.qs | → | `cedar_programs` |
-| **Graduates & Pending Graduates** | degrees.qs | → | `cedar_degrees` |
+| Code | MyReports Report | Parsed file | → | CEDAR Table | Scheduled refresh |
+|------|------------------|-------------|---|-------------|-------------------|
+| `desr` | **DESR** (Department Enrollment Status Report) | DESRs.qs | → | `cedar_sections` | daily |
+| `cl` | **Class Lists** | class_lists.qs | → | `cedar_registrations` | daily |
+| `as` | **Academic Study Detail** | academic_studies.qs | → | `cedar_programs` | daily |
+| `deg` | **Graduates & Pending Graduates** | degrees.qs | → | `cedar_degrees` | daily |
+| `aa` | **Admissions Applicants Detail** | admissions_applicants.qs | → | `cedar_applicants` | only when named |
+| `holds` | **Student Holds** | student_holds.qs | → | `cedar_holds` | only when named |
+
+The code is what is typed on every command line. The list itself lives in
+`R/data-parsers/report-specs.R` (for the parser) and
+`scripts/report-registry.sh` (for the shell scripts); this table is a reading
+aid.
+
+---
+
+## Adding a MyReports report
+
+A report is fetched by mrgather, parsed by `parse-data.R` into an accumulated
+file, and built into a `cedar_*` table by one stage of `transform-to-cedar.R`.
+Adding one touches five files in two projects. The Student Holds report
+(2026-11) is the worked example: search for `holds` in each file below.
+
+### First, pull one term by hand
+
+Run the report once in a browser, for one term, with every column, as Excel.
+The file answers the questions the code depends on, and none of them can be
+guessed from the form:
+
+| Find out | Why | Student Holds |
+|---|---|---|
+| The download's file name | Files are matched to their report by a piece of the name every download carries | `S_Student_Holds_<date>_<time>.xlsx` |
+| Which line holds the column names, and whether the export ends in lines that are not rows | A title above the table makes the file read as having no column names; a footer line is otherwise hashed as a person | title on line 1, names on line 3, a "ran on" line at the end |
+| Which columns identify a person, and which are direct identifiers | The first are hashed, the second dropped, before anything is saved | `ID` and the username that placed the hold are hashed; name, email, phone dropped |
+| What choosing a term selects | A new pull of a term replaces that term's rows and no others, so the term must mean the same thing in every pull | the students registered that term, each with their whole hold history |
+| Any field the form needs beyond a term and columns | Left blank, MyReports opens a page asking for it and nothing downloads | "Hold From Date" |
+| How the form's term list stores its values | The older reports' lists hold the term code; some hold a position in the list | positions (1 is the newest term) |
+| What one row is, and what makes two rows of different pulls the same thing | The table's grain, and how a later pull replaces an earlier one | no id: student, hold code, start date, explanation and office |
+
+Look at the file in aggregate (counts, column names, blanks). It holds names
+and unhashed IDs: keep it out of the repository and delete it afterwards.
+
+### Then, the five places
+
+1. **mrgather** (`mrgather.js`, in its own repository,
+   `cedar-collective/mrgather`). For a form with the usual
+   Guided Adhoc layout, add an entry to `GUIDED_ADHOC_REPORTS` (the form's
+   address, the download's file prefix, the ids of the term list, the add-all
+   arrow, the Excel option and the run button) and a line to
+   `REPORT_HANDLERS`. A form laid out differently needs its own function, as
+   the DESR has. mrgather refuses a report code it does not have. Its Docker
+   image bakes the source, so rebuild it wherever it runs
+   (`docker compose build mrgather`), production included.
+2. **`R/data-parsers/report-specs.R`**: the report's entry. Its header
+   documents every field. `header_first_col` and `drop_na_col` are the two
+   accommodations for a title above the table and footer lines below it.
+3. **`scripts/report-registry.sh`**: the report's row, with the same code,
+   file signature, stage and schedule as the spec.
+   `test-data-update-pipeline.R` fails when the two disagree.
+4. **`R/data-parsers/transform-to-cedar.R`**: a `transform_<name>()` that
+   takes the parsed file and saves the table with `save_cedar_file()`; the
+   stage's name in `CEDAR_TRANSFORM_STAGES`; its block in the orchestrator. A
+   student ID goes through `encrypt_if_needed()`, as in every other table, or
+   the new table joins nothing.
+5. **Tests and docs.** The raw rows are a fixed object in
+   `tests/testthat/fixtures/scenario_tables.R`, written to show what the
+   stage must decide (a hold that changed between pulls, one listed twice,
+   one that vanished), with the expected result beside them; the stage's test
+   is in `test-transform-status.R`. Reintroduce the bug the fixture is for
+   and confirm the test fails. The table is documented in
+   [data-model.md](data-model.md) and its columns' sources in
+   [source-to-cedar-manifest.md](source-to-cedar-manifest.md).
+
+Nothing else names a report: the update script's arguments, its check for
+today's files, the stages it asks the transform for and its usage text all
+read the registry.
+
+### Checking it
+
+```bash
+# The parser and the stage, on the file pulled by hand (put it where
+# config/config.R's cedar_myreports_local_dir points; --keep leaves it there).
+Rscript --vanilla R/data-parsers/parse-data.R -r holds --keep
+Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables holds
+
+# What the whole run would do, without fetching anything.
+scripts/update-data.sh --dry-run -s 202680 holds
+```
+
+Then check that the student IDs join. A table hashed any other way matches
+no one, and nothing else will say so:
+
+```r
+source("scripts/cedar-repl.R")
+holds <- qs2::qs_read(file.path(cedar_data_dir, "cedar_holds.qs"))
+mean(unique(holds$student_id) %in% cedar_student_terms$student_id)   # 0.998 for Fall 2026
+```
+
+### Catching up, and the scheduled refresh
+
+A new report starts `named` in both lists: fetched only when asked for. Catch
+up with one run over the terms wanted, from a terminal, since MyReports may
+ask for a 2FA code:
+
+```bash
+CEDAR_FETCH_TIME_LIMIT=14400 scripts/update-data.sh -s 201980 -e 202680 holds
+```
+
+A requested report with no file from today fails the fetch
+([ISSUES I43](https://github.com/cedar-collective/cedar/blob/main/ISSUES.md)),
+so the report becomes `daily` (in the spec and the registry, together) only
+once production mrgather has been rebuilt with its handler.
+
+### When a page reads the table
+
+A table no page reads is built and left on disk. When one does: load it in
+`global.R`, `scripts/cedar-repl.R` and the cache-warming scripts; give it a
+row in `CEDAR_FACT_SCHEMA_VERSIONS` if the app must not start on an old
+shape; add it to the join-integrity check if it holds `student_id` and
+`term`; and give it a row in `AGENTS.md`'s table of loaded tables.
 
 ---
 
@@ -67,8 +181,9 @@ cedar_degrees.qs (14 columns)
 
 1. MyReports Excel files downloaded
 2. `parse-data.R` has completed successfully (creates DESRs.qs, class_lists.qs, etc.)
-3. R packages: `tidyverse`, `digest`, `qs`
-4. Environment variable `CEDAR_STUDENT_SALT` set (for student ID encryption)
+3. R packages: `tidyverse`, `digest`, `qs2`, `data.table`
+4. Environment variable `CEDAR_STUDENT_SALT` set (for student ID encryption;
+   unset, the transform uses a built-in default: ISSUES I23)
 
 ### Daily Workflow
 

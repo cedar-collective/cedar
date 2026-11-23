@@ -173,6 +173,8 @@ helper_actions_without_arguments <- c(
   skip_if_no_lookups        = "skips the test",
   load_r_environment_script = "sources scripts/r-environment.R into a fresh environment",
   load_transform_helpers    = "sources the transform into a fresh environment",
+  load_report_specs         = "sources the report specs into a fresh environment",
+  read_report_registry      = "runs scripts/report-registry.sh and reads what it prints",
   projection_request_runner = "sources the projection build script",
   make_shared_rule_artifact = "writes rule files to a temporary directory",
   st01                      = "runs build_student_terms(), the function under test",

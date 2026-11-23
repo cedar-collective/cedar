@@ -73,10 +73,10 @@ Runs the complete data update workflow:
 ### Examples
 
 ```bash
-# Update all reports for a single term
+# Update the default reports for a single term
 ./scripts/update-data.sh -s 202610
 
-# Update multiple terms, all reports
+# Update multiple terms, the default reports
 ./scripts/update-data.sh -s 202610 -e 202680
 
 # Update only specific reports (DESR and degrees)
@@ -88,12 +88,19 @@ Runs the complete data update workflow:
 
 ### Report types
 
-| Code | Full Name | Description |
-|------|-----------|-------------|
-| `desr` | Department Enrollment Status Report | Section-level course data (enrollments, capacity, instructor) |
-| `deg` | Degrees | Graduates and pending graduates |
-| `as` | Academic Studies | Program/major enrollment by student |
-| `cl` | Class Lists | Student-level course enrollment data |
+| Code | Full Name | Description | Fetched |
+|------|-----------|-------------|---------|
+| `desr` | Department Enrollment Status Report | Section-level course data (enrollments, capacity, instructor) | by default |
+| `deg` | Degrees | Graduates and pending graduates | by default |
+| `as` | Academic Studies | Program/major enrollment by student | by default |
+| `cl` | Class Lists | Student-level course enrollment data | by default |
+| `aa` | Admissions Applicants Detail | Applicant detail for comparison analyses | only when named |
+| `holds` | Student Holds | Every hold of the students registered in the term | only when named |
+
+The list is `scripts/report-registry.sh`; `update-data.sh -h` prints it. A
+report is fetched by default only once production mrgather can fetch it. To
+add one, see "Adding a MyReports report" in
+`docs/developers/data-transformation-myreports.md`.
 
 ### Parameters
 
@@ -102,7 +109,7 @@ Runs the complete data update workflow:
 
 **Optional:**
 - `-e END_TERM` — Ending term code (defaults to START_TERM)
-- `REPORTS...` — Space-separated list of reports (default: all four)
+- `REPORTS...` — Space-separated list of reports (default: the four fetched by default)
 - `-h` — Show help message
 
 ### Term codes

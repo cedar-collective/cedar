@@ -36,13 +36,14 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (fixed in code 2026-11-22: the CSV is removed once read; open until the files already there, locally and on production, are deleted) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
 | [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
-| [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; open for mrgather, which still accepts a report it cannot fetch) |
+| [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; mrgather refuses a report it does not have since 2026-11-22; open until production's mrgather is rebuilt from that source) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" (fixed 2026-11-11 through `leads_to`; open for the eleven names in `programs.csv`) |
 | [I37](#i37--renumbered-courses-lose-their-history) | Defect | Renumbered courses lose their history: ACCT 3401 (was MGMT 340) and the other Fall 2026 ACCT, BUSA and POPH courses read as new (every reader follows a confirmed renumbering; 277 of the 320 title matches confirmed 2026-11-07, 6 deleted, 37 held for review with the reason on each row) |
 | [I33](#i33--a-crashed-myreports-download-is-recorded-as-a-successful-fetch) | Defect | A crashed MyReports download is recorded as a successful fetch: on Oct 23 class lists and applicants were never downloaded, and every step reported ✅ (fixed in CEDAR 2026-11-11: the fetch is judged per report by its files and parse stops on a named report with no file; open for mrgather's exit status) |
@@ -52,7 +53,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M64 | Improvement | See [Improvements](#improvements) |
+| M1–M65 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -60,6 +61,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I78](#i78--the-transforms-status-file-lists-only-the-tables-of-the-last-run) | Defect | `cedar-status.json` held only the tables the last transform run built, so a run of one stage (`--tables degrees`, or the holds catch-up) left `scripts/data-status.sh` listing one table (the file now keeps the entries of tables a run did not rebuild) |
 | [I73](#i73--special-topics-st-titles-were-not-treated-as-topics-courses) | Defect | A topics course was recognised only by a title opening "T:"; "ST:" (special topics) sections were stored as ordinary courses, so their history, trends and dashboard cards mixed unrelated topics. The labels are now an institution setting read by one function (resolved 2026-11-20) |
 | [I72](#i72--the-enrollment-table-counted-a-crosslisted-offering-by-its-home-listing-alone) | Defect | The Enrollment table showed a crosslisted offering once, on its home row, with class-list counts (first day, census, final) for the home listing's students only, while the schedule's combined total beside it counted every listing. The home row now counts the whole offering, each student once (resolved 2026-11-20) |
 | [I71](#i71--regstats-worth-a-look-stops-on-a-topics-course-waitlisted-under-two-titles) | Defect | Regstats' "Worth a look" could not be built for a term in which a topics course had waitlisted students under two titles: the waitlist screen has a row per title and the watch reads one row per course. The watch now reads `waits_by_course`, each student once (resolved 2026-11-20) |
@@ -105,6 +107,85 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I78 — The transform's status file lists only the tables of the last run
+
+**Status:** resolved 2026-11-22 (branch `ingest/student-holds`).
+**Found:** 2026-11-22, running the new `holds` stage alone.
+**Severity:** low: no table is wrong. `scripts/data-status.sh` reads
+`cedar-status.json` for its table of row counts and pull dates, and after any
+run that built some tables it showed only those.
+**Affects:** `write_cedar_status_file()` in
+`R/data-parsers/transform-to-cedar.R`.
+
+### Reproduce (before the fix)
+
+```bash
+Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables degrees
+scripts/data-status.sh      # lists cedar_degrees and the derived tables only
+```
+
+Every scheduled refresh names its stages, so the applicants table had been
+missing from the listing since the default stopped asking for that report.
+
+### Fix
+
+The writer reads the file already there and keeps the entry of every table
+this run did not build, as long as the table's file is still in the
+directory; a table built again replaces its entry. A previous file that is
+not valid JSON is replaced. Test: "a run that rebuilds some tables keeps the
+others in the status file" (`test-transform-status.R`).
+
+## I77 — The parser left each export unhashed beside its hashed file
+
+**Status:** fixed in code 2026-11-22 (branch `ingest/student-holds`). Open
+until the files already written are deleted (see Still to do).
+**Found:** 2026-11-22, parsing the Student Holds report for the first time.
+**Severity:** medium for privacy; no number is wrong. The parser drops names,
+emails and addresses and hashes every ID before it saves a report, and the
+file it converted the export into, with all of them, stayed next to the
+result.
+**Affects:** `R/data-parsers/parse-data.R`, every report, in every data
+directory a parse has run in.
+
+### What is wrong
+
+`parse-data.R` converts each `.xlsx` to `<data_file>.csv` in the shared data
+directory with `xlsx2csv`, reads it, and never removed it. The CSV is the
+export as MyReports wrote it. Each parse overwrote the last, so the directory
+held the most recent export of each report:
+
+```
+academic_studies.csv       15.6 MB   2026-10-08
+admissions_applicants.csv  29.6 MB   2026-10-08
+class_lists.csv           104.2 MB   2026-10-08
+degrees.csv                 1.6 MB   2026-10-08
+DESRs.csv                   4.8 MB   2026-10-08
+```
+
+That is the local shared data directory, which Dropbox syncs. Nothing reads
+these files (`grep -rn "class_lists.csv"` finds only the line that writes
+one).
+
+### Reproduce (before the fix)
+
+```bash
+Rscript --vanilla R/data-parsers/parse-data.R -r deg
+ls -la <shared data dir>/degrees.csv
+```
+
+### Fix
+
+The CSV is removed as soon as it has been read, whether or not the read
+worked, and the parse stops if it cannot be removed.
+
+### Still to do
+
+- Delete the CSVs already there: the five above in the local shared data
+  directory, and their counterparts in production's (`/root/shared-data`).
+  Check first that each name is one of the parsed files' (`DESRs`,
+  `class_lists`, `academic_studies`, `degrees`, `admissions_applicants`):
+  the directory also holds CSVs that are not exports (`report_timing.csv`).
 
 ## I76 — Dept Trends raises a plotly "axis scaling" error in the browser
 
@@ -1317,8 +1398,9 @@ CEDAR's basis for enrollment elsewhere. Whichever is chosen goes into
 ## I43 — Every scheduled refresh fails because the default asks for a report mrgather never fetches
 
 **Status:** fixed in CEDAR: the default 2026-11-03 (#186), per-report
-rebuilds and the run summary 2026-11-11. Open only for mrgather, which still
-accepts a report it cannot fetch (see Still to do)
+rebuilds and the run summary 2026-11-11. mrgather's source refuses a report
+it does not have since 2026-11-22; open until production's copy and image are
+replaced with it (see Still to do)
 **Found:** 2026-11-03, reading the production refresh logs
 **Severity:** high. Nothing wrong was published, but production stopped
 refreshing. `cedar_sections` and `cedar_programs` were last written on Oct 27
@@ -1368,8 +1450,13 @@ fails.
 
 ### Still to do
 
-- mrgather: fetch the applicants report, or refuse a report it cannot fetch
-  instead of accepting it and counting the rest as complete.
+- Production's mrgather (`/root/mrgather`, image built 2026-04-10) is still
+  the old one: copy the current `mrgather.js` there and rebuild the image.
+  The current source (2026-11-22) fetches the applicants report, keeps every
+  report in one list (`REPORT_HANDLERS`) and exits 1 naming any report not in
+  it before fetching anything. Once production has it, `aa` and `holds` can
+  be made `daily` in `R/data-parsers/report-specs.R` and
+  `scripts/report-registry.sh`.
 
 Done 2026-11-11 (branch `refresh/partial-rebuild-and-fetch-limit`):
 
@@ -3730,7 +3817,7 @@ rebuilt table, since the transform rehashes every term from the stored MD5s.
 But tables built under different salts no longer join, so the change must be
 one complete rebuild of every table holding student IDs (`cedar_programs`,
 `cedar_degrees`, `cedar_registrations`, `cedar_student_terms`,
-`cedar_applicants`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
+`cedar_applicants`, `cedar_holds`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
 and `cedar_next_term` are retired), checked afterwards on Admin >
 Join Integrity. Salting the parse stage too means a one-time migration of the
 stored exports' MD5s, not a re-pull.
@@ -4628,6 +4715,21 @@ campus. Found 2026-11-22 while testing the Graduation preload. *Reproduce:*
 `build_graduation_dashboard()` on XC01 with `attempts` and `boards`, given
 `parts` whose `exit$students` has no rows. *Done when:* the cone returns its
 empty result before it reads the last term, and a test covers the empty scope.
+
+**M65 — The list of MyReports reports is kept in three places.** Until
+2026-11-22 a report's code, file signature or stage was typed in about a
+dozen: `report_specs` inside `parse-data.R`, five spots in
+`update-data.sh` (the argument pattern, the default, the file globs, the
+stage map and a literal `5` for "every report"), `restart-cedar.sh` (which
+had never accepted `aa`), three help texts and two lists in mrgather. Adding
+the Student Holds report reduced that to three: `R/data-parsers/report-specs.R`
+for the parser, `scripts/report-registry.sh` for the shell scripts, and
+`REPORT_HANDLERS` in mrgather. The first two are held to each other by
+`test-data-update-pipeline.R`; mrgather is a separate repository
+(`cedar-collective/mrgather`), and nothing checks its list but its own
+refusal of a code it does not have. *Done when:* one file is the list and the
+others are generated from it or read it, mrgather's included (ROADMAP:
+production's mrgather as a checkout of its repository).
 
 ### Documentation and naming
 
