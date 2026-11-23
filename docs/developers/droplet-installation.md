@@ -74,7 +74,8 @@ mounted into the container at `data/`. Two ways to fill it:
 - **Copy** a reviewed set of normalized tables from another instance over a
   secure channel. Access, retention and backup of this directory are the
   institution's ([Installation](installation.html#institutional-instance-restricted-data-and-production-style-docker)).
-- **Fetch and transform** with mrgather: clone mrgather beside CEDAR
+- **Fetch and transform** with mrgather: clone mrgather
+  (`cedar-collective/mrgather`, a private repository) beside CEDAR
   (`/root/mrgather` in production), put the MyReports credentials in its
   `.env`, and run the first refresh by hand
   ([Release Runbook: data refresh](release-runbook.html#3-data-refresh)).

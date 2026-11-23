@@ -61,6 +61,49 @@ test_that("XC01: with attempts and boards the payload counts each plan's require
   expect_snapshot(cat(format_graduation_dashboard(p)[-(1:25)], sep = "\n"))
 })
 
+test_that("XC01: a credit line built over the scope's shared parts is the payload built alone", {
+  opt <- function(line, ...) c(xc01$opt, list(line = line, min_list = 2L, ...))
+  build <- function(line, parts = NULL, ...) build_graduation_dashboard(
+    xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims, opt(line, ...),
+    attempts = xc01$attempts, boards = xc01$boards, parts = parts)
+  parts <- graduation_scope_parts(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, opt(90))
+  # Who left and who passed the ceiling are counted once; every line reads them.
+  for (line in GRADUATION_LINES) expect_identical(build(line, parts), build(line))
+  # The payload is counted from the parts it is handed, not counted again:
+  # with nobody in them, nobody was far along.
+  nobody <- parts
+  nobody$exit$students <- nobody$exit$students[0, ]
+  expect_equal(build_graduation_dashboard(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
+                                          opt(90), parts = nobody)$meta$n_far, 0L)
+  # Parts counted under another scope are refused, never read as this one's.
+  expect_error(build(90, parts, return_window = 0L), "another scope")
+  elsewhere <- graduation_scope_parts(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms,
+                                      c(opt(90), list(campus = "EA")))
+  expect_error(build(90, elsewhere), "another scope")
+})
+
+test_that("the Graduation page's scope has one form, and the page opens on a scope it can ask for", {
+  scope <- graduation_page_scope("UG", c("EA", "ABQ"), "115")
+  expect_identical(scope, list(level = "UG", campus = c("ABQ", "EA"), line = 115))
+  # The same campuses in another order, or named twice, are the same scope.
+  expect_identical(graduation_page_scope("UG", c("ABQ", "EA", "ABQ"), 115), scope)
+  # No campus picked is every campus, however the browser says it.
+  expect_null(graduation_page_scope("UG", character(0))$campus)
+  expect_null(graduation_page_scope("UG", NULL)$campus)
+  expect_error(graduation_page_scope(c("UG", "GR")), "one student level")
+  expect_error(graduation_page_scope("UG", line = "most"), "one credit line")
+
+  # It opens on the first level, the main campuses it offers and the first line.
+  opens_on <- graduation_default_scope(c("ZZ", CEDAR_CAMPUS_MAIN))
+  expect_identical(opens_on, list(level = names(CEDAR_STUDENT_LEVEL_LABELS)[[1]], campus = CEDAR_CAMPUS_MAIN,
+                                  lines = GRADUATION_LINES))
+  expect_identical(graduation_default_scope("ZZ")$campus, character(0))
+  opt <- graduation_page_opt(graduation_page_scope(opens_on$level, opens_on$campus, opens_on$lines[[1]]),
+                             xc01$opt$data_edges)
+  expect_identical(opt, list(student_level = opens_on$level, campus = sort(CEDAR_CAMPUS_MAIN),
+                             line = GRADUATION_LINES[[1]], data_edges = xc01$opt$data_edges, class_pace = FALSE))
+})
+
 test_that("XC01: the page's words", {
   p <- build_graduation_dashboard(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, test_dims,
                                   c(xc01$opt, list(line = 90, min_list = 2L)))

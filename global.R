@@ -525,6 +525,23 @@ message("[global.R] ✓ Data summary computed: ",
 message("[global.R] Initializing logging system...")
 init_logging()
 
+# ── Preload ─────────────────────────────────────────────────────────────────
+# The home campuses the student pages offer (First Year, Retention, Graduation).
+cedar_home_campuses <- sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus)))
+# Graduation opens on the same view for everyone, and building it is the
+# longest wait in the app (about 25 seconds on production, during which R
+# answers no one). It is built here instead, in the background once the app is
+# running, so the page opens at once: the opening scope under each credit line
+# and its summer finishers. Any other scope is built when first asked for.
+# Nothing is saved to disk: the results live in this process, like the tables
+# they are counted from (cedar_preload_shared_results(), R/modules/ui-helpers.R).
+cedar_preload_shared_results(graduation_preload_jobs(
+  list(student_terms = data_objects[["cedar_student_terms"]], programs = data_objects[["cedar_programs"]],
+       degrees = data_objects[["cedar_degrees"]], terms = data_objects[["cedar_terms"]],
+       dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]],
+       attempts = data_objects[["cedar_attempts"]], boards = CEDAR_DEGREE_BOARDS),
+  cedar_home_campuses))
+
 message("[global.R] Loading ui.R and server.R...")
 source("ui.R")
 source("server.R")

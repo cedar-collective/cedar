@@ -1609,6 +1609,48 @@ cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache
   value
 }
 
+# Build shared results ahead of their first reader, in the background once the
+# app is running. `jobs` is a list of list(key, build), each as
+# cedar_shared_result() takes them; a page's module makes its jobs with the
+# same function its reactives call, so a result built ahead is the one the
+# page asks for (graduation_preload_jobs() is the pattern).
+#
+# R answers one request at a time, so the jobs do not run in one piece: the
+# first waits `start_after` seconds from the moment the event loop starts, so
+# the request that started the process is answered first, and each later job
+# waits `gap` seconds after the one before, so a click made meanwhile is
+# answered between two jobs. A job whose result is already there builds
+# nothing. A job that fails is written to the log and stores nothing: the page
+# builds it when opened and shows the error there. The error is caught because
+# one that escapes a scheduled callback stops the app.
+# `schedule` and `cache` are arguments for the tests.
+cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedule = later::later,
+                                         cache = function() shiny::getShinyOption("cache")) {
+  is_job <- function(job) is.list(job) && is.list(job$key) && length(job$key) > 0L && is.function(job$build)
+  if (!all(vapply(jobs, is_job, logical(1)))) {
+    stop("[ui-helpers.R] cedar_preload_shared_results() takes jobs of list(key, build).", call. = FALSE)
+  }
+  if (length(jobs) == 0L) return(invisible(0L))
+  run <- function(i) {
+    job <- jobs[[i]]
+    parts <- vapply(job$key, function(k) paste(k, collapse = "+"), character(1))
+    label <- paste(parts[nzchar(parts)], collapse = ", ")
+    started <- Sys.time()
+    built <- FALSE
+    outcome <- tryCatch({
+      value <- cedar_shared_result(job$key, function() { built <<- TRUE; job$build() }, cache())
+      if (is.null(value)) "the build returned nothing; not kept" else if (built) "built" else "already built"
+    }, error = function(e) paste("failed:", conditionMessage(e)))
+    message(sprintf("[preload] %s: %s (%.1fs)", label, outcome,
+                    as.numeric(difftime(Sys.time(), started, units = "secs"))))
+    if (i < length(jobs)) schedule(function() run(i + 1L), gap)
+  }
+  # A callback scheduled now runs when the event loop starts: the wait before
+  # the first job is counted from there, not from this call during startup.
+  schedule(function() schedule(function() run(1L), start_after), 0)
+  invisible(length(jobs))
+}
+
 signal_load_complete <- function(session, id, duration_sec = NULL,
                                  cached = NULL, error = FALSE) {
   session$sendCustomMessage(paste0(id, "_load_complete"), list(

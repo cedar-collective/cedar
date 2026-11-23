@@ -113,6 +113,44 @@ test_that("cedar-status writer emits valid JSON with null metadata", {
   expect_equal(parsed$tables$students$rows, 10L)
 })
 
+# ISSUES.md I78: each run wrote only the tables it had built, so a run of one
+# stage left the status file, and scripts/data-status.sh, listing one table.
+test_that("a run that rebuilds some tables keeps the others in the status file", {
+  env <- load_transform_helpers()
+  dir <- withr::local_tempdir()
+  status_file <- file.path(dir, "cedar-status.json")
+  file.create(file.path(dir, c("cedar_registrations.qs", "cedar_holds.qs")))
+  entry <- function(file, rows) {
+    list(filename = file, rows = rows, size_mb = 1, as_of_date = "2026-11-20",
+         min_term = NA_character_, max_term = NA_character_)
+  }
+
+  # The first run built the class list and degrees; the degrees file is gone.
+  env$write_cedar_status_file(
+    list(students = entry("cedar_registrations.qs", 10L), degrees = entry("cedar_degrees.qs", 3L)),
+    status_file, generated = "2026-11-20 05:00:00")
+  # The second built holds alone.
+  env$write_cedar_status_file(list(holds = entry("cedar_holds.qs", 6L)), status_file,
+                              generated = "2026-11-22 11:00:00")
+  status <- jsonlite::fromJSON(status_file)
+  expect_equal(status$generated, "2026-11-22 11:00:00")
+  expect_setequal(names(status$tables), c("students", "holds"))
+  expect_equal(status$tables$students$rows, 10L)
+  expect_equal(status$tables$holds$rows, 6L)
+
+  # A table built again replaces its entry.
+  env$write_cedar_status_file(list(students = entry("cedar_registrations.qs", 12L)), status_file,
+                              generated = "2026-11-23 05:00:00")
+  status <- jsonlite::fromJSON(status_file)
+  expect_setequal(names(status$tables), c("students", "holds"))
+  expect_equal(status$tables$students$rows, 12L)
+
+  # A status file that cannot be read is replaced, not a reason to stop.
+  writeLines("{ not json", status_file)
+  env$write_cedar_status_file(list(holds = entry("cedar_holds.qs", 6L)), status_file)
+  expect_equal(names(jsonlite::fromJSON(status_file)$tables), "holds")
+})
+
 test_that("applicant transform keeps only runtime comparison covariates", {
   env <- load_transform_helpers()
   captured <- NULL
@@ -144,6 +182,87 @@ test_that("applicant transform keeps only runtime comparison covariates", {
     "high_school_self_reported_gpa", "current_age", "state_admit"
   ))
   expect_false("unused_source_field" %in% names(captured))
+})
+
+
+# HD01 (fixtures/scenario_tables.R): three pulls, five holds. A hold is kept as
+# the most recent pull listing it saw it, pulls ordered by day then term; a
+# pull's own rows are all kept; a hold the student's latest pull no longer
+# lists stays, marked.
+test_that("the holds transform keeps each hold as the latest pull listing it saw it", {
+  env <- load_transform_helpers()
+  output_dir <- withr::local_tempdir()
+  env$transform_holds(student_holds_hd01, output_dir, ".qs")
+  holds <- qs2::qs_read(file.path(output_dir, "cedar_holds.qs"))
+
+  expect_equal(names(holds), c(
+    "student_id", "hold_code", "hold", "hold_explanation", "origin_office_code", "origin_office",
+    "created_by", "hold_from_date", "hold_to_date", "open_ended", "pull_term", "as_of_date",
+    "in_latest_pull"))
+  expect_equal(nrow(holds), 6L)
+  # Student IDs are hashed as every other table's are, so the tables join.
+  expect_setequal(holds$student_id, env$encrypt_if_needed(c("HD-A", "HD-B", "HD-C")))
+  of <- function(id, from) {
+    holds[holds$student_id == env$encrypt_if_needed(id) & holds$hold_from_date == as.Date(from), ]
+  }
+
+  # H1: open when the earlier pull saw it, ended when the later one did.
+  h1 <- of("HD-A", "2025-01-10")
+  expect_equal(nrow(h1), 1L)
+  expect_equal(h1$hold_to_date, as.Date("2025-03-01"))
+  expect_false(h1$open_ended)
+  expect_equal(h1$pull_term, 202580L)
+  expect_equal(h1$as_of_date, as.Date("2026-11-22"))
+  # H2: gone from the student's later pull; kept as last seen, and marked.
+  h2 <- of("HD-A", "2025-02-01")
+  expect_equal(nrow(h2), 1L)
+  expect_false(h2$in_latest_pull)
+  expect_true(h2$open_ended)
+  expect_equal(h2$as_of_date, as.Date("2026-11-20"))
+  # H3: one pull lists it twice, and both rows stay.
+  h3 <- of("HD-A", "2025-09-01")
+  expect_equal(h3$hold_to_date, as.Date(c("2025-09-20", "2099-12-31")))
+  expect_equal(h3$open_ended, c(FALSE, TRUE))
+  # H4: the student's only pull is their latest; blanks are missing, not "".
+  h4 <- of("HD-B", "2025-04-15")
+  expect_true(h4$in_latest_pull)
+  expect_true(is.na(h4$hold_explanation))
+  expect_true(is.na(h4$origin_office_code))
+  # H5: two pulls on one day; the later term's row is the one kept.
+  h5 <- of("HD-C", "2025-08-20")
+  expect_equal(nrow(h5), 1L)
+  expect_equal(h5$pull_term, 202610L)
+  expect_equal(h5$hold_to_date, as.Date("2025-12-01"))
+
+  expect_equal(sum(holds$open_ended), 3L)
+  expect_equal(sum(!holds$in_latest_pull), 1L)
+  # Which terms were pulled, and when: a student with no row had no hold only
+  # if one of their terms is here.
+  pulls <- attr(holds, "pulls")
+  expect_equal(pulls$pull_term, c(202510L, 202580L, 202610L))
+  expect_equal(pulls$as_of_date, as.Date(c("2026-11-20", "2026-11-22", "2026-11-22")))
+  expect_equal(pulls$students, c(2L, 2L, 1L))
+  expect_equal(pulls$rows, c(3L, 4L, 1L))
+})
+
+test_that("the holds transform stops on a column it needs, a date it cannot read, or a footer line", {
+  env <- load_transform_helpers()
+  output_dir <- withr::local_tempdir()
+
+  expect_error(
+    env$transform_holds(student_holds_hd01[setdiff(names(student_holds_hd01), "Hold To Date")],
+                        output_dir, ".qs"),
+    "missing column\\(s\\): Hold To Date")
+  # A date in another order is an error, never a missing date.
+  unreadable <- student_holds_hd01
+  unreadable$`Hold From Date`[2] <- "02/01/2025"
+  expect_error(env$transform_holds(unreadable, output_dir, ".qs"), "no readable Hold From Date")
+  # The export's footer line has no hold code: parse-data.R drops it, and a
+  # file that still carries one is not transformed.
+  footer <- student_holds_hd01
+  footer$`Hold Code`[8] <- ""
+  expect_error(env$transform_holds(footer, output_dir, ".qs"), "no hold code, term or pull date")
+  expect_false(file.exists(file.path(output_dir, "cedar_holds.qs")))
 })
 
 

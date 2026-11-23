@@ -12,6 +12,9 @@
 # who has stopped"). Nothing here reads it for anyone else.
 #
 #   build_graduation_dashboard()   the payload
+#   graduation_scope_parts()       the part of it the credit line does not change
+#   graduation_default_scope(), graduation_page_scope(), graduation_page_opt()
+#                                  the page's scope: where it opens, one form of it
 #   graduation_headline()          the lead sentence
 #   graduation_band_table()        each band with its standing counts
 #   graduation_required_table()    each plan's required courses, counted
@@ -64,6 +67,82 @@ build_class_pace <- function(student_terms, degrees, programs, opt = list()) {
   list(pace = pace, transfer = transfer)
 }
 
+#' The scope the Graduation page opens on
+#'
+#' The controls' starting values. The page's UI and the startup preload both
+#' read them here, so what is built ahead is what the page first asks for.
+#'
+#' @param campuses The home campuses the page offers.
+#' @return list(`level`, `campus`, `lines`: every credit line, the opening one
+#'   first).
+graduation_default_scope <- function(campuses) {
+  list(level = names(CEDAR_STUDENT_LEVEL_LABELS)[[1]], campus = intersect(CEDAR_CAMPUS_MAIN, campuses),
+       lines = GRADUATION_LINES)
+}
+
+#' One scope of the Graduation page, in one form
+#'
+#' The controls as the browser sends them, or as the preload names them: one
+#' level, the home campuses sorted (none means every campus) and the credit
+#' line as a number. The same campuses picked in another order are one scope,
+#' so they share one result.
+#'
+#' @param level A student level code.
+#' @param campus Home campus codes; NULL or empty for every campus.
+#' @param line Credits that count as far along.
+#' @return list(`level`, `campus` (character, or NULL for every campus), `line`).
+graduation_page_scope <- function(level, campus = NULL, line = GRADUATION_LINES[[1]]) {
+  level <- as.character(level)
+  line <- suppressWarnings(as.numeric(line))
+  if (length(level) != 1L || is.na(level) || !nzchar(level)) {
+    stop("[graduation-dashboard.R] The Graduation page takes one student level.", call. = FALSE)
+  }
+  if (length(line) != 1L || !is.finite(line)) {
+    stop("[graduation-dashboard.R] The Graduation page takes one credit line, a number.", call. = FALSE)
+  }
+  campus <- sort(unique(as.character(campus)))
+  list(level = level, campus = if (length(campus) > 0L) campus else NULL, line = line)
+}
+
+#' The options the Graduation page builds a scope under
+#'
+#' @param scope [graduation_page_scope()].
+#' @param edges The data edges.
+#' @return The `opt` [build_graduation_dashboard()] and
+#'   [graduation_scope_parts()] take.
+graduation_page_opt <- function(scope, edges) {
+  list(student_level = scope$level, campus = scope$campus, line = scope$line, data_edges = edges,
+       class_pace = FALSE)
+}
+
+# The options the line-independent parts are built under: every option but the
+# credit line and what is laid over it.
+.graduation_scope_opt <- function(opt) {
+  opt[sort(setdiff(names(opt), c("line", "min_list", "class_pace")))]
+}
+
+#' The parts of the Graduation payload the credit line does not change
+#'
+#' Who left and with how many credits ([get_exit_credits()]) and who passed
+#' the attempted-credit ceiling ([get_credit_ceiling_crossings()]) depend on
+#' the level and the home campuses, not on how many credits count as far
+#' along. They are most of the build's time, so the page builds them once for
+#' a level and its campuses and builds each credit line over them
+#' (`build_graduation_dashboard(parts =)`).
+#'
+#' @param student_terms,programs,degrees,terms,opt As
+#'   [build_graduation_dashboard()] takes them. `opt$line` is not read.
+#' @return list(`exit`, `ceiling`, `scope`: the options they were built under).
+graduation_scope_parts <- function(student_terms, programs, degrees, terms, opt = list()) {
+  list(
+    exit = get_exit_credits(student_terms, programs, degrees, terms, opt),
+    # Students passing the attempted-credit ceiling with no degree yet.
+    ceiling = get_credit_ceiling_crossings(student_terms, programs, degrees, list(
+      student_level = opt$student_level, campus = opt$campus, data_edges = opt$data_edges,
+      credit_ceiling = opt$credit_ceiling)),
+    scope = .graduation_scope_opt(opt))
+}
+
 #' The payload for Bird's Eye > Graduation
 #'
 #' @param student_terms,programs,degrees,terms As `get_exit_credits()` takes
@@ -78,6 +157,9 @@ build_class_pace <- function(student_terms, degrees, programs, opt = list()) {
 #'   `first_exit_term`, `line` (credits that count as far along; default 90),
 #'   `min_list` (fewest students for a major to be listed by name; default
 #'   10), `min_n`, `class_pace` (FALSE leaves `pace` and `transfer` NULL).
+#' @param parts Optional: [graduation_scope_parts()] already built for this
+#'   scope, to build another credit line without counting who left again.
+#'   Parts built under another scope are refused.
 #' @return list(`bands`, `series` (one row per last term: `n_left`, `n_far`,
 #'   `n_done`: at 120 or more), `colleges`, `majors` (far-along students by
 #'   group: `n`, `n_done`, `n_flagged`, `n_pell`; majors under `min_list`
@@ -88,7 +170,7 @@ build_class_pace <- function(student_terms, degrees, programs, opt = list()) {
 #'   per band of credits brought, named by band),
 #'   `ceiling` (`get_credit_ceiling_crossings()` for the scope), `meta`).
 build_graduation_dashboard <- function(student_terms, programs, degrees, terms, dims, opt = list(),
-                                       attempts = NULL, boards = NULL) {
+                                       attempts = NULL, boards = NULL, parts = NULL) {
   if (!"primary_college_code" %in% names(student_terms)) {
     stop("[graduation-dashboard.R] student_terms lacks primary_college_code (the loader attaches it).", call. = FALSE)
   }
@@ -97,7 +179,11 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
   }
   line <- as.numeric(opt$line %||% GRADUATION_LINES[[1]])
   min_list <- as.integer(opt$min_list %||% 10L)
-  exit <- get_exit_credits(student_terms, programs, degrees, terms, opt)
+  if (is.null(parts)) parts <- graduation_scope_parts(student_terms, programs, degrees, terms, opt)
+  if (!identical(parts$scope, .graduation_scope_opt(opt))) {
+    stop("[graduation-dashboard.R] `parts` were built under another scope than `opt`.", call. = FALSE)
+  }
+  exit <- parts$exit
   done_at <- max(exit$meta$breaks)
   students <- exit$students %>%
     left_join(student_terms %>% transmute(student_id, exit_term = as.integer(term), college = primary_college_code,
@@ -151,11 +237,6 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
     build_class_pace(student_terms, degrees, programs, opt)
   }
 
-  # Students passing the attempted-credit ceiling with no degree yet.
-  ceiling <- get_credit_ceiling_crossings(student_terms, programs, degrees, list(
-    student_level = opt$student_level, campus = opt$campus, data_edges = opt$data_edges,
-    credit_ceiling = opt$credit_ceiling))
-
   series <- students %>%
     group_by(exit_term) %>%
     summarize(n_left = n(), n_far = sum(credits >= line, na.rm = TRUE),
@@ -164,7 +245,7 @@ build_graduation_dashboard <- function(student_terms, programs, degrees, terms, 
 
   list(
     bands = exit$bands, series = series, colleges = colleges, majors = majors, required = required,
-    pace = class_pace$pace, transfer = class_pace$transfer, ceiling = ceiling,
+    pace = class_pace$pace, transfer = class_pace$transfer, ceiling = parts$ceiling,
     meta = c(exit$meta, list(line = line, done_at = done_at, n_far = nrow(far),
                              n_done = sum(far$credits >= done_at),
                              n_far_flagged = sum(far$flagged %in% TRUE),

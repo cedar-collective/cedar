@@ -174,9 +174,65 @@ test_that("a fetch nobody can answer, or one that overruns, is stopped and its c
 # ISSUES.md I43: the cron names no reports, and the default asked for the
 # applicants report, which production mrgather never fetches. Under the check
 # above, every scheduled refresh failed from 2026-10-24 and kept the old tables.
-test_that("the scheduled refresh's default reports leave the applicants report out", {
+# The default is now the registry's daily reports: a report production mrgather
+# cannot fetch stays out of it until its row says daily.
+test_that("the scheduled refresh's default reports leave out the ones only fetched when named", {
   script <- readLines("../../scripts/update-data.sh", warn = FALSE)
   default <- grep("^\\[\\[ \\$\\{#REPORTS\\[@\\]\\} -eq 0 \\]\\]", script, value = TRUE)
   expect_length(default, 1L)
-  expect_match(default, "REPORTS=(desr deg as cl);", fixed = TRUE)
+  expect_match(default, "REPORTS=($(report_daily_codes));", fixed = TRUE)
+
+  registry <- read_report_registry()
+  expect_equal(registry$code[registry$daily], c("desr", "deg", "as", "cl"))
+  expect_equal(registry$code[!registry$daily], c("aa", "holds"))
+})
+
+# The reports are listed twice, once for R and once for the shell. They
+# drifted when the shell's copy was typed by hand (ISSUES.md I2: three of five
+# skip checks could never fire), so the two lists are held to each other.
+test_that("the shell scripts' report registry and the parser's report specs agree", {
+  specs <- load_report_specs()$report_specs
+  registry <- read_report_registry()
+
+  # The registry's order is the order the default reports are fetched in.
+  expect_setequal(registry$code, names(specs))
+  registry <- registry[match(names(specs), registry$code), ]
+  expect_equal(registry$filename_sig, unname(vapply(specs, `[[`, character(1), "filename_sig")))
+  expect_equal(registry$stage, unname(vapply(specs, `[[`, character(1), "stage")))
+  expect_equal(registry$daily, unname(vapply(specs, `[[`, logical(1), "daily")))
+
+  # Both scripts take any report in the registry, and no other word.
+  for (script in c("update-data.sh", "restart-cedar.sh")) {
+    path <- normalizePath(file.path("../../scripts", script))
+    expect_equal(system2("bash", c("-n", shQuote(path))), 0, info = script)
+    unknown <- suppressWarnings(
+      system2("bash", c(shQuote(path), "-s", "202680", "bogus"), stdout = TRUE, stderr = TRUE))
+    expect_true(any(grepl("Unknown option or report: bogus (reports: desr deg as cl aa holds)",
+                          unknown, fixed = TRUE)), info = script)
+  }
+})
+
+# The transform was told its stages only when fewer than five reports arrived,
+# five being every report there was. With a sixth, five arriving named no
+# stage, and the transform rebuilt every table, the missing report's from its
+# old export.
+test_that("the transform is told its stages however many reports arrived", {
+  todays <- c(desr = "Department_Enrollment_Status_20261020.xlsx",
+              deg = "Graduates_and_Pending_Graduates_20261020.xlsx",
+              as = "Academic_Study_Detail_Guided_20261020.xlsx",
+              cl = "Class_List_Guided_Adhoc_20261020.xlsx",
+              aa = "S_Admissions_Applicants_Detail_20261020.xlsx",
+              holds = "S_Student_Holds_20261020_104513.xlsx")
+
+  one <- run_fetch_step(todays[["holds"]], reports = "holds")
+  expect_equal(one$step, "SKIPPED|files already from today")
+  expect_equal(one$parse, "holds")
+  expect_equal(one$tables, "--tables holds")
+
+  five <- run_fetch_step(unname(todays[names(todays) != "aa"]), reports = names(todays))
+  expect_match(five$step, "^PARTIAL\\|no file from today for: aa; continuing with: desr deg as cl holds$")
+  expect_equal(five$tables, "--tables sections,degrees,programs,students,holds")
+
+  all_six <- run_fetch_step(unname(todays), reports = names(todays))
+  expect_equal(all_six$tables, "--tables sections,degrees,programs,students,applicants,holds")
 })

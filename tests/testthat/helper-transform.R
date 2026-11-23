@@ -12,3 +12,12 @@ load_transform_helpers <- function() {
              envir = env)
   env
 }
+
+# The report list parse-data.R reads (R/data-parsers/report-specs.R): the specs
+# and the two functions that find an export's header and drop its footer
+# lines, sourced into their own environment.
+load_report_specs <- function() {
+  env <- new.env(parent = .GlobalEnv)
+  sys.source(file.path(cedar_base_dir, "R/data-parsers/report-specs.R"), envir = env)
+  env
+}

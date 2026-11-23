@@ -15,6 +15,7 @@
 # Verify after changes: Rscript -e "testthat::test_dir('tests/testthat')"
 #
 # Recent schema changes:
+# - Nov 2026: Added cedar_holds (from student_holds)
 # - Nov 2026: Units and colleges are no longer written (ADR-001 step 3). Every
 #             table carries its keys -- subject, program code, the source's
 #             college -- and the loader attaches department / college /
@@ -28,8 +29,10 @@
 # - Jan 2026: Added subject_code, level, instructor_id to cedar_registrations
 # - Jan 2026: Added student_level, student_college, student_campus to cedar_programs
 #
-# To add a new table: write a transform_<name>() function below,
-# add the name to all_tables in transform_to_cedar(), wire it in the orchestrator.
+# To add a new table: write a transform_<name>() function below, add the name
+# to CEDAR_TRANSFORM_STAGES, wire it in the orchestrator. A table built from a
+# new MyReports report: docs/developers/data-transformation-myreports.md,
+# "Adding a MyReports report".
 
 library(tidyverse)
 library(digest)
@@ -161,8 +164,25 @@ build_cedar_status_payload <- function(saved_files, generated = Sys.time()) {
   )
 }
 
+# The status file describes the data directory, not the last run: a run that
+# rebuilt some tables keeps the entries of the others, as long as their files
+# are still there. Until 2026-11-22 each run wrote only its own tables, so a
+# run of one stage left scripts/data-status.sh listing one table (ISSUES.md I78).
 write_cedar_status_file <- function(saved_files, status_file, generated = Sys.time()) {
   status <- build_cedar_status_payload(saved_files, generated)
+  if (file.exists(status_file)) {
+    previous_text <- paste(readLines(status_file, warn = FALSE), collapse = "\n")
+    if (isTRUE(jsonlite::validate(previous_text))) {
+      previous <- jsonlite::fromJSON(previous_text, simplifyVector = FALSE)$tables
+      kept <- previous[setdiff(names(previous), names(status$tables))]
+      still_there <- vapply(kept, function(info) {
+        is.character(info$file) && file.exists(file.path(dirname(status_file), info$file))
+      }, logical(1))
+      status$tables <- c(kept[still_there], status$tables)
+    } else {
+      message("  The previous status file is not valid JSON; writing this run's tables only.")
+    }
+  }
   jsonlite::write_json(status, status_file, auto_unbox = TRUE,
                        pretty = TRUE, na = "null")
   invisible(status)
@@ -1358,7 +1378,153 @@ transform_applicants <- function(applicants, data_dir, ext) {
 }
 
 
+# ── 7. transform_holds: student_holds → cedar_holds ───────────────────────────
+
+# Banner's end date for a hold nobody has ended.
+HOLD_OPEN_END_DATE <- as.Date("2099-12-31")
+
+# What makes two rows of different pulls the same hold. The report carries no
+# hold id, and a hold's end date changes when the hold is ended, so the end
+# date cannot be part of it.
+CEDAR_HOLD_KEY <- c("student_id", "hold_code", "hold_from_date", "hold_explanation",
+                    "origin_office_code")
+
+# A hold date as a Date. The export writes YYYY/MM/DD; a value that is neither
+# that nor a date is an error, never NA. The shape is checked first: as.Date()
+# reads "02/01/2025" under %Y/%m/%d as the 20th of January in the year 2.
+parse_hold_date <- function(x, column) {
+  if (inherits(x, "Date")) return(as.Date(x))
+  text <- trimws(as.character(x))
+  slashed <- grepl("^[0-9]{4}/[0-9]{2}/[0-9]{2}$", text)
+  dashed <- grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", text)
+  parsed <- as.Date(rep(NA_character_, length(text)))
+  parsed[slashed] <- as.Date(text[slashed], format = "%Y/%m/%d")
+  parsed[dashed] <- as.Date(text[dashed], format = "%Y-%m-%d")
+  bad <- is.na(parsed)
+  if (any(bad)) {
+    stop("[transform_holds] ", sum(bad), " row(s) have no readable ", column,
+         " (expected YYYY/MM/DD), e.g. \"", text[bad][1], "\".", call. = FALSE)
+  }
+  parsed
+}
+
+#' Transforms the Student Holds pulls to the CEDAR model: one table of every
+#' hold each pulled student has had, as the most recent pull that listed it
+#' saw it.
+#'
+#' A pull of one term lists the whole hold history of the students registered
+#' in that term, so a student enrolled in six terms brings the same holds six
+#' times, each as it stood the day that term was pulled. A hold is kept as the
+#' most recent pull listing it saw it (the pulls ordered by date, then term).
+#' Rows of that pull are all kept: one pull can list the same hold twice, with
+#' two end dates.
+#'
+#' Reading the table: a hold's dates are known only up to its `as_of_date`. One
+#' still open then may have ended since, and for a student no longer pulled
+#' nothing says so. `in_latest_pull` is FALSE for a hold the student's own most
+#' recent pull no longer lists: removed from Banner, changed in the fields that
+#' identify it, or begun before that pull's ten-year window.
+#'
+#' A student with no row had no hold only if a term they were registered in
+#' was pulled. The pulls are on the table as its `pulls` attribute: one row per
+#' term pulled, with the day, the students who had a hold and the rows.
+#'
+#' The student's description on the report (major, college, population) is not
+#' carried: it is cedar_student_terms' to give.
+#'
+#' @param holds    Raw student_holds data frame (output of parse-data.R)
+#' @param data_dir Path to data directory
+#' @param ext      File extension
+#' @return list(saved = list(holds = <meta>))
+transform_holds <- function(holds, data_dir, ext) {
+  message("──────────────────────────────────────────────────────")
+  message("7. Transforming student_holds → cedar_holds")
+  message("──────────────────────────────────────────────────────")
+  message("  Loaded ", nrow(holds), " rows, ", ncol(holds), " columns")
+
+  required <- c("ID", "Academic Period Code", "Hold Code", "Hold", "Hold Explanation",
+                "Hold User Creator", "Hold Originating Office Code", "Hold Originating Office",
+                "Hold From Date", "Hold To Date", "as_of_date")
+  missing <- setdiff(required, names(holds))
+  if (length(missing) > 0) {
+    stop("[transform_holds] student_holds is missing column(s): ", paste(missing, collapse = ", "),
+         call. = FALSE)
+  }
+  blank_to_na <- function(x) dplyr::na_if(trimws(as.character(x)), "")
+
+  holds <- tibble::tibble(
+    student_id         = encrypt_if_needed(holds[["ID"]]),
+    hold_code          = blank_to_na(holds[["Hold Code"]]),
+    hold               = blank_to_na(holds[["Hold"]]),
+    hold_explanation   = blank_to_na(holds[["Hold Explanation"]]),
+    origin_office_code = blank_to_na(holds[["Hold Originating Office Code"]]),
+    origin_office      = blank_to_na(holds[["Hold Originating Office"]]),
+    created_by         = blank_to_na(holds[["Hold User Creator"]]),
+    hold_from_date     = parse_hold_date(holds[["Hold From Date"]], "Hold From Date"),
+    hold_to_date       = parse_hold_date(holds[["Hold To Date"]], "Hold To Date"),
+    pull_term          = as.integer(holds[["Academic Period Code"]]),
+    as_of_date         = as.Date(holds[["as_of_date"]])
+  )
+  unplaced <- is.na(holds$hold_code) | is.na(holds$pull_term) | is.na(holds$as_of_date)
+  if (any(unplaced)) {
+    stop("[transform_holds] ", sum(unplaced), " row(s) have no hold code, term or pull date: ",
+         "the export's own footer lines are parse-data.R's to drop (report-specs.R drop_na_col).",
+         call. = FALSE)
+  }
+
+  pulls <- holds %>%
+    group_by(pull_term, as_of_date) %>%
+    summarise(students = n_distinct(student_id), rows = n(), .groups = "drop") %>%
+    arrange(pull_term)
+  if (anyDuplicated(pulls$pull_term)) {
+    stop("[transform_holds] A term is stored with more than one pull date: ",
+         paste(unique(pulls$pull_term[duplicated(pulls$pull_term)]), collapse = ", "),
+         ". parse-data.R replaces a term's rows on each pull.", call. = FALSE)
+  }
+
+  # The pulls in order: by the day pulled, then by term.
+  holds <- holds %>% mutate(pull_order = as.numeric(as_of_date) * 1e6 + pull_term)
+  student_latest <- holds %>%
+    group_by(student_id) %>%
+    summarise(latest_pull = max(pull_order), .groups = "drop")
+  key_latest <- holds %>%
+    group_by(across(all_of(CEDAR_HOLD_KEY))) %>%
+    summarise(pull_order = max(pull_order), .groups = "drop")
+
+  cedar_holds <- holds %>%
+    inner_join(key_latest, by = c(CEDAR_HOLD_KEY, "pull_order")) %>%
+    left_join(student_latest, by = "student_id") %>%
+    mutate(
+      open_ended     = hold_to_date == HOLD_OPEN_END_DATE,
+      in_latest_pull = pull_order == latest_pull
+    ) %>%
+    select(student_id, hold_code, hold, hold_explanation, origin_office_code, origin_office,
+           created_by, hold_from_date, hold_to_date, open_ended, pull_term, as_of_date,
+           in_latest_pull) %>%
+    distinct() %>%
+    arrange(student_id, hold_from_date, hold_code, hold_to_date)
+
+  message("  ✅ Created cedar_holds: ", format(nrow(cedar_holds), big.mark = ","), " rows for ",
+          format(n_distinct(cedar_holds$student_id), big.mark = ","), " students, from ",
+          format(nrow(holds), big.mark = ","), " pulled rows over ",
+          n_distinct(holds$pull_term), " term(s)")
+  message("  ", format(sum(cedar_holds$open_ended), big.mark = ","), " with no end date; ",
+          format(sum(!cedar_holds$in_latest_pull), big.mark = ","),
+          " not listed by the student's most recent pull")
+  message("  Terms pulled: ", paste(pulls$pull_term, collapse = " "))
+
+  attr(cedar_holds, "pulls") <- pulls
+  saved_meta <- save_cedar_file(cedar_holds, "holds", data_dir, ext)
+  list(saved = list(holds = saved_meta))
+}
+
+
 # ── Orchestrator ──────────────────────────────────────────────────────────────
+
+# Every stage --tables can name. A report's stage (report-specs.R,
+# scripts/report-registry.sh) must be one of these.
+CEDAR_TRANSFORM_STAGES <- c("sections", "students", "programs", "degrees", "student_terms",
+                            "measures", "applicants", "holds")
 
 #' Transform MyReports data to CEDAR model
 #'
@@ -1369,7 +1535,7 @@ transform_applicants <- function(applicants, data_dir, ext) {
 #' @param use_qs   Use .qs format (default: from config)
 #' @param tables   Character vector of tables to run (default: all)
 #'                 Options: "sections", "students", "programs", "degrees",
-#'                          "student_terms", "measures", "applicants"
+#'                          "student_terms", "measures", "applicants", "holds"
 #' @return Invisibly: named list of save metadata for each table written
 transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
                                include_student_terms = TRUE, min_term = NULL) {
@@ -1396,8 +1562,7 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
   ext <- if (use_qs && requireNamespace("qs2", quietly = TRUE)) ".qs" else ".Rds"
 
   # Resolve which tables to run
-  all_tables <- c("sections", "students", "programs", "degrees", "student_terms", "measures",
-                  "applicants")
+  all_tables <- CEDAR_TRANSFORM_STAGES
   if (is.null(tables)) {
     run_tables <- all_tables
   } else {
@@ -1565,6 +1730,27 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     }
   } else {
     message("  ⏭  Skipping cedar_applicants (not in --tables)")
+  }
+
+  # ── 7. cedar_holds ────────────────────────────────────────────────────────
+  # A run that names the stage has a file to build from; a run of everything
+  # builds it where the report has been pulled.
+  if ("holds" %in% run_tables) {
+    holds_file <- file.path(data_dir, paste0("student_holds", ext))
+    if (file.exists(holds_file)) {
+      message("\nLoading: ", holds_file)
+      holds  <- load_file(holds_file, ext)
+      result <- transform_holds(holds, data_dir, ext)
+      saved_files <- c(saved_files, result$saved)
+      rm(holds); gc(verbose = FALSE)
+    } else if ("holds" %in% tables) {
+      stop("[transform-to-cedar.R] The holds stage was asked for and there is no ", holds_file,
+           ": parse the Student Holds report first (parse-data.R -r holds).", call. = FALSE)
+    } else {
+      message("  ⏭  Skipping cedar_holds (no student_holds file: the report has not been pulled)")
+    }
+  } else {
+    message("  ⏭  Skipping cedar_holds (not in --tables)")
   }
 
   # ── Summary ───────────────────────────────────────────────────────────────

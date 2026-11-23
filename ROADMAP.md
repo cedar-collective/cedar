@@ -187,6 +187,17 @@ worth a page is who does not pass a course, which is the return watch.
   Downstream) that Against Non-Takers has
   (M41), so its cohorts can leave concurrent-enrollment students out.
 - [ ] **Near-completers and stalled pre-majors** as outreach counts.
+- [ ] **Holds against stopping out, not returning and registering late.**
+  `cedar_holds` is built and no page reads it
+  ([data-model.md](docs/developers/data-model.md#6-cedar_holds-student-holds)).
+  First: an institution file saying what each hold code blocks (registration,
+  transcript, graduation), which the report does not carry; without it an
+  advisement hold and a transcript hold count alike. Then, for each term's
+  students, who had a registration-blocking hold in force while the next
+  term's registration was open, read against `returned_next_regular_term` and
+  the day they registered, by hold type. A hold on a student who has left is
+  known only up to its last pull, so the previous term stays in the daily
+  pull's range.
 
 ## Degree Explorer and curriculum-informed demand
 
@@ -268,6 +279,21 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
 
 ## Platform
 
+- [ ] **Retention opens without a wait.** Graduation's opening view is built
+  in the background when the app starts (2026-11-22); Retention's first build
+  averages 11 seconds on production and is the next page to give the same
+  treatment ([built ahead](docs/developers/shiny-modules.md#results-shared-by-every-session-and-built-ahead)).
+- [ ] **Production's mrgather as a checkout of its repository.** mrgather has
+  its own repository since 2026-11-22 (`cedar-collective/mrgather`, private);
+  production still runs a hand-copied, older folder (I43). Make
+  `/root/mrgather` a checkout (a read-only deploy key; its `.env` and
+  `puppeteer_data/` carried over) so a change arrives by `git pull` and an
+  image rebuild; then let it read CEDAR's report list instead of keeping its
+  own (M65), and report a failed download in its exit status (I33).
+- [ ] **The Student Holds report in the scheduled refresh.** Fetched only
+  when named until production's mrgather has its handler; then `daily` in
+  the report spec and the registry, with the pull's range reaching back one
+  regular term.
 - [ ] **Code history by unit.** Admin → Mappings → Code history lists every
   `code_history.csv` row with when each code was offered. Still to do: each
   unit's program codes and course subjects with when each was in use, and the

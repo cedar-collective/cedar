@@ -165,67 +165,19 @@ write_summary <- function() {
   )
 }
 
-# define details for each kind of MyReports report
-message("defining report specifications...")
-report_specs <- list(
-  desr = list(
-    data_file = "DESRs",
-    term_col = "TERM",
-    parser = "parse-DESR.R",
-    filename_sig = "Department_Enrollment_Status"
-  ),
-  cl = list(
-    data_file = "class_lists",
-    term_col = "Academic Period",
-    ID_col = c("Primary Instructor ID", "Student ID"),
-    drop_cols = c(
-      "Primary Instructor Email", "Primary Instructor Preferred First Name",
-      "Primary Instructor NetID", "Student Name", "Student First Name",
-      "Student Last Name", "Confidentiality Indicator", "Student Email Address",
-      "Student Preferred First Name", "Student NetID", "Street Line 1",
-      "Street Line 2", "City", "County", "Zip Code", "Nation", "Phone Number",
-      "Visa Type", "Registration User ID"
-    ),
-    filename_sig = "Class_List_Guided_Adhoc"
-  ),
-  as = list(
-    data_file = "academic_studies",
-    term_col = "Academic Period",
-    ID_col = "ID",
-    drop_na_col = "Academic Year",
-    drop_cols = c(
-      "Student First Name", "Student Last Name", "Confidentiality Indicator",
-      "Email Address", "Preferred First Name", "NetID", "Street Line 1",
-      "Street Line 2", "City", "County", "County Code", "Zip Code",
-      "State/Province", "Phone Number"
-    ),
-    filename_sig = "Academic_Study_Detail_Guided"
-  ),
-  deg = list(
-    data_file = "degrees",
-    term_col = "Academic Period",
-    ID_col = "ID",
-    drop_cols = c(
-      "Student Preferred First Name", "Student First Name", "Student Last Name",
-      "Student Middle Initial", "Confidentiality Indicator", "Email Address",
-      "NetID", "Street Line 1", "Street Line 2", "City", "State/Province",
-      "Zipcode", "Phone Number", "Visa Type", "Visa Type Code"
-    ),
-    filename_sig = "Graduates_and_Pending_Graduates"
-  ),
-  aa = list(
-    data_file = "admissions_applicants",
-    term_col = "Academic Period",
-    ID_col = "ID",
-    drop_cols = c(
-      "Student First Name", "Student Middle Name", "Student Last Name", "Name",
-      "Email Address", "Phone Number", "Street Line 1", "Street Line 2", "City",
-      "State Province Code", "Zipcode", "Nation", "Nation of Citizenship",
-      "Visa Type", "Registration User ID", "Father School", "Mother School"
-    ),
-    filename_sig = "S_Admissions_Applicants_Detail"
-  )
-)
+# The reports and how each file is read (report_specs, find_report_header_line(),
+# drop_report_noise_rows()) are in report-specs.R, beside this file, so the
+# tests and the shell scripts' registry can be checked against one list.
+local({
+  file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  here <- if (length(file_arg) > 0) dirname(sub("^--file=", "", file_arg[1])) else file.path("R", "data-parsers")
+  specs_file <- file.path(here, "report-specs.R")
+  if (!file.exists(specs_file)) {
+    stop("[parse-data.R] report-specs.R not found beside parse-data.R (looked in ", here, ").", call. = FALSE)
+  }
+  message("reading report specifications from ", specs_file, "...")
+  source(specs_file, local = globalenv())
+})
 
 # Function to check if running in Docker
 is_docker <- function() {
@@ -258,7 +210,7 @@ check_memory <- function(context = "") {
 #' - Handles encryption of sensitive ID columns.
 #' - Designed for command line use.
 #'
-#' @param report Character vector of report types to process (e.g., "desr", "cl", "as", "deg").
+#' @param report Character vector of report types to process: names of report_specs (report-specs.R).
 #' @param guide Logical; if TRUE, prints usage instructions.
 #' @return None. Side effects: saves processed data, prints progress messages.
 process_reports <- function(
@@ -528,7 +480,24 @@ for (report in report_list) {
     } else {
       NULL
     }
-    new_data <- fread(file.path(csv_file), colClasses = col_classes)
+    # An export with a title above its table has its column names further down.
+    skip_lines <- 0L
+    if (!is.null(report_spec$header_first_col)) {
+      header_line <- find_report_header_line(csv_file, report_spec$header_first_col)
+      skip_lines <- header_line - 1L
+      message("Column names are on line ", header_line, " of the export.")
+    }
+    # The CSV is the export unhashed, names and all: it goes the moment it has
+    # been read, whether or not the read worked. Until 2026-11-22 it was left
+    # beside the hashed file after every parse (ISSUES.md I77).
+    new_data <- tryCatch(
+      fread(file.path(csv_file), colClasses = col_classes, skip = skip_lines),
+      finally = unlink(csv_file)
+    )
+    if (file.exists(csv_file)) {
+      add_error(paste0("ERROR: could not remove the unhashed CSV: ", csv_file), report = report)
+      stop("[parse-data.R] ERROR: could not remove the unhashed CSV: ", csv_file)
+    }
 
     # fread only warns when a named colClasses column is absent, and a missing ID
     # column means the rows would be hashed from the wrong field or not at all.
@@ -547,6 +516,13 @@ for (report in report_list) {
       filter(
         !if_all(everything(), ~ is.na(.) | trimws(.) == "")
       )
+
+    # The export's own footer lines go before anything reads the rows: left in,
+    # a footer line would be counted, named as a term and hashed as a person.
+    if (!is.null(report_spec$drop_na_col)) {
+      message("Dropping rows with nothing in: ", report_spec$drop_na_col)
+      new_data <- drop_report_noise_rows(new_data, report_spec$drop_na_col)
+    }
 
     message("Loaded ",nrow(new_data) ," rows from CSV file.")
 
@@ -572,13 +548,6 @@ for (report in report_list) {
     new_data$as_of_date <- ymd(file_date)
     as_of_date_value <- as.character(ymd(file_date))
     
-    # drop noise rows before anything else
-    if (!is.null(report_spec$drop_na_col)) {
-      message("Dropping rows with NA in: ", report_spec$drop_na_col)
-      new_data <- new_data %>% filter(!is.na(.data[[report_spec$drop_na_col]]))
-      message(nrow(new_data), " rows remain.")
-    }
-
     # drop PII / extraneous columns listed in spec
     if (!is.null(report_spec$drop_cols)) {
       cols_to_drop <- intersect(report_spec$drop_cols, names(new_data))
@@ -778,7 +747,7 @@ if (!requireNamespace("optparse", quietly = TRUE)) {
 }
 library(optparse)
 option_list = list(
-  make_option(c("-r","--report"), help="specifies what report to process. separate by commas without spaces if multiple. default is all (desr, cl, as, deg, aa).", metavar="character"),
+  make_option(c("-r","--report"), help=paste0("specifies what report to process. separate by commas without spaces if multiple. default is all (", paste(names(report_specs), collapse = ", "), ")."), metavar="character"),
   make_option(c("--guide"), default=FALSE, action="store_true", help="show instructions and options for specified function."),
   make_option(c("--keep"), default=FALSE, action="store_true", help="keep original .xlsx file after processing (default: FALSE).")
 )
@@ -789,7 +758,7 @@ message("Parsed options: ", str(opt))
 # check if report is specified
 reports_named <- !(is.null(opt$report) || opt$report == "")
 if (!reports_named) {
-  message("No report specified. Using all (desr, cl, as, deg) by default.")
+  message("No report specified. Using all (", paste(names(report_specs), collapse = ", "), ") by default.")
   opt$report <- names(report_specs) 
 } else {
   message("Processing report(s): ", opt$report)

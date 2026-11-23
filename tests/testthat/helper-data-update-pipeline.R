@@ -5,7 +5,7 @@
 # stand-in's stdout is mrgather's); `rm -f` records the container it was asked
 # to remove and ends the running fetch, as removing the container does.
 run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "20261020",
-                           time_limit = 60L) {
+                           time_limit = 60L, reports = c("cl", "desr")) {
   script <- readLines("../../scripts/update-data.sh", warn = FALSE)
   first <- grep("^report_file_glob\\(\\) \\{", script)
   last <- grep("^# ── Step 2: Parse raw data", script)
@@ -38,10 +38,13 @@ run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "2026
     paste0("MRGATHER_DATA_DIR=", shQuote(downloads)),
     paste0("TODAY=", today), "MODE=local", "DRY_RUN=false", "SECONDS=0", "STEP_START=0",
     "MRGATHER_DIR=/nonexistent", "START_TERM=202480", "END_TERM=202510",
-    "REPORTS=(cl desr)", "SKIP_FETCH=true", "FETCH_RC=0", "FETCH_STATUS=OK", "FETCH_NOTE=",
+    paste0("REPORTS=(", paste(reports, collapse = " "), ")"),
+    "SKIP_FETCH=true", "FETCH_RC=0", "FETCH_STATUS=OK", "FETCH_NOTE=",
     "FETCH_STOP_REASON=", paste0("FETCH_TIME_LIMIT=", time_limit), "FETCH_POLL_SECONDS=1",
     "MRGATHER_2FA_PROMPT='Please enter the 2FA code'",
     "REFRESH_CAN_CONTINUE=true",
+    # The reports' signatures and stages, as the script reads them.
+    paste0("source ", shQuote(normalizePath("../../scripts/report-registry.sh"))),
     "record_step() { printf 'STEP:%s|%s\\n' \"$2\" \"$4\"; }",
     "log_step() { :; }; log_success() { :; }; log_warning() { :; }; log_error() { :; }",
     "run_cmd() { \"$@\"; }",
@@ -63,4 +66,23 @@ run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "2026
     removed = read_one("removed"),
     args = read_one("fetch.args")
   )
+}
+
+# The shell scripts' report table (scripts/report-registry.sh), read through
+# its own functions: one row per report with its code, file signature,
+# transform stage and whether the scheduled refresh asks for it.
+read_report_registry <- function() {
+  code <- paste(
+    paste0("source ", shQuote(normalizePath("../../scripts/report-registry.sh"))),
+    "daily=\" $(report_daily_codes) \"",
+    "for code in $(report_codes); do",
+    "  is_daily=FALSE; [[ \"$daily\" == *\" $code \"* ]] && is_daily=TRUE",
+    "  printf '%s|%s|%s|%s\\n' \"$code\" \"$(report_filename_sig \"$code\")\" \"$(report_stage \"$code\")\" \"$is_daily\"",
+    "done",
+    sep = "\n"
+  )
+  out <- system2("bash", c("-c", shQuote(code)), stdout = TRUE, stderr = TRUE)
+  utils::read.table(text = out, sep = "|", col.names = c("code", "filename_sig", "stage", "daily"),
+                    colClasses = c("character", "character", "character", "logical"),
+                    stringsAsFactors = FALSE)
 }

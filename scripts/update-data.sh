@@ -32,17 +32,11 @@
 #   update-data.sh -s 202610 -e 202680              # Default reports, Spring–Fall 2026
 #   update-data.sh -s 202610 desr deg               # Only DESR and degrees
 #   update-data.sh -s 202580                        # Single term, default reports
-#   update-data.sh -s 202680 desr deg as cl aa      # Every report, applicants too
+#   update-data.sh -s 202680 desr deg as cl aa      # The default reports and applicants
+#   update-data.sh -s 201980 -e 202680 holds        # One report over many terms
 #
-# Report options: desr deg as cl aa (default: desr deg as cl)
-#   desr = Department Enrollment Status Report (section data)
-#   deg  = Degrees (graduation data)
-#   as   = Academic Studies (program/major data)
-#   cl   = Class Lists (student enrollment data)
-#   aa   = Admissions Applicants (applicant detail data). Not in the default:
-#          production mrgather does not fetch it, and a requested report with
-#          no file from today fails the fetch, so asking for it by default
-#          stopped every scheduled refresh from 2026-10-24 (ISSUES.md I43).
+# The reports, their file signatures, the tables built from each and which are
+# fetched when none is named are in scripts/report-registry.sh (-h lists them).
 
 # No set -e: exit codes are tracked explicitly so we always print the final summary
 
@@ -109,6 +103,17 @@ enter_dir() {
     exit 1
 }
 
+# ── The reports ───────────────────────────────────────────────────────────────
+# Which reports exist, each one's file signature and transform stage, and which
+# are fetched when none is named: one table, beside this script.
+REPORT_REGISTRY_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/report-registry.sh"
+if [[ ! -f "$REPORT_REGISTRY_FILE" ]]; then
+    log_error "Report registry not found: $REPORT_REGISTRY_FILE"
+    exit 1
+fi
+# shellcheck source=scripts/report-registry.sh
+source "$REPORT_REGISTRY_FILE"
+
 # ── Mode detection ────────────────────────────────────────────────────────────
 detect_mode() {
     if [[ -f "$PROD_DOCKER_COMPOSE_FILE" ]] && [[ -d "$PROD_MRGATHER_DIR" ]]; then
@@ -165,13 +170,16 @@ tables built from the ones that did were rebuilt; 1 for any other failure.
 
   -h               Show this help message
   REPORTS          Space-separated list of reports to fetch
-                   (default: desr deg as cl; aa only when named)
-                   Options: desr deg as cl aa
+                   (default: $(report_daily_codes))
+
+Reports:
+$(report_usage_lines)
 
 Examples:
-  $(basename "$0") -s 202610 -e 202680              # All reports, Spring 2026 - Fall 2026
+  $(basename "$0") -s 202610 -e 202680              # Default reports, Spring 2026 - Fall 2026
   $(basename "$0") -s 202610 desr deg               # Only DESR and degrees for Spring 2026
-  $(basename "$0") -s 202580                        # All reports for Fall 2025
+  $(basename "$0") -s 202580                        # Default reports for Fall 2025
+  $(basename "$0") -s 201980 -e 202680 holds        # One report over many terms
 
 EOF
     exit 0
@@ -202,10 +210,13 @@ while [[ $# -gt 0 ]]; do
         --mode) MODE_OVERRIDE="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         --log-tail) LOG_TAIL="$2"; shift 2 ;;
-        desr|deg|as|cl|aa) REPORTS+=("$1"); shift ;;
         *)
-            log_error "Unknown option: $1"
-            usage
+            if report_is_known "$1"; then
+                REPORTS+=("$1"); shift
+            else
+                log_error "Unknown option or report: $1 (reports: $(report_codes))"
+                usage
+            fi
             ;;
     esac
 done
@@ -216,7 +227,11 @@ if [[ -z "$START_TERM" ]]; then
 fi
 
 [[ -z "$END_TERM" ]] && { END_TERM="$START_TERM"; log_warning "No end term specified, using START_TERM: $END_TERM"; }
-[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=(desr deg as cl); log_warning "No reports specified, using the default: ${REPORTS[*]}"; }
+# The default is the registry's daily reports. A report production mrgather
+# cannot fetch must not be daily: asking for the applicants report by default
+# stopped every scheduled refresh from 2026-10-24 (ISSUES.md I43).
+# shellcheck disable=SC2207
+[[ ${#REPORTS[@]} -eq 0 ]] && { REPORTS=($(report_daily_codes)); log_warning "No reports specified, using the default: ${REPORTS[*]}"; }
 
 # ── Mode detection ────────────────────────────────────────────────────────────
 PROD_COMPOSE_EXISTS=false
@@ -287,10 +302,12 @@ else
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     CEDAR_HOST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-    if [[ -d "$CEDAR_HOST_DIR/../mrgather" ]]; then
-        MRGATHER_DIR="$(cd "$CEDAR_HOST_DIR/../mrgather" && pwd)"
+    # mrgather sits beside the CEDAR checkout, or where MRGATHER_DIR says.
+    MRGATHER_CANDIDATE="${MRGATHER_DIR:-$CEDAR_HOST_DIR/../mrgather}"
+    if [[ -d "$MRGATHER_CANDIDATE" ]]; then
+        MRGATHER_DIR="$(cd "$MRGATHER_CANDIDATE" && pwd)"
     else
-        log_error "Cannot find mrgather at: $CEDAR_HOST_DIR/../mrgather"
+        log_error "Cannot find mrgather at: $MRGATHER_CANDIDATE (set MRGATHER_DIR to its directory)"
         exit 1
     fi
 
@@ -349,22 +366,16 @@ log_step "Data dir: $MRGATHER_DATA_DIR"
 log_step "Checking for today's files ($TODAY)..."
 SKIP_FETCH=true
 
-# These signatures MUST match report_specs$<report>$filename_sig in
-# R/data-parsers/parse-data.R — that is the string the parser actually matches
-# files on. They drifted once (`deg` looked for "*Degrees*" against real files
-# named Graduates_and_Pending_Graduates, `as` for "*Academic_Studies*" against
-# Academic_Study_Detail_Guided, and `aa` was missing entirely), which made the
-# skip check permanently unable to fire for three of the five reports. Keep them
-# in sync when a report is added or MyReports renames an export.
+# A report's file from today, by the registry's signature: the same text
+# parse-data.R matches files on (report_specs$<report>$filename_sig). The two
+# drifted once, when the signatures were typed here (`deg` looked for
+# "*Degrees*" against files named Graduates_and_Pending_Graduates), and the
+# skip check could not fire for three of five reports (ISSUES.md I2);
+# test-data-update-pipeline.R now fails when the registry and the specs differ.
 report_file_glob() {
-    case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
-        desr) echo "*Department_Enrollment_Status*${TODAY}*.xlsx" ;;
-        deg)  echo "*Graduates_and_Pending_Graduates*${TODAY}*.xlsx" ;;
-        as)   echo "*Academic_Study_Detail_Guided*${TODAY}*.xlsx" ;;
-        cl)   echo "*Class_List_Guided_Adhoc*${TODAY}*.xlsx" ;;
-        aa)   echo "*S_Admissions_Applicants_Detail*${TODAY}*.xlsx" ;;
-        *)    return 1 ;;
-    esac
+    local signature
+    signature=$(report_filename_sig "$1") || return 1
+    echo "*${signature}*${TODAY}*.xlsx"
 }
 has_todays_file() {
     find "$MRGATHER_DATA_DIR" -maxdepth 1 -name "$1" 2>/dev/null | grep -q .
@@ -489,19 +500,21 @@ echo
 # are, and no table is republished from an older export as today's.
 REPORTS_CSV=$(IFS=,; echo "${ARRIVED[*]}")
 
-# Map those reports to cedar table names for transform-to-cedar.R.
-# Only pass --tables when a subset of reports is refreshed (not all 5)
+# The transform stages those reports feed, from the registry. The stages are
+# always named: the transform adds the derived tables itself (student_terms,
+# measures), and a run that names nothing would rebuild every table, the ones
+# whose report did not arrive included.
 TABLES_ARGS=()
-if [[ ${#ARRIVED[@]} -gt 0 && ${#ARRIVED[@]} -lt 5 ]]; then
+if [[ ${#ARRIVED[@]} -gt 0 ]]; then
   TABLES=()
   for report in "${ARRIVED[@]}"; do
-    case "$report" in
-      desr) TABLES+=("sections") ;;
-      cl)   TABLES+=("students") ;;
-      as)   TABLES+=("programs") ;;
-      deg)  TABLES+=("degrees") ;;
-      aa)   TABLES+=("applicants") ;;
-    esac
+    if stage=$(report_stage "$report"); then
+      TABLES+=("$stage")
+    else
+      log_error "No transform stage for report: $report (scripts/report-registry.sh)"
+      REFRESH_CAN_CONTINUE=false
+      PIPELINE_SUCCESS=false
+    fi
   done
   TABLES_CSV=$(IFS=,; echo "${TABLES[*]}")
   TABLES_ARGS+=(--tables "$TABLES_CSV")

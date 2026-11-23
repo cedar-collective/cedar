@@ -11,28 +11,35 @@
 #
 # The module holds no analysis: it collects the level, the home campuses and
 # the credit line, calls build_graduation_dashboard()
-# (features/graduation-dashboard.R) and lays out its payload. It builds only
-# while the tab is open, once per scope, shared by every session.
+# (features/graduation-dashboard.R) and lays out its payload. Each scope is
+# built once and shared by every session. The scope the page opens on, with
+# each of its credit lines, is built in the background when the app starts
+# (graduation_preload_jobs(), called from global.R), so the page opens without
+# a wait; any other scope is built when first asked for.
 #
 # Exported functions:
 #   graduationUI(id, campuses)
 #   graduationServer(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards)
+#   graduation_payload_job(), graduation_summer_job()   a shared result's key and build
+#   graduation_preload_jobs(tables, campuses)           the opening scope's, for the preload
 
 graduationUI <- function(id, campuses) {
   ns <- NS(id)
   levels <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
   lines <- stats::setNames(GRADUATION_LINES, paste(GRADUATION_LINES, "credits or more"))
+  # The opening values are the scope the preload builds: one source for both.
+  opens_on <- graduation_default_scope(campuses)
   tagList(
     filter_bar(
       "Graduation",
       "Where do students leave without a degree, and how far along were they?",
       fluidRow(
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
+        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = opens_on$level)),
         column(4, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
-                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
+                                 selected = opens_on$campus,
                                  options = list(placeholder = "Every home campus"))),
         column(5, radioButtons(ns("line"), "Far along means", choices = lines,
-                               selected = GRADUATION_LINES[[1]], inline = TRUE))
+                               selected = opens_on$lines[[1]], inline = TRUE))
       )
     ),
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332",
@@ -124,6 +131,60 @@ graduationUI <- function(id, campuses) {
       n_pell = cedar_count_coldef("Ever Pell-eligible")))
 }
 
+# ── Shared results ───────────────────────────────────────────────────────────
+#
+# The page's results are the same for every session, so each is built once and
+# shared (cedar_shared_result()). A job is one result's key and its build. The
+# server's reactives and the startup preload make their jobs here, so a result
+# built ahead is the one the page asks for.
+#
+# tables   named list: student_terms, programs, degrees, terms, dims, edges,
+#          attempts, boards (as graduationServer() takes them).
+
+GRADUATION_TABLES <- c("student_terms", "programs", "degrees", "terms", "dims", "edges", "attempts", "boards")
+
+# A table left out would not fail: the payload would be built without the
+# part that reads it. Stop instead.
+.graduation_check_tables <- function(tables) {
+  missing <- setdiff(GRADUATION_TABLES, names(tables)[!vapply(tables, is.null, logical(1))])
+  if (length(missing) > 0L) {
+    stop("[graduation.R] The Graduation page needs: ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+}
+
+# The payload for one level, home campuses and credit line. Who left and who
+# passed the credit ceiling do not depend on the line: they are a shared result
+# of their own, built once for the level and campuses and read by each line.
+graduation_payload_job <- function(tables, level, campus, line) {
+  .graduation_check_tables(tables)
+  scope <- graduation_page_scope(level, campus, line)
+  opt <- graduation_page_opt(scope, tables$edges)
+  parts <- function() cedar_shared_result(list("graduation_parts", scope$level, scope$campus), function() {
+    graduation_scope_parts(tables$student_terms, tables$programs, tables$degrees, tables$terms, opt)
+  })
+  list(key = list("graduation_dashboard", scope$level, scope$campus, scope$line),
+       build = function() build_graduation_dashboard(
+         tables$student_terms, tables$programs, tables$degrees, tables$terms, tables$dims, opt,
+         attempts = tables$attempts, boards = tables$boards, parts = parts()))
+}
+
+# The spring students who finish in the summer, for one level and home campuses.
+graduation_summer_job <- function(tables, level, campus) {
+  .graduation_check_tables(tables)
+  scope <- graduation_page_scope(level, campus)
+  list(key = list("graduation_summer", scope$level, scope$campus),
+       build = function() get_summer_finishers(tables$student_terms, tables$degrees, tables$attempts, list(
+         term_type = "spring", student_level = scope$level, campus = scope$campus, data_edges = tables$edges)))
+}
+
+# What the preload builds: the scope the page opens on, under each credit line
+# (the opening line first), and its summer finishers.
+graduation_preload_jobs <- function(tables, campuses) {
+  opens_on <- graduation_default_scope(campuses)
+  c(lapply(opens_on$lines, function(line) graduation_payload_job(tables, opens_on$level, opens_on$campus, line)),
+    list(graduation_summer_job(tables, opens_on$level, opens_on$campus)))
+}
+
 # ── Server ───────────────────────────────────────────────────────────────────
 
 # student_terms, programs, degrees, terms, dims, edges   the loaded tables and edges.
@@ -133,18 +194,19 @@ graduationUI <- function(id, campuses) {
 graduationServer <- function(id, student_terms, programs, degrees, terms, dims, edges, active, attempts, boards,
                              courses, course_codes) {
   moduleServer(id, function(input, output, session) {
+    tables <- list(student_terms = student_terms, programs = programs, degrees = degrees, terms = terms,
+                   dims = dims, edges = edges, attempts = attempts, boards = boards)
     # Shared by every session: the tables are fixed for the life of the process.
+    # The opening scope is already there (the startup preload); another is
+    # built here, behind the overlay, the first time anyone asks for it.
     payload <- reactive({
       req(isTRUE(active()), input$level, input$line)
-      cedar_shared_result(list("graduation_dashboard", input$level, input$campus, input$line), function() cedar_with_loading(session, session$ns("load"), report_type = "graduation_dashboard", {
-        tryCatch(
-          build_graduation_dashboard(student_terms, programs, degrees, terms, dims, list(
-            student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
-            line = as.numeric(input$line), data_edges = edges, class_pace = FALSE), attempts = attempts, boards = boards),
-          error = function(e) {
-            showNotification(paste("Graduation:", conditionMessage(e)), type = "error", duration = 10)
-            NULL
-          })
+      job <- graduation_payload_job(tables, input$level, input$campus, input$line)
+      cedar_shared_result(job$key, function() cedar_with_loading(session, session$ns("load"), report_type = "graduation_dashboard", {
+        tryCatch(job$build(), error = function(e) {
+          showNotification(paste("Graduation:", conditionMessage(e)), type = "error", duration = 10)
+          NULL
+        })
       }))
     })
 
@@ -316,14 +378,11 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
     # Spring students who finish in the summer.
     summer <- reactive({
       req(isTRUE(active()), input$level)
-      cedar_shared_result(list("retention_summer", input$level, input$campus), function() tryCatch(
-        get_summer_finishers(student_terms, degrees, attempts, list(
-          term_type = "spring", student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges)),
-        error = function(e) {
-          showNotification(paste("Summer finishers:", conditionMessage(e)), type = "error", duration = 10)
-          NULL
-        }))
+      job <- graduation_summer_job(tables, input$level, input$campus)
+      cedar_shared_result(job$key, function() tryCatch(job$build(), error = function(e) {
+        showNotification(paste("Summer finishers:", conditionMessage(e)), type = "error", duration = 10)
+        NULL
+      }))
     })
     output$summer_finding <- renderUI({
       s <- summer()

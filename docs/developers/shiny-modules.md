@@ -126,6 +126,65 @@ explicit `.cedar-prose-*` utilities over a new `max-width` literal.
 - Do not refactor the remaining inline server.R tabs unless touching them for a separate reason. The `enrl_data` reactive feeds 8+ output handlers and has non-obvious shared state.
 - Headcount has been extracted to `R/modules/headcount.R` — use it (with pathways.R) as the extraction template. See `ROADMAP.md` for the recommended extraction order of the remaining inline surfaces.
 
+## Results shared by every session, and built ahead
+
+The app is one R process, and R answers one request at a time: while one
+session builds a page, every other session waits. A result that is the same for
+everyone (the tables are fixed for the life of the process) is therefore built
+once and shared: `cedar_shared_result(key, build)` (`R/modules/ui-helpers.R`),
+called inside a plain reactive after its `req()`. `key` is a list of every
+input that changes the result, with the result's name first. Only a built
+value is stored; a build that fails stores nothing and is tried again
+(ISSUES I75 is what `bindCache(cache = "app")` did instead).
+
+Sharing leaves one wait: the first person to open the page after each restart
+(every morning's refresh, every deploy) pays for the build, and so does
+everyone else using the app at that moment. Where the page opens on the same
+view for everyone, that build is done ahead instead:
+`cedar_preload_shared_results(jobs)`, called at the end of `global.R`, builds a
+list of jobs in the background once the app is running. A job is
+`list(key, build)`.
+
+Graduation is the pattern (`R/modules/graduation.R`):
+
+- `graduation_payload_job()` and `graduation_summer_job()` make a result's key
+  and build for a scope. The server's reactives call them, and so does
+  `graduation_preload_jobs()` for the opening scope. **One function makes the
+  job for both**, so the result built ahead is the one the page asks for; a
+  key written twice drifts, and the preload then builds something nobody reads.
+- The opening scope is `graduation_default_scope()`, which the UI's `selected =`
+  values also read. The scope is put in one form before it becomes a key
+  (`graduation_page_scope()`: campuses sorted, the line a number), so the same
+  campuses picked in another order share one result.
+- What does not depend on a control is its own shared result. Who left and who
+  passed the credit ceiling are 85% of the build and do not depend on the
+  credit line, so they are built once for a level and its campuses
+  (`graduation_scope_parts()`), and each line is built over them
+  (`build_graduation_dashboard(parts =)`, which refuses parts counted under
+  another scope). Changing the line then costs the remainder.
+
+How the runner behaves, and why:
+
+- The jobs run one at a time with a gap between them, and the first waits ten
+  seconds from the start of the event loop, so the request that started the
+  process is answered first and a click made meanwhile is answered between
+  two jobs.
+- A job that fails is written to the log (`[preload] ...: failed: ...`) and
+  stores nothing; the page builds it when opened and shows the error there. The
+  error is caught because one that escapes a scheduled callback stops the app.
+- Nothing is saved to disk. A saved payload would need a key over the data and
+  over every source file that shapes it, and a deploy that forgot one would
+  show yesterday's numbers; a result held in the process cannot be stale.
+- The log line for each job (`built`, `already built`, its seconds) is the
+  evidence that the preload ran. A page build that still appears in
+  `report_timing.csv` under the opening scope means the key drifted.
+
+Before adding a page: the preload occupies the process right after every
+start, so add what is slow and opened on a fixed view, and say what it costs.
+Measured 2026-11-22: Graduation's build averaged 25 seconds on production
+(the longest wait of any page) and about 5 on a development machine;
+Retention's averaged 11 on production and is the next candidate.
+
 ## URL deep links & shareable state
 
 One registry, `CEDAR_SHARE_SPECS` in `R/trunk/url-state.R`, drives BOTH directions of the shareable-URL round-trip so they cannot drift. Each entry is keyed by the exact navbar tab title and declares `slug` (the `?tab=` value), `prefix`/`sep` (how a namespaced input id is built), ordered `fields` (the only URL keys accepted, with dependency order such as campus before department), `run` (the ordinary run button), optional per-key `types`, optional `aliases`, and an optional early-loading `overlay`.
