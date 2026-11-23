@@ -2395,6 +2395,55 @@ rr01 <- local({
   list(student_terms = student_terms, attempts = attempts, dashboard = dashboard)
 })
 
+# RS01: who the Retention page counts in Fall 2022 (test-return-rates.R).
+# Enrolled that fall at home campus ABQ unless said; the record's arrivals:
+#   W-A  undergraduate; first-time in Fall 2022 itself            first-time
+#   W-B  undergraduate; first-time in Fall 2021, continuing since first-time
+#   W-C  undergraduate; a new transfer in Spring 2022              transfer
+#   W-D  undergraduate; first-time in Fall 2020, a new transfer in Fall 2022
+#        (left and came back): the latest arrival reads            transfer
+#   W-E  undergraduate; readmitted in Fall 2022, never called new  not on record
+#   W-F  undergraduate; continuing in Fall 2022, called first-time in Spring
+#        2023: an arrival after the term is not yet one            not on record
+#   W-G  undergraduate; Fall 2022 recorded both ways (two declarations): a
+#        term recorded both ways reads                             first-time
+#   W-H, W-I  graduate students                                    another level
+#   W-J  a student with no level recorded                          another level
+#   W-K  undergraduate at EA, a new transfer in Fall 2022          another campus
+#   W-L  undergraduate with a Fall 2022 row and no enrollment      not enrolled
+#   W-M  undergraduate enrolled in Fall 2021 only, first-time then another term
+# So Fall 2022 undergraduates at ABQ: 7 counted (A to G), 3 first-time, 2
+# transfer, 2 with no start on record; 2 graduate students and 1 with no
+# level left out. At every home campus: 8 counted, 3 transfer.
+rs01 <- local({
+  st <- function(id, term = 202280L, level = "UG", campus = "ABQ", enrolled = TRUE) tibble::tibble(
+    student_id = id, term = term, enrolled = enrolled, student_level = level, student_campus = campus)
+  said <- function(id, term, population) tibble::tibble(student_id = id, term = term, student_population = population)
+  student_terms <- dplyr::bind_rows(
+    st("W-A"), st("W-B", 202180L), st("W-B"), st("W-C", 202210L), st("W-C"),
+    st("W-D", 202080L), st("W-D"), st("W-E"), st("W-F"), st("W-F", 202310L), st("W-G"),
+    st("W-H", level = "GR"), st("W-I", level = "GR"), st("W-J", level = NA_character_),
+    st("W-K", campus = "EA"), st("W-L", enrolled = FALSE), st("W-M", 202180L))
+  list(
+    student_terms = student_terms,
+    # The same rows as the return rates read them: everyone came back.
+    returns = dplyr::mutate(student_terms, returned_next_regular_term = TRUE, return_observable = TRUE,
+                            degree_awarded = FALSE),
+    programs = dplyr::bind_rows(
+      said("W-A", 202280L, "First Time/Beginning Freshman"),
+      said("W-B", 202180L, "First Time/Beginning Freshman"), said("W-B", 202280L, "Continuing"),
+      said("W-C", 202210L, "New Transfer from NM Inst"), said("W-C", 202280L, "Continuing"),
+      said("W-D", 202080L, "First Time/Beginning Freshman"), said("W-D", 202280L, "New Transfer from Out of State"),
+      said("W-E", 202280L, "Readmit"),
+      said("W-F", 202280L, "Continuing"), said("W-F", 202310L, "Summer First Time/Beg Freshman"),
+      said("W-G", 202280L, "New Transfer from NM Inst"), said("W-G", 202280L, "First Time/Beginning Freshman"),
+      said("W-H", 202280L, "Frst Time Grad/Prf Deg not UNM"), said("W-I", 202280L, "Continuing"),
+      said("W-K", 202280L, "New Transfer from NM Inst"),
+      said("W-L", 202280L, "First Time/Beginning Freshman"),
+      said("W-M", 202180L, "First Time/Beginning Freshman")),
+    opt = list(student_level = "UG", campus = "ABQ"))
+})
+
 # SG01: spring students who finish in the summer (test-return-rates.R,
 # test-summer-finishers.R). Enrollment is settled through Fall 2023; degrees
 # are posted and grades are in through Summer 2022. ABQ undergraduates unless

@@ -657,9 +657,9 @@ scope_chip <- function(key, val, class = NULL) {
        span(class = "scope-chip-val", paste(val, collapse = ", ")))
 }
 
-# A stacked scope bar saying what a headcount counted, one chip per part of
-# describe_headcount_scope(). Shared by the Headcount tab and the Dept
-# Dashboard so the two read as the same count.
+# A stacked scope bar saying what a page counted, one chip per described part:
+# describe_headcount_scope() for the Headcount tab and the Dept Dashboard (so
+# the two read as the same count), describe_retention_scope() for Retention.
 headcount_scope_bar <- function(described, ...) {
   div(class = "scope-bar scope-bar--stacked", ...,
       lapply(names(described), function(k) scope_chip(k, described[[k]])))

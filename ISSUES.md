@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M66 | Improvement | See [Improvements](#improvements) |
+| M1–M67 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4744,6 +4744,23 @@ for the parser, `scripts/report-registry.sh` for the shell scripts, and
 refusal of a code it does not have. *Done when:* one file is the list and the
 others are generated from it or read it, mrgather's included (ROADMAP:
 production's mrgather as a checkout of its repository).
+
+**M67 — One Retention section reads every student level, whatever the page's
+control says.** "Courses Harder on Students with Lower GPAs"
+(`retention_dashboard_band_courses()` over `get_course_band_dfw()`) takes the
+page's term type and campus and no student level. With Undergraduate chosen it
+still reads every graded attempt in a course whose student has a GPA band:
+graduate students, and students at a non-degree level. It also reads the
+campus control as the campus that taught the course, where the sections above
+it read the same control as the student's home campus. The section's method
+note has said the second since it shipped and says the first since
+2026-11-23; neither is a wrong number, but one control means two things on
+one page. Found 2026-11-23 writing down who each Retention section counts
+(read from the code; how many attempts it moves was not measured). *Done
+when:* the section reads the students of the page's level (their level that
+term, from `cedar_student_terms`), or the choice to read everyone is recorded
+here as deliberate; and the campus control means one thing on the page, or
+the section has its own.
 
 ### Documentation and naming
 

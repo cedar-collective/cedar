@@ -1,3 +1,51 @@
+# RS01: the page says who it counts: the level's students by how they started, other levels left out
+
+    Code
+      describe_retention_scope(who)
+    Output
+                                                Counted, Fall 2022 
+                       "7 Undergraduate students, home campus ABQ" 
+                                               First-time students 
+                                                       "3 of them" 
+                                                 Transfer students 
+                                                       "2 of them" 
+                                               Start not on record 
+                                                       "2 of them" 
+                                                       Not counted 
+      "students at another level: Graduate 2; no level recorded 1" 
+    Code
+      describe_retention_scope(everywhere)
+    Output
+                                                Counted, Fall 2022 
+                     "8 Undergraduate students, every home campus" 
+                                               First-time students 
+                                                       "3 of them" 
+                                                 Transfer students 
+                                                       "3 of them" 
+                                               Start not on record 
+                                                       "2 of them" 
+                                                       Not counted 
+      "students at another level: Graduate 2; no level recorded 1" 
+    Code
+      describe_retention_scope(every_level)
+    Output
+                                 Counted, Fall 2022 
+      "10 students at every level, home campus ABQ" 
+                                First-time students 
+                                        "3 of them" 
+                                  Transfer students 
+                                        "2 of them" 
+                                Start not on record 
+                                        "5 of them" 
+    Code
+      cat(retention_who_note(who))
+    Output
+      A transfer student is counted like any other, from their first term here. A student at another level is not counted: choose that level above to read them. Of the 7 counted in Fall 2022, the record calls 3 first-time students and 2 new transfers in the term they arrived; the other 2 it never calls new in the terms on record (readmitted after time away, moved from another campus or level, or here before the records begin). A student who arrived more than once is read by the latest.
+    Code
+      cat(retention_who_note(NULL))
+    Output
+      A transfer student is counted like any other, from their first term here. A student at another level is not counted: choose that level above to read them.
+
 # RR01: the dashboard as text
 
     Code

@@ -323,6 +323,12 @@ the scope. It is not where a page explains itself.
 - **What a fact means goes behind the disclosure.** `unit_codes_scope(rows,
   time_facts, time_meaning)` puts `cedar_in_progress_meaning()` in the
   collapsed part with the codes. Dept Trends is the reference.
+- **Who is counted is a fact too.** Retention's bar gives the students counted
+  in the latest term read, how many of them started first-time, transferred
+  in or have no start on record, and the students at another level, left out
+  (`retention_scope_facts()` → `describe_retention_scope()` →
+  `headcount_scope_bar()`). The rule behind the counts (a transfer student is
+  counted like any other) is in the first section's method.
 - **How a number is counted goes in the section's method slot**, never a
   "Method:" row in the bar. Cancellations moved its row into each tab's method
   (2026-11-15); `test-architecture.R` fails on a bar row labelled Method, Note,
