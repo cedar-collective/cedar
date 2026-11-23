@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (fixed in code 2026-11-22: the CSV is removed once read; open until the files already there, locally and on production, are deleted) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -61,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
 | [I78](#i78--the-transforms-status-file-lists-only-the-tables-of-the-last-run) | Defect | `cedar-status.json` held only the tables the last transform run built, so a run of one stage (`--tables degrees`, or the holds catch-up) left `scripts/data-status.sh` listing one table (the file now keeps the entries of tables a run did not rebuild) |
 | [I73](#i73--special-topics-st-titles-were-not-treated-as-topics-courses) | Defect | A topics course was recognised only by a title opening "T:"; "ST:" (special topics) sections were stored as ordinary courses, so their history, trends and dashboard cards mixed unrelated topics. The labels are now an institution setting read by one function (resolved 2026-11-20) |
 | [I72](#i72--the-enrollment-table-counted-a-crosslisted-offering-by-its-home-listing-alone) | Defect | The Enrollment table showed a crosslisted offering once, on its home row, with class-list counts (first day, census, final) for the home listing's students only, while the schedule's combined total beside it counted every listing. The home row now counts the whole offering, each student once (resolved 2026-11-20) |
@@ -138,8 +138,9 @@ others in the status file" (`test-transform-status.R`).
 
 ## I77 — The parser left each export unhashed beside its hashed file
 
-**Status:** fixed in code 2026-11-22 (branch `ingest/student-holds`). Open
-until the files already written are deleted (see Still to do).
+**Status:** resolved 2026-11-23. Fixed in code 2026-11-22 (branch
+`ingest/student-holds`, PR #388); the files already written are gone (see
+The files already written).
 **Found:** 2026-11-22, parsing the Student Holds report for the first time.
 **Severity:** medium for privacy; no number is wrong. The parser drops names,
 emails and addresses and hashes every ID before it saves a report, and the
@@ -179,13 +180,13 @@ ls -la <shared data dir>/degrees.csv
 The CSV is removed as soon as it has been read, whether or not the read
 worked, and the parse stops if it cannot be removed.
 
-### Still to do
+### The files already written
 
-- Delete the CSVs already there: the five above in the local shared data
-  directory, and their counterparts in production's (`/root/shared-data`).
-  Check first that each name is one of the parsed files' (`DESRs`,
-  `class_lists`, `academic_studies`, `degrees`, `admissions_applicants`):
-  the directory also holds CSVs that are not exports (`report_timing.csv`).
+Gone on 2026-11-23. The five above were deleted from the local shared data
+directory by hand. Production's (`/root/shared-data`) held four, and the
+scheduled refresh of 2026-11-23, the first on the fixed parser, removed each
+as it parsed that report. The directory also holds CSVs that are not exports
+(`report_timing.csv`); those stay.
 
 ## I76 — Dept Trends raises a plotly "axis scaling" error in the browser
 
