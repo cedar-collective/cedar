@@ -60,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I79](#i79--a-report-whose-conversion-or-read-stopped-part-way-was-stored-as-a-smaller-report) | Defect | `parse-data.R` stored whatever part of an export its converter had written or its reader returned: on 2026-11-23 Fall 2025's Student Holds were stored as the first 211,142 of 300,138 rows (15,152 of 26,890 students) with no error. A converter that does not exit 0, or any warning from the read, now stops the parse (resolved 2026-11-23; what cut that conversion short is not established) |
 | [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
 | [I78](#i78--the-transforms-status-file-lists-only-the-tables-of-the-last-run) | Defect | `cedar-status.json` held only the tables the last transform run built, so a run of one stage (`--tables degrees`, or the holds catch-up) left `scripts/data-status.sh` listing one table (the file now keeps the entries of tables a run did not rebuild) |
 | [I73](#i73--special-topics-st-titles-were-not-treated-as-topics-courses) | Defect | A topics course was recognised only by a title opening "T:"; "ST:" (special topics) sections were stored as ordinary courses, so their history, trends and dashboard cards mixed unrelated topics. The labels are now an institution setting read by one function (resolved 2026-11-20) |
@@ -107,6 +108,80 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I79 — A report whose conversion or read stopped part-way was stored as a smaller report
+
+**Status:** resolved 2026-11-23 (branch `parser/short-read-is-an-error`), and
+Fall 2025's holds reloaded the same day. What cut the conversion short on the
+run that found it is not established (see Evidence).
+**Found:** 2026-11-23, loading Student Holds for Fall 2019 to Fall 2026: Fall
+2025 held 15,152 students where every other fall holds 23,700 to 27,600.
+**Severity:** high where it happens: the term is stored without a third of its
+students and reads as a quiet term. Seen once, on the development machine;
+production's stored reports show no sign of it (see Evidence).
+**Affects:** `R/data-parsers/parse-data.R`, every report.
+
+### What is wrong
+
+The parser converts each `.xlsx` to a CSV with `xlsx2csv` and reads the CSV
+with `fread()`. Both steps took whatever they were given:
+
+- **The conversion.** `system2(..., stdout = TRUE)` reports a converter that
+  failed or was killed as a warning and a `status` attribute. The parser
+  checked only that a non-empty file existed, and the lines a stopped
+  converter had already written are one.
+- **The read.** `fread()` warns and carries on when a line does not fit the
+  table. It returns only the rows above a line with too many cells, drops a
+  last line cut off inside a cell, and keeps a last line cut off after one as
+  a row with its cells in the wrong columns. The parser did not look at the
+  warnings, and each quotes the line it is about into the log: a person's row,
+  name and unhashed ID included.
+
+### Evidence
+
+Fall 2025's export is sorted by ID and holds 300,138 holds for 26,890
+students. The parse of 2026-11-23 stored 211,142 rows for 15,152 students:
+exactly the export's first 211,142 rows (they hold 15,152 students, none of
+whom has a row further down), which end 52.0 MB into a 74.1 MB CSV.
+
+Fetched again and converted with nothing else running, the same export (28.8
+MB both times) converts and reads whole, with no warning. So the CSV was short
+on the first run, not the export. That parse ran beside a MyReports fetch on a
+machine with 8 GB of memory, and Docker's virtual machine stopped minutes
+later; the kernel log for the hour shows no process killed for memory, so the
+cause is not known.
+
+The size of each export against the rows stored from it shows the other 21
+terms loaded that day at 98.7 to 101.5 bytes a row, and the short one at
+143.1 (100.7 once whole). That rules out another cut of more than about 2%,
+not a smaller one.
+
+Production: none of the 441 refresh logs from 2026-03-09 to 2026-11-23 holds
+an `fread` warning or a "had status" warning.
+
+### Reproduce (before the fix)
+
+```r
+# A converter that stops part-way: a warning, and a file the parser accepted.
+out <- system2("sh", c("-c", shQuote("printf 'a,b\\n1,2\\n' > part.csv; exit 1")),
+               stdout = TRUE, stderr = TRUE)
+attr(out, "status")      # 1; part.csv exists and is not empty
+
+# A line with one cell too many: the row below it is not returned.
+nrow(data.table::fread(text = 'ID,Name,Code\n1,"A, B",X\n2,C, D,Y\n3,"E, F",Z\n'))   # 1
+```
+
+### Fix
+
+`convert_report_export()` stops when the converter does not exit 0 and
+removes what it had written; `read_report_export()` stops on any warning from
+the read, and repeats the warning only up to the row it quotes
+(`R/data-parsers/report-specs.R`). Tests: "a conversion that stops part-way
+stops the parse and leaves no unhashed file" and "an export the reader cannot
+take as written stops the parse, and its row is not quoted"
+(`test-report-specs.R`), on `holds_export_unreadable`.
+
+Not covered: a converter that writes part of a sheet and still exits 0.
 
 ## I78 — The transform's status file lists only the tables of the last run
 
