@@ -7,7 +7,8 @@ nav_order: 14
 # Degree Explorer
 
 Open **Pathways > Degree Explorer**. Choose one degree, your math starting
-course, and your English starting course. A semester board immediately shows
+course, and your English starting course. The page opens on College Algebra
+(MATH 1220) and Composition I. A semester board immediately shows
 courses and course groups. The latest 2026–2027 catalog examples use one interface:
 
 - Computer Science B.S. and Biology B.S.

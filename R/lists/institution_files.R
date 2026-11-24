@@ -176,7 +176,8 @@ CEDAR_CONFIG_FILE_SPECS <- list(
                            "baseline_semesters", "evidence_id", "assumption", "upper_level_from_semester",
                            "senior_level_from_semester",
                            "allowance_slot_credits", "gen_ed_source_url"),
-  degree_roadmap_starts = c("track", "start_id", "label", "node_ids", "completed_degree_credits"),
+  # opens: TRUE on the one start of each track the Degree Explorer pickers open on.
+  degree_roadmap_starts = c("track", "start_id", "label", "node_ids", "completed_degree_credits", "opens"),
   degree_roadmap_math_routes = c("catalog_id", "start_id", "label", "node_ids"),
   degree_roadmap_conditions = c("condition_id", "catalog_id", "node_id", "kind", "minimum",
                                  "eligible_node_ids", "label", "evidence_id"),

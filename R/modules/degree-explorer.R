@@ -22,9 +22,11 @@ degreeExplorerUI <- function(id, catalog, roadmaps, status = NULL, colleges = NU
           cedar_link_menu(ns("dx_copy_url"))))),
       fluidRow(
         column(4, selectInput(ns("dx_math_start"), "Where will you start in math?",
-          choices = degree_math_start_choices(roadmaps, choices[[1]]))),
+          choices = degree_math_start_choices(roadmaps, choices[[1]]),
+          selected = degree_start_default(roadmaps, "math"))),
         column(4, selectInput(ns("dx_english_start"), "Where will you start in English?",
-          choices = stats::setNames(english$start_id, english$label))),
+          choices = stats::setNames(english$start_id, english$label),
+          selected = degree_start_default(roadmaps, "english"))),
         column(4, selectInput(ns("dx_start_season"), "First semester", choices = c(Fall = "fall", Spring = "spring"))))),
     filter_actions(actionButton(ns("show_rules"), "Rules behind this plan", icon = icon("list"))),
     uiOutput(ns("roadmap")),
@@ -146,8 +148,10 @@ degreePlanRulesUI <- function(id, catalog, roadmaps) {
   choices <- degree_catalog_choices(catalog)
   tagList(subtab_header("Visualization rules", "The readable rules behind Degree Explorer, generated from its saved course lists, choices and graph. Compare catalog requirements with their source; CEDAR planning preferences are labeled separately."),
     fluidRow(column(5, selectInput(ns("catalog"), "Program", choices, width = "100%")),
-      column(3, selectInput(ns("math"), "Math starting point", degree_math_start_choices(roadmaps, choices[[1]]), width = "100%")),
-      column(4, selectInput(ns("english"), "English starting point", stats::setNames(english$start_id, english$label), width = "100%"))),
+      column(3, selectInput(ns("math"), "Math starting point", degree_math_start_choices(roadmaps, choices[[1]]),
+                            selected = degree_start_default(roadmaps, "math"), width = "100%")),
+      column(4, selectInput(ns("english"), "English starting point", stats::setNames(english$start_id, english$label),
+                            selected = degree_start_default(roadmaps, "english"), width = "100%"))),
     uiOutput(ns("summary")), downloadButton(ns("download"), "Download readable rules"),
     reactable::reactableOutput(ns("table")))
 }

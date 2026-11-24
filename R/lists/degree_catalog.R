@@ -393,6 +393,15 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
   }
   completed <- suppressWarnings(as.numeric(starts$completed_degree_credits))
   if (any(!is.finite(completed) | completed < 0)) stop("[degree_catalog.R] Invalid completed starting credits")
+  # The pickers open on one start per track, named by the file.
+  if (any(!starts$opens %in% c("TRUE", "FALSE"))) {
+    stop("[degree_catalog.R] A roadmap starting point's opens must be TRUE or FALSE")
+  }
+  n_opens <- tapply(starts$opens == "TRUE", starts$track, sum)
+  if (any(n_opens != 1L)) {
+    stop("[degree_catalog.R] Each roadmap track needs exactly one starting point with opens TRUE: ",
+         paste(names(n_opens)[n_opens != 1L], collapse = ", "))
+  }
   for (i in seq_len(nrow(starts))) {
     ids <- degree_split_ids(starts$node_ids[i])
     shared <- nodes$node_id[nodes$catalog_id == "*" & nodes$track == starts$track[i]]

@@ -157,6 +157,12 @@ const checkAdminSharedRules = async () => {
 const checkDegreeExplorer = async () => {
   await connect(page, { tab: 'degree-explorer' });
   await waitForSelector(page, '[data-roadmap][data-ready]');
+  // The math picker opens on College Algebra, the start degree_roadmap_starts.csv
+  // marks (`opens`). The scenarios below were written from the calculus start.
+  check(await page.$eval('#degree_explorer-dx_math_start', el => el.value) === 'algebra' &&
+    await page.$eval('[data-roadmap]', el => el.dataset.mathStart === 'algebra'),
+    'the page opens on the College Algebra math start');
+  await choose('degree_explorer-dx_math_start', 'calculus');
   // The degrees read alphabetically; a college narrows them to its own.
   const labels = id => page.evaluate(id => Object.values(document.getElementById(id).selectize.options)
     .sort((a, b) => a.$order - b.$order).map(o => o.label), id);
@@ -726,6 +732,8 @@ try {
   if (process.argv.includes('--shared-requirements-only')) {
     await connect(page, { tab: 'degree-explorer' });
     await waitForSelector(page, '[data-roadmap][data-ready]');
+    // These scenarios were written from the calculus start; the page opens on College Algebra.
+    await choose('degree_explorer-dx_math_start', 'calculus');
     // The page opens on the first degree alphabetically; the overlap is CS's.
     await choose('degree_explorer-dx_catalog_id', 'cs-bs-2026');
     // The overlap labels are on the Detailed cards, which the full run has
