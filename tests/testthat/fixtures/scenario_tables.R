@@ -2014,6 +2014,26 @@ holds_export_lines <- c(
   ",,,"
 )
 
+# The same export as three files the reader cannot take as written (I79). Read
+# with fread() alone, each comes back looking like a report:
+#   cut_inside_a_cell   the file ends part-way through a third hold's name, as
+#                       a conversion that stops mid-file leaves it: the two
+#                       holds above come back and the third is dropped.
+#   cut_after_a_cell    it ends after the name: the third hold comes back as a
+#                       row, its name split over two columns.
+#   too_many_cells      a third hold's name has a comma and no quotes, so the
+#                       line has one cell too many: the hold below it is lost.
+holds_export_unreadable <- list(
+  cut_inside_a_cell = c(holds_export_lines[1:5], "012345679,\"Hopper, Gr"),
+  cut_after_a_cell = c(holds_export_lines[1:5], "012345679,\"Hopper, Grace\",A"),
+  too_many_cells = c(
+    holds_export_lines[1:5],
+    "012345679,Hopper, Grace,AV,2025/03/01",
+    "012345680,\"Franklin, Rosalind\",AV,2025/03/02",
+    holds_export_lines[6:8]
+  )
+)
+
 # ── test-dfw-dashboard.R ────────────────────────────────────────────────────────
 
 # DF01's attempt table, built to its edges (graded through Fall 2022).
