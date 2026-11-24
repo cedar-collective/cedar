@@ -31,9 +31,9 @@ test_that("XC01: credits are the stamped total, with the last term added when th
   expect_equal(s$credits_basis, c("recorded", "recorded + last term", "recorded", NA, rep("recorded", 3)))
   expect_equal(r$meta$n_last_term_added, 1L)
   expect_equal(as.character(s$band),
-               c("90 to 114", "120 or more", "Under 30", "Not recorded", "60 to 89", "115 to 119", "120 or more"))
+               c("90 to 104", "120 or more", "Under 30", "Not recorded", "60 to 89", "105 to 119", "120 or more"))
   expect_equal(as.character(r$bands$band),
-               c("Under 30", "30 to 59", "60 to 89", "90 to 114", "115 to 119", "120 or more", "Not recorded"))
+               c("Under 30", "30 to 59", "60 to 89", "90 to 104", "105 to 119", "120 or more", "Not recorded"))
   expect_equal(r$bands$n, c(1L, 0L, 1L, 1L, 1L, 2L, 1L))
   expect_equal(sum(r$bands$share_pct), 100)
   expect_equal(r$by_term$n[r$by_term$exit_term == 202080L], 1L)

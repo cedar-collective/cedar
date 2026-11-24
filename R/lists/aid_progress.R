@@ -18,7 +18,7 @@ DEGREE_PACE_TERM_CREDITS <- c(four_year = 15, six_year = 10)
 
 EXIT_GPA_FLOOR <- 2.0
 EXIT_CREDIT_CEILING <- 160
-EXIT_CREDIT_BREAKS <- c(30, 60, 90, 115, 120)
+EXIT_CREDIT_BREAKS <- c(30, 60, 90, 105, 120)
 
 #' Band labels for a set of lower edges
 #'

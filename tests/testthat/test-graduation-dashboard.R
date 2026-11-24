@@ -83,10 +83,10 @@ test_that("XC01: a credit line built over the scope's shared parts is the payloa
 })
 
 test_that("the Graduation page's scope has one form, and the page opens on a scope it can ask for", {
-  scope <- graduation_page_scope("UG", c("EA", "ABQ"), "115")
-  expect_identical(scope, list(level = "UG", campus = c("ABQ", "EA"), line = 115))
+  scope <- graduation_page_scope("UG", c("EA", "ABQ"), "105")
+  expect_identical(scope, list(level = "UG", campus = c("ABQ", "EA"), line = 105))
   # The same campuses in another order, or named twice, are the same scope.
-  expect_identical(graduation_page_scope("UG", c("ABQ", "EA", "ABQ"), 115), scope)
+  expect_identical(graduation_page_scope("UG", c("ABQ", "EA", "ABQ"), 105), scope)
   # No campus picked is every campus, however the browser says it.
   expect_null(graduation_page_scope("UG", character(0))$campus)
   expect_null(graduation_page_scope("UG", NULL)$campus)
