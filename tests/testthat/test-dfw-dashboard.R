@@ -170,6 +170,36 @@ test_that("the dashboard names colleges and agrees on its window", {
   expect_equal(p$meta$level, "lower")
 })
 
+test_that("the DFW Rates page's scope has one form, and the page opens on a scope it can ask for", {
+  scope <- dfw_rates_page_scope("fall", c("EA", "ABQ"), "201980", "202180")
+  expect_identical(scope, list(term_type = "fall", campus = c("ABQ", "EA"), from_term = 201980L, to_term = 202180L))
+  # The same campuses in another order, or named twice, are the same scope.
+  expect_identical(dfw_rates_page_scope("fall", c("ABQ", "EA", "ABQ"), 201980L, 202180L), scope)
+  # No campus picked is every campus, however the browser says it.
+  expect_null(dfw_rates_page_scope("fall", character(0), 201980, 202180)$campus)
+  expect_null(dfw_rates_page_scope("fall", NULL, 201980, 202180)$campus)
+  expect_error(dfw_rates_page_scope(c("fall", "spring"), NULL, 201980, 202180), "one term type")
+  expect_error(dfw_rates_page_scope("fall", NULL, "first", 202180), "a first and a last term")
+  expect_error(dfw_rates_page_scope("fall", NULL, 202180, 201980), "first term is after its last")
+
+  # It opens on fall, the default campuses it offers and every term it offers.
+  opens_on <- dfw_rates_default_scope(c("ZZ", CEDAR_CAMPUS_DEFAULT), c(202180L, 201980L, 202080L, 202080L))
+  expect_identical(opens_on, list(term_type = "fall", campus = CEDAR_CAMPUS_DEFAULT,
+                                  from_term = 201980L, to_term = 202180L))
+  expect_identical(dfw_rates_default_scope("ZZ", 202080L)$campus, character(0))
+  expect_error(dfw_rates_default_scope("ABQ", integer(0)), "graded terms it offers")
+
+  # DF01 as the page opens on it: every term it holds, so the same rates as
+  # the whole history read for those campuses.
+  opens_on <- dfw_rates_default_scope(unique(df_attempts$campus), unique(df_attempts$term))
+  scope <- dfw_rates_page_scope(opens_on$term_type, opens_on$campus, opens_on$from_term, opens_on$to_term)
+  built <- build_dfw_dashboard(df_attempts, test_dims, dfw_rates_page_opt(scope, df01_edges))
+  expect_identical(built$meta[c("term_type", "campus", "from_term", "to_term")], scope)
+  whole <- build_dfw_dashboard(df_attempts, test_dims, c(df01_fall_opt, list(campus = scope$campus)))
+  expect_equal(built$overall$terms, whole$overall$terms)
+  expect_equal(built$courses$courses, whole$courses$courses)
+})
+
 test_that("the DFW dashboard's text preview", {
   testthat::local_edition(3)
   p <- build_dfw_dashboard(df_attempts, test_dims, df01_fall_opt)

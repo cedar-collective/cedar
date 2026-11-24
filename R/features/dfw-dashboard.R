@@ -13,6 +13,8 @@
 #
 # Exported functions:
 #   build_dfw_dashboard(attempts, dims, opt)
+#   dfw_rates_default_scope(campuses, terms), dfw_rates_page_scope(), dfw_rates_page_opt()
+#                                    the page's scope: where it opens, one form of it
 #   format_dfw_dashboard(payload, n_list)
 #   dfw_trend_sentence(trend_row, min_terms)
 #
@@ -64,6 +66,68 @@ build_dfw_dashboard <- function(attempts, dims, opt = list()) {
                 from_term = opt$from_term, to_term = opt$to_term,
                 graded_edge = overall$meta$graded_edge, window_terms = courses$meta$window_terms)
   ), class = "dfw_dashboard")
+}
+
+# ── The page's scope ──────────────────────────────────────────────────────────
+
+# The term type the page opens on.
+DFW_RATES_OPENING_TERM_TYPE <- "fall"
+
+#' The scope the DFW Rates page opens on
+#'
+#' The controls' starting values. The page's UI and the startup preload both
+#' read them here, so what is built ahead is what the page first asks for.
+#'
+#' @param campuses The teaching campuses the page offers.
+#' @param terms The graded terms the page offers as its first and last term.
+#' @return list(`term_type`, `campus` (the default campuses it offers),
+#'   `from_term`, `to_term` (the first and last term offered)).
+dfw_rates_default_scope <- function(campuses, terms) {
+  terms <- sort(unique(as.integer(terms)))
+  if (length(terms) == 0L || anyNA(terms)) {
+    stop("[dfw-dashboard.R] The DFW Rates page needs the graded terms it offers.", call. = FALSE)
+  }
+  list(term_type = DFW_RATES_OPENING_TERM_TYPE, campus = intersect(CEDAR_CAMPUS_DEFAULT, campuses),
+       from_term = terms[[1]], to_term = terms[[length(terms)]])
+}
+
+#' One scope of the DFW Rates page, in one form
+#'
+#' The controls as the browser sends them, or as the preload names them: one
+#' term type, the teaching campuses sorted (none means every campus) and the
+#' two terms as integers. The same campuses picked in another order are one
+#' scope, so they share one result.
+#'
+#' @param term_type One term type.
+#' @param campus Teaching campus codes; NULL or empty for every campus.
+#' @param from_term,to_term The first and last term read.
+#' @return list(`term_type`, `campus` (character, or NULL for every campus),
+#'   `from_term`, `to_term`).
+dfw_rates_page_scope <- function(term_type, campus = NULL, from_term, to_term) {
+  term_type <- as.character(term_type)
+  if (length(term_type) != 1L || is.na(term_type) || !nzchar(term_type)) {
+    stop("[dfw-dashboard.R] The DFW Rates page takes one term type.", call. = FALSE)
+  }
+  terms <- suppressWarnings(as.integer(c(from_term, to_term)))
+  if (length(terms) != 2L || anyNA(terms)) {
+    stop("[dfw-dashboard.R] The DFW Rates page takes a first and a last term, as term codes.", call. = FALSE)
+  }
+  if (terms[[1]] > terms[[2]]) {
+    stop("[dfw-dashboard.R] The DFW Rates page's first term is after its last.", call. = FALSE)
+  }
+  campus <- sort(unique(as.character(campus)))
+  list(term_type = term_type, campus = if (length(campus) > 0L) campus else NULL,
+       from_term = terms[[1]], to_term = terms[[2]])
+}
+
+#' The options the DFW Rates page builds a scope under
+#'
+#' @param scope [dfw_rates_page_scope()].
+#' @param edges The data edges.
+#' @return The `opt` [build_dfw_dashboard()] takes.
+dfw_rates_page_opt <- function(scope, edges) {
+  list(term_type = scope$term_type, campus = scope$campus, from_term = scope$from_term,
+       to_term = scope$to_term, data_edges = edges)
 }
 
 # ── Text preview ──────────────────────────────────────────────────────────────
