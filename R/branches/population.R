@@ -425,6 +425,38 @@ student_term_entry_type <- function(programs) {
 
 
 # ---------------------------------------------------------------------------
+# student_arrival_as_of
+# ---------------------------------------------------------------------------
+
+#' How each student most recently arrived, as of a term
+#'
+#' The latest arrival the record holds for the student in or before `term`
+#' (student_term_entry_type()): a student who started first-time, left and
+#' came back as a new transfer reads transfer. A term recorded both ways
+#' reads first-time, as get_major_tenure() reads it. An arrival recorded
+#' after `term` is not yet one.
+#'
+#' @param programs `cedar_programs`.
+#' @param term One term code.
+#' @return A tibble of `student_id`, `arrived_term` and `entry_type`
+#'   (`"first_time"` or `"transfer"`), one row per student with an arrival on
+#'   record by `term`. A student the record never calls new by then
+#'   (readmitted, moved from another campus or level, here before the records
+#'   begin) has no row.
+student_arrival_as_of <- function(programs, term) {
+  as_of <- suppressWarnings(as.integer(term))
+  if (length(as_of) != 1L || is.na(as_of)) {
+    stop("[population.R] student_arrival_as_of: term must be one term code.", call. = FALSE)
+  }
+  student_term_entry_type(programs) %>%
+    filter(term <= as_of) %>%
+    arrange(desc(term), entry_type) %>%
+    distinct(student_id, .keep_all = TRUE) %>%
+    transmute(student_id, arrived_term = term, entry_type)
+}
+
+
+# ---------------------------------------------------------------------------
 # classify_entry_method
 # ---------------------------------------------------------------------------
 

@@ -17,8 +17,13 @@
 # (get_entering_class_retention(), cones/entering-class-retention.R) sits
 # beside the one-step return: where a class is lost, not only how many.
 #
+# Who the rates count is stated with them: retention_scope_facts() counts the
+# latest term's students by how the record says they arrived (first-time, a
+# new transfer, or neither) and the students at another level, who are left
+# out; describe_retention_scope() words it for the page's data scope bar.
+#
 # Depends on: get_return_rates(), get_stopout(), compute_rate_trend(),
-#             get_entering_class_retention()
+#             get_entering_class_retention(), student_arrival_as_of()
 
 RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 
@@ -34,7 +39,11 @@ RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 #'   (how many of the latest anchor terms the courses section reads; default
 #'   3), `course_min_n` / `course_min_dfw_n` (get_stopout()'s guards; default
 #'   100 and 20).
-#' @return A `retention_dashboard` list: `meta`; `series` (one row per anchor
+#' @param programs `cedar_programs`, or NULL: then `who` and `milestones`
+#'   (which read how the record says a student arrived) are left out.
+#' @return A `retention_dashboard` list: `meta`; `who` (retention_scope_facts()
+#'   for the latest term read: the students counted, how they started, and
+#'   the levels left out); `series` (one row per anchor
 #'   term: the counts and `return_pct`); `trend` (compute_rate_trend() of the
 #'   series); `signs` (per sign and term: with and without the sign, and the
 #'   share of the term's non-returners who had it); `signs_latest` (each
@@ -68,7 +77,7 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   # A scope with no student whose return can be read (a campus with none at
   # this level, say) is an answer, not an error: an empty payload says so.
   if (nrow(series) == 0L) {
-    return(structure(list(meta = meta, series = series, trend = NULL, signs = NULL, signs_latest = NULL,
+    return(structure(list(meta = meta, who = NULL, series = series, trend = NULL, signs = NULL, signs_latest = NULL,
                           groups = NULL, courses = list(terms = integer(0), by_course = NULL, listed = NULL),
                           milestones = NULL),
                      class = "retention_dashboard"))
@@ -123,11 +132,92 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
 
   structure(list(
     meta = meta,
+    who = if (is.null(programs)) NULL else retention_scope_facts(student_terms, programs, opt, latest),
     series = series, trend = trend, signs = signs,
     signs_latest = signs %>% group_by(sign) %>% filter(term == max(term)) %>% ungroup(),
     groups = groups, courses = courses,
     milestones = if (isFALSE(opt$milestones)) NULL else retention_dashboard_milestones(student_terms, degrees, opt, programs)
   ), class = "retention_dashboard")
+}
+
+RETENTION_ARRIVALS <- c(first_time = "First-time students", transfer = "Transfer students",
+                        not_recorded = "Start not on record")
+
+#' Who the page's return rates count, in one term
+#'
+#' The enrolled students of the scope's level and home campus in `term`, as
+#' get_return_rates() picks them; how the record says each most recently
+#' arrived by then (student_arrival_as_of()); and the students of the same
+#' term and home campus at another level, who are not counted.
+#'
+#' @param student_terms `cedar_student_terms`.
+#' @param programs `cedar_programs`, for `student_population`.
+#' @param opt The dashboard's scope: `student_level`, `campus`.
+#' @param term The term to describe (the latest the page reads).
+#' @return list(`term`, `student_level`, `campus`, `n_counted`, `arrivals`
+#'   (a count for each of `RETENTION_ARRIVALS`, adding to `n_counted`),
+#'   `other_levels` (`student_level`, `n`; largest first, empty when the scope
+#'   names no level)).
+retention_scope_facts <- function(student_terms, programs, opt = list(), term) {
+  missing <- setdiff(c("student_id", "term", "enrolled", "student_level", "student_campus"), names(student_terms))
+  if (length(missing) > 0L) {
+    stop("[retention-dashboard.R] student_terms lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  as_of <- as.integer(term)
+  in_term <- student_terms %>% filter(enrolled, term == as_of) %>% select(student_id, student_level, student_campus)
+  if (!is.null(opt$campus)) in_term <- in_term %>% filter(student_campus %in% opt$campus)
+  at_level <- if (is.null(opt$student_level)) rep(TRUE, nrow(in_term)) else in_term$student_level %in% opt$student_level
+  counted <- in_term[at_level, ] %>% distinct(student_id)
+  arrived <- counted %>%
+    left_join(student_arrival_as_of(programs, as_of), by = "student_id", relationship = "one-to-one") %>%
+    mutate(arrival = dplyr::coalesce(entry_type, "not_recorded"))
+  arrivals <- vapply(names(RETENTION_ARRIVALS), function(a) sum(arrived$arrival == a), integer(1))
+  list(term = as_of, student_level = opt$student_level, campus = opt$campus,
+       n_counted = nrow(counted), arrivals = arrivals,
+       other_levels = in_term[!at_level, ] %>%
+         distinct(student_id, student_level) %>%
+         count(student_level, name = "n") %>%
+         arrange(desc(n), student_level))
+}
+
+#' Who the page counts, as short labelled facts for its data scope bar
+#'
+#' @param who retention_scope_facts() output.
+#' @return A named character vector, in display order: the students counted,
+#'   how many of them started each way, and the levels not counted (absent
+#'   when no other level has a student in the term).
+describe_retention_scope <- function(who) {
+  level_name <- function(code) ifelse(is.na(code), "no level recorded",
+                                      dplyr::coalesce(unname(CEDAR_STUDENT_LEVEL_LABELS[code]), code))
+  level <- if (is.null(who$student_level)) "students at every level"
+           else paste(paste(level_name(who$student_level), collapse = " and "), "students")
+  campus <- if (is.null(who$campus)) "every home campus" else paste("home campus", paste(who$campus, collapse = ", "))
+  described <- c(paste0(fmt_count(who$n_counted), " ", level, ", ", campus),
+                 paste(fmt_count(who$arrivals), "of them"))
+  names(described) <- c(paste0("Counted, ", fmt_term(who$term)), unname(RETENTION_ARRIVALS[names(who$arrivals)]))
+  if (nrow(who$other_levels) > 0L) {
+    described[["Not counted"]] <- paste0(
+      "students at another level: ",
+      paste0(level_name(who$other_levels$student_level), " ", fmt_count(who$other_levels$n), collapse = "; "))
+  }
+  described
+}
+
+#' Who is counted, as the rule: for the first section's "How this is counted"
+#'
+#' @param who retention_scope_facts() output, or NULL when the payload has none.
+#' @return One sentence group: how a transfer student and a student at another
+#'   level are treated, with the latest term's counts when they are known.
+retention_who_note <- function(who) {
+  rule <- paste0("A transfer student is counted like any other, from their first term here. A student at another ",
+                 "level is not counted: choose that level above to read them.")
+  if (is.null(who)) return(rule)
+  a <- who$arrivals
+  paste0(rule, " Of the ", fmt_count(who$n_counted), " counted in ", fmt_term(who$term), ", the record calls ",
+         fmt_count(a[["first_time"]]), " first-time students and ", fmt_count(a[["transfer"]]),
+         " new transfers in the term they arrived; the other ", fmt_count(a[["not_recorded"]]),
+         " it never calls new in the terms on record (readmitted after time away, moved from another campus or ",
+         "level, or here before the records begin). A student who arrived more than once is read by the latest.")
 }
 
 #' The courses where a DFW goes with not coming back, and the 25 listed
@@ -316,6 +406,10 @@ format_retention_dashboard <- function(payload) {
     else "Overall: no student in this scope has a settled next term."
   )
   if (nrow(payload$series) == 0L) return(lines)
+  if (!is.null(payload$who)) {
+    described <- describe_retention_scope(payload$who)
+    lines <- c(lines, paste0("  ", names(described), ": ", described))
+  }
   for (i in seq_len(nrow(payload$series))) {
     s <- payload$series[i, ]
     lines <- c(lines, paste0("  ", fmt_term(s$term), ": ", n(s$n_returned), " of ", n(s$n_observable),

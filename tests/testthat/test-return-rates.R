@@ -99,6 +99,70 @@ test_that("RR01: a scope with no student to read is an empty payload, not an err
   expect_match(format_retention_dashboard(p)[[3]], "no student in this scope")
 })
 
+test_that("RS01: an arrival is the latest the record holds by the term; a later one is not yet one", {
+  by_fall <- student_arrival_as_of(rs01$programs, 202280L) %>% arrange(student_id)
+  expect_equal(by_fall$student_id, c("W-A", "W-B", "W-C", "W-D", "W-G", "W-K", "W-L", "W-M"))
+  expect_equal(by_fall$entry_type, c("first_time", "first_time", "transfer", "transfer", "first_time",
+                                     "transfer", "first_time", "first_time"))
+  expect_equal(by_fall$arrived_term, c(202280L, 202180L, 202210L, 202280L, 202280L, 202280L, 202280L, 202180L))
+  # A term earlier, W-D is still the first-time student of Fall 2020; a term
+  # later, W-F has arrived.
+  expect_equal(student_arrival_as_of(rs01$programs, 202180L) %>% arrange(student_id) %>% pull(student_id),
+               c("W-B", "W-D", "W-M"))
+  later <- student_arrival_as_of(rs01$programs, "202310")
+  expect_equal(later$entry_type[later$student_id == "W-F"], "first_time")
+  expect_error(student_arrival_as_of(rs01$programs, c(202280L, 202310L)), "one term code")
+})
+
+test_that("RS01: the page says who it counts: the level's students by how they started, other levels left out", {
+  who <- retention_scope_facts(rs01$student_terms, rs01$programs, rs01$opt, 202280L)
+  expect_equal(who$n_counted, 7L)
+  expect_equal(who$arrivals, c(first_time = 3L, transfer = 2L, not_recorded = 2L))
+  expect_equal(who$other_levels, tibble::tibble(student_level = c("GR", NA), n = c(2L, 1L)))
+  # They are the students the return rates count that term.
+  rates <- get_return_rates(rs01$returns, c(rs01$opt, list(data_edges = rs01_edges)))$rates
+  expect_equal(rates$n_enrolled[rates$term == 202280L], who$n_counted)
+
+  # Every home campus adds the EA transfer student; no level named counts
+  # everyone and leaves no level out.
+  everywhere <- retention_scope_facts(rs01$student_terms, rs01$programs, list(student_level = "UG"), 202280L)
+  expect_equal(c(everywhere$n_counted, everywhere$arrivals[["transfer"]]), c(8L, 3L))
+  every_level <- retention_scope_facts(rs01$student_terms, rs01$programs, list(campus = "ABQ"), 202280L)
+  expect_equal(every_level$n_counted, 10L)
+  expect_equal(nrow(every_level$other_levels), 0L)
+  expect_error(retention_scope_facts(rs01$student_terms["student_id"], rs01$programs, rs01$opt, 202280L),
+               "student_terms lacks term, enrolled")
+  expect_error(retention_scope_facts(rs01$student_terms, rs01$programs["student_id"], rs01$opt, 202280L),
+               "programs lacks term, student_population")
+
+  testthat::local_edition(3)
+  expect_snapshot({
+    describe_retention_scope(who)
+    describe_retention_scope(everywhere)
+    describe_retention_scope(every_level)
+    cat(retention_who_note(who))
+    cat(retention_who_note(NULL))
+  })
+})
+
+test_that("RR01: the dashboard describes the latest term it reads, when it has the declarations", {
+  p <- build_retention_dashboard(rr01$student_terms, rr01$attempts, NULL, list(
+    term_type = "fall", student_level = "UG", data_edges = rr01_edges, min_n = 5L,
+    courses = FALSE, milestones = FALSE), programs = rs01$programs)
+  latest <- p$series[p$series$term == max(p$series$term), ]
+  expect_equal(p$who$term, 202380L)
+  expect_equal(p$who$n_counted, latest$n_enrolled)
+  # None of RR01's students is in RS01's declarations, and its five graduate
+  # students are another level.
+  expect_equal(p$who$arrivals[["not_recorded"]], p$who$n_counted)
+  expect_equal(p$who$other_levels$n, 5L)
+  # The text preview carries the same facts the page's bar shows.
+  described <- describe_retention_scope(p$who)
+  expect_true(all(paste0("  ", names(described), ": ", described) %in% format_retention_dashboard(p)))
+  # Without them the payload says nothing of who, as before.
+  expect_null(rr01$dashboard$who)
+})
+
 test_that("RR01: the courses read the latest graded falls' students", {
   courses <- rr01$dashboard$courses
   expect_equal(courses$terms, c(202080L, 202180L, 202280L))

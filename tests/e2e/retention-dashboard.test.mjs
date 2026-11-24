@@ -2,7 +2,9 @@
 // (R/modules/retention-dashboard.R over build_retention_dashboard()).
 //
 // Asserts the tab opens on fall terms and undergraduates and builds without a
-// run button: the return line with a label a term and the dashed trend line
+// run button: the data scope bar saying who is counted (the level's students
+// in the latest term, first-time, transfer and start-not-on-record students
+// adding to them, and the levels left out); the return line with a label a term and the dashed trend line
 // labelled with its slope and verdict (no cards), the warning-sign table (a late withdrawal and a DFW grade, each with
 // and without), the classification and college tables with a trend line and
 // no word, the course table, every method slot filled; a re-read when the
@@ -50,6 +52,22 @@ try {
   ok(level === 'UG', `the page opens on undergraduates (${level})`);
   const campus = await page.$eval(`#${NS}campus`, (el) => (el.selectize ? el.selectize.getValue() : [...el.selectedOptions].map((o) => o.value)));
   ok(JSON.stringify(campus) === '["ABQ"]', `the page opens on the main home campus (${campus})`);
+
+  // Who is counted, as facts under the controls.
+  const readScope = () => page.evaluate((ns) => [...document.querySelectorAll(`#${ns}scope .scope-chip`)].map((c) => ({
+    key: c.querySelector('.scope-chip-key')?.textContent.trim(), val: c.querySelector('.scope-chip-val')?.textContent.trim() })), NS);
+  const num = (text) => parseInt(String(text || '').replace(/,/g, ''), 10);
+  await waitForSelector(page, `#${NS}scope .scope-chip`, { timeout: 120000 });
+  const scope = await readScope();
+  const keys = scope.map((c) => c.key);
+  ok(/^Counted, Fall \d{4}$/.test(keys[0] || '') && keys.slice(1, 4).join('|') === 'First-time students|Transfer students|Start not on record',
+     `the scope bar says who is counted and how they started (${keys})`);
+  const started = scope.slice(1, 4).map((c) => num(c.val));
+  ok(started.every((n) => n >= 0) && started.reduce((a, b) => a + b, 0) === num(scope[0]?.val),
+     `first-time, transfer and start-not-on-record students add to those counted (${started} of ${num(scope[0]?.val)})`);
+  ok(started[1] > 0, `transfer students are among those counted (${started[1]})`);
+  const leftOut0 = scope.find((c) => c.key === 'Not counted');
+  ok(leftOut0 && /^students at another level: \D+ [\d,]+/.test(leftOut0.val), `the levels left out are named with their counts (${leftOut0?.val.slice(0, 80)})`);
 
   const noCards = await page.evaluate(() => !document.querySelector('#retention_dashboard-overall_finding .finding-card'));
   ok(noCards, 'the chart carries the finding: no cards');
@@ -107,6 +125,9 @@ try {
   const methods = await page.evaluate((ns) => ['method_overall', 'method_signs', 'method_groups', 'method_courses']
     .map((id) => document.getElementById(ns + id)?.textContent.trim().length || 0), NS);
   ok(methods.every((n) => n > 80), `every section's method is filled (${methods})`);
+  const who = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
+  ok(/transfer student is counted/i.test(who) && /another level is not counted/i.test(who),
+     'the first method note says transfer students are counted and other levels are not');
 
   await page.screenshot({ path: '/tmp/cedar-retention.png', fullPage: true });
 
@@ -181,6 +202,13 @@ try {
     return now && now !== f;
   }, { timeout: 300000, args: [undergrad] });
   ok(narrowed, `another student level (${second}) re-reads the page`);
+  await waitFor(page, (ns, before) => {
+    const val = document.querySelector(`#${ns}scope .scope-chip-val`);
+    return !!val && val.textContent.trim() !== before;
+  }, { timeout: 120000, args: [NS, scope[0]?.val] });
+  const [counted] = await readScope();
+  ok(/^Counted, Spring \d{4}$/.test(counted?.key || '') && counted.val !== scope[0]?.val,
+     `the scope bar re-reads with the level and term type (${counted?.key}: ${counted?.val})`);
 
   await connect(page, { tab: 'home' });
   const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=retention'));

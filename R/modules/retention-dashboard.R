@@ -15,6 +15,11 @@
 # and lays out its payload. It builds only while the tab is open, once per
 # scope a session asks for.
 #
+# Who is counted is said twice, each where its kind belongs: as facts in the
+# data scope bar under the controls (the level's students in the latest term,
+# how many started first-time or transferred in, and the levels left out), and
+# as the rule in each section's "How this is counted".
+#
 # Exported functions:
 #   retentionDashboardUI(id, campuses)
 #   retentionDashboardServer(id, student_terms, attempts, degrees, dims, edges, active)
@@ -40,6 +45,8 @@ retentionDashboardUI <- function(id, campuses) {
                                  options = list(placeholder = "Every home campus")))
       )
     ),
+    # Who the page counts, as facts (describe_retention_scope()).
+    uiOutput(ns("scope")),
     # Opened by the server while it reads (cedar_with_loading()).
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading who came back…",
     dashboard_section(
@@ -187,7 +194,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
             campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
-            milestones = FALSE, courses = FALSE)),
+            milestones = FALSE, courses = FALSE), programs = programs),
           error = function(e) {
             showNotification(paste("Retention:", conditionMessage(e)), type = "error", duration = 10)
             NULL
@@ -196,6 +203,13 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     # Shared by every session (cedar_shared_result()): the tables are fixed for
     # the life of the process, so the first reader after a start waits and the
     # rest do not.
+    })
+
+    # Who is counted, as facts: the latest term's students, how they started,
+    # and the levels left out. The rule is in each section's method.
+    output$scope <- renderUI({
+      p <- payload(); req(p, p$who)
+      headcount_scope_bar(describe_retention_scope(p$who))
     })
 
     # The course list is the slowest part: read after the charts above it.
@@ -235,7 +249,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       m <- b$meta
       tags$ul(
         tags$li(paste0("Graded attempts in ", paste(vapply(m$terms, fmt_term, character(1)), collapse = ", "),
-                       ", by the campus that taught the course (the campus chosen above). The GPA band is ",
+                       ", by the campus that taught the course (the campus chosen above). Every student in the course ",
+                       "is read, whatever their level: the Student level chosen above does not narrow this section. The GPA band is ",
                        if (m$band_by == "entering") "the GPA a continuing student brought into the term, counted from their own earlier terms here; first-term students have none"
                        else "the high-school GPA on file for a student in their first graded term here",
                        ". A student is read once for each term: ", fmt_count(m$n_banded), " in all. ",
@@ -265,8 +280,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       m <- p$meta
       tags$ul(
         tags$li(paste0("Every student enrolled in each of the ", .retention_type(p), " terms (registered, or withdrawn ",
-                       "after census), counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
+                       "after census) at the student level chosen above, counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
                        "at UNM on any campus: summer is not a step, and moving campus is not leaving.")),
+        tags$li(retention_who_note(p$who)),
         tags$li(paste0("Left out: ", fmt_count(m$n_graduated), " who finished rather than left, and ",
                        fmt_count(m$n_unobservable), " whose next term had not settled. Finished means awarded a ",
                        "degree that term",
@@ -332,6 +348,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        "credits and earns ", rates[["four_year"]], " a term finishes in two years. Students who transfer ",
                        "in a spring are not in these classes.")),
         tags$li(graduation_transfer_record_note(p$transfer[[1]])),
+        tags$li(paste0("A student the record never calls first-time or a new transfer (readmitted after time away, moved ",
+                       "from another campus or level, or here before the records begin) is in no class here, though the ",
+                       "return rates above count them.")),
         tags$li(paste0("Each student is in one part as the year begins: awarded a degree by then; enrolled that term; ",
                        "or not enrolled, which includes a student away for the term who later comes back.")),
         tags$li(paste0("An enrolled student is on pace for four years with ", rates[["four_year"]],
@@ -388,7 +407,8 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       rows <- pace_summer_rows()
       tags$ul(
         tags$li(paste0("First-time students who entered in a fall, read at the spring that ends each of their first ",
-                       "four years, if enrolled that spring. A student awarded a degree that spring is left out (",
+                       "four years, if enrolled that spring. Transfer students are not read here: they start part-way, ",
+                       "so a four-year pace does not fit them. A student awarded a degree that spring is left out (",
                        fmt_count(sum(rows$n_finished)), " over these springs).")),
         tags$li(paste0("Behind means fewer than ", m$pace_credits, " credits completed here for each fall and spring ",
                        "since entering, the pace that finishes in four years. Credit brought from elsewhere (test, ",
@@ -424,6 +444,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     output$method_signs <- renderUI({
       p <- payload(); req(p)
       tags$ul(
+        tags$li("The same students as the section above: everyone enrolled that term at the chosen level and home campus, transfer students included."),
         tags$li("A late withdrawal: at least one course dropped after census that term."),
         tags$li(paste0("A DFW grade: at least one D, F or other non-passing grade posted that term (a late ",
                        "withdrawal is counted apart). Read only for terms with posted grades, through ",
@@ -444,6 +465,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     output$method_groups <- renderUI({
       p <- payload(); req(p)
       tags$ul(
+        tags$li("The same students as the first section: everyone enrolled that term at the chosen level and home campus, transfer students included."),
         tags$li("Classification is the student's that term; college is the college of the primary major that term."),
         tags$li(paste0("A group's rate is read in each term it had ", p$meta$min_n, " or more students whose return ",
                        "could be read; a group not read in the latest term is left out (",
@@ -471,8 +493,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       terms <- crs$terms
       tags$ul(
         tags$li(paste0("The students of the latest ", length(terms), " ", .retention_type(p), " terms with posted grades (",
-                       paste(vapply(terms, fmt_term, character(1)), collapse = ", "), "), by the campus that taught ",
-                       "the course. A degree that term counts as finishing, not leaving.")),
+                       paste(vapply(terms, fmt_term, character(1)), collapse = ", "), ") at the chosen level and home ",
+                       "campus, transfer students included; each course is read by the campus that taught it. ",
+                       "A degree that term counts as finishing, not leaving.")),
         tags$li(paste0("A course is listed when 100 or more of these students took it, 20 or more got a DFW, and the ",
                        "students who did not pass came back less often than those who passed by more than chance ",
                        "alone would explain. Each course is tested on its own, so among this many courses chance ",

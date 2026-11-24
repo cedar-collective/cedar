@@ -73,3 +73,5 @@ pd01_edges <- list(last_enrolled = 202280L, last_enrolled_complete = 202280L, la
 
 # RR01: enrollment settled through Fall 2024, grades posted through Fall 2022.
 rr01_edges <- list(last_enrolled = 202480L, last_enrolled_complete = 202480L, last_graded = 202280L)
+# RS01: enrollment settled through Spring 2023, so Fall 2022's return is read.
+rs01_edges <- list(last_enrolled = 202310L, last_enrolled_complete = 202310L, last_graded = 202280L)
