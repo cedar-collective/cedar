@@ -139,13 +139,17 @@ complete.
 
 ---
 
-## Usage Overview
+## Usage
 
-Usage Overview summarizes recent CEDAR activity for a selected date range.
+Usage summarizes CEDAR activity for a date range, and lists the events behind
+the summary. One **Start Date** and **End Date** filter the whole tab: the
+dashboard, its tables and the event log are counted from one read of the log,
+so they always describe the same dates. **Refresh** rereads the range (today's
+log grows while CEDAR runs).
 
-The top dashboard shows:
+The dashboard at the top shows:
 
-- active sessions;
+- active sessions, and how many sessions were opened;
 - reports run;
 - tab views;
 - logged errors;
@@ -158,20 +162,13 @@ CEDAR logs browser sessions, not authenticated user identities. The active
 session count should not be interpreted as unique people.
 
 The tables below the dashboard break usage down by tab, report type,
-department, course, campus scope, and day. Use this to see which parts of CEDAR
+department, course, campus scope, and day. Use them to see which parts of CEDAR
 are getting attention and where training or documentation might help.
 
----
-
-## Feature Details
-
-Feature Details exposes the lower-level usage event log for a selected date
-range. It is useful when the overview says something happened and you need the
-specific event records behind it.
-
-The preview shows the newest 500 matching events. Its summary includes all
-matching events, not just those visible in the preview. Refresh rereads the
-selected range, and the preview and summary share that read.
+The **Usage Event Log** at the bottom is the lower-level record: the newest 500
+events in the range, for when the summary says something happened and you need
+the specific events behind it. The counts above include every event in the
+range, not only those listed.
 
 New usage logs rotate daily, including across midnight in long-running sessions.
 Older monthly files remain readable; date filtering happens before JSON parsing.
@@ -180,7 +177,7 @@ At app startup, closed usage files older than the configured active window
 being deleted. Older date selections include those archives automatically.
 Archives remain part of the production data backup; timing logs are unchanged.
 
-Use this for troubleshooting, not as a polished usage dashboard.
+Use the event log for troubleshooting, not as a polished usage dashboard.
 
 ---
 

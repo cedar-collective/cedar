@@ -5584,49 +5584,41 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       coded_in = reactable::colDef(name = "Coded in", minWidth = 200)))
   })
 
-  # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────────
-  usage_overview_data <- reactiveVal(NULL)
+  # ── Tab 2: Usage (lazy loaded) ─────────────────────────────────────────
+  # One date range and one read of the log for the whole tab: the dashboard,
+  # its tables and the event log are all counted from usage_logs(), so they
+  # always describe the same dates. The log is never read while the tab is
+  # hidden; Refresh rereads it (today's file grows while the app runs).
+  usage_logs <- reactive({
+    req(input$main_navbar == "Data & Usage", input$data_usage_tabs == "Usage")
+    req(input$usage_start_date, input$usage_end_date)
+    input$refresh_usage_overview
+    cedar_debug("[server.R] Reading usage logs for ", input$usage_start_date, " to ", input$usage_end_date)
+    read_logs(as.character(input$usage_start_date), as.character(input$usage_end_date))
+  })
 
-  # Helper to (re)load overview data
-  .load_usage_overview <- function() {
-    tryCatch({
-      start_date <- if(!is.null(input$usage_start_date)) as.character(input$usage_start_date) else as.character(Sys.Date())
-      end_date   <- if(!is.null(input$usage_end_date))   as.character(input$usage_end_date)   else as.character(Sys.Date())
-      cedar_debug("[server.R] Loading usage overview for date range: ", start_date, " to ", end_date)
-      usage_overview_data(get_usage_overview(start_date, end_date))
-    }, error = function(e) {
-      message("[server.R] Error loading usage overview: ", e$message)
-      usage_overview_data(list(message = paste("Error loading usage data:", e$message)))
-    })
-  }
+  usage_overview_data <- reactive({
+    logs <- usage_logs()
+    tryCatch(
+      get_usage_overview(as.character(input$usage_start_date), as.character(input$usage_end_date), logs = logs),
+      error = function(e) {
+        message("[server.R] Error loading usage overview: ", e$message)
+        list(message = paste("Error loading usage data:", e$message))
+      })
+  })
 
   .usage_label <- function(x) {
     x <- gsub("[-_]+", " ", as.character(x))
     tools::toTitleCase(x)
   }
 
-  # Auto-load when this tab becomes active
-  observeEvent(input$data_usage_tabs, {
-    if (isTRUE(input$main_navbar == "Data & Usage") &&
-        isTRUE(input$data_usage_tabs == "Usage Overview")) .load_usage_overview()
-  })
-
-  # Also reload on explicit Refresh click
   observeEvent(input$refresh_usage_overview, {
-    .load_usage_overview()
-    showNotification("Usage overview refreshed", type = "message")
+    showNotification("Usage refreshed", type = "message")
   })
 
   # Render usage overview UI
   output$usage_overview_ui <- renderUI({
     overview <- usage_overview_data()
-
-    if (is.null(overview)) {
-      return(div(
-        class = "text-center p-3",
-        p("Click 'Refresh' to load usage overview")
-      ))
-    }
 
     if ("message" %in% names(overview)) {
       return(div(
@@ -5681,13 +5673,14 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       ),
       fluidRow(
         column(3, metric_card(fmt_count(overview$unique_sessions), "Active sessions",
-                              "Sessions with tab, report, or download activity; not unique users.")),
+                              paste0("Of ", fmt_count(overview$sessions_opened), " opened: those with tab, report, ",
+                                     "or download activity; not unique users."))),
         column(3, metric_card(fmt_count(overview$total_reports), "Reports run",
                               top_label(overview$report_type_usage, "report_type", .usage_label))),
         column(3, metric_card(fmt_count(overview$total_tab_views), "Tab views",
                               top_label(overview$tab_usage, "tab"))),
         column(3, metric_card(fmt_count(overview$errors_count), "Errors logged",
-                              if (overview$errors_count > 0) "Check Feature Details." else "No logged errors."))
+                              if (overview$errors_count > 0) "See the event log below." else "No logged errors."))
       ),
       fluidRow(
         column(3, metric_card(fmt_count(overview$total_events), "Total events", busiest_note)),
@@ -5779,7 +5772,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     .admin_reactable(display, page_size = 10L, searchable = FALSE)
   })
 
-  # ── Tab 3: Feature Details ──────────────────────────────────────────────
+  # ── The Usage tab's event log ───────────────────────────────────────────
 
   # Human-readable labels for event types
   .event_labels <- c(
@@ -5816,51 +5809,11 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     }, error = function(e) details_str)
   }
 
-  # Both outputs share one read, and never read logs while this tab is hidden.
-  feature_usage_data <- reactive({
-    req(input$main_navbar == "Data & Usage", input$data_usage_tabs == "Feature Details")
-    req(input$feature_start_date, input$feature_end_date)
-    input$refresh_feature_details
-    read_logs(as.character(input$feature_start_date), as.character(input$feature_end_date))
-  })
-
-  # Stats summary card — auto-renders reactively from log inputs
-  output$usage_stats_output <- renderUI({
-    start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
-    end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
-    tryCatch({
-      stats <- get_usage_stats(start_date, end_date, logs = feature_usage_data())
-      if ("message" %in% names(stats)) return(p(stats$message, style = "color:var(--text-muted);"))
-      date_label <- if (start_date == end_date) start_date else paste(start_date, "–", end_date)
-      tagList(
-        fluidRow(
-          column(3, div(class = "well well-sm text-center",
-            h4(stats$total_sessions),  p("Sessions", class = "text-muted m-0"))),
-          column(3, div(class = "well well-sm text-center",
-            h4(stats$total_session_starts), p("Session starts", class = "text-muted m-0"))),
-          column(3, div(class = "well well-sm text-center",
-            h4(if (!is.null(stats$reports_generated)) stats$reports_generated else 0),
-            p("Reports generated", class = "text-muted m-0"))),
-          column(3, div(class = "well well-sm text-center",
-            h4(stats$error_count),  p("Errors", class = "text-muted m-0")))
-        )
-      )
-    }, error = function(e) {
-      # req() in feature_usage_data() says "not ready yet" with a silent error;
-      # pass it on so Shiny renders nothing, instead of reporting an empty error.
-      if (inherits(e, "shiny.silent.error")) stop(e)
-      p(paste("Error loading stats:", e$message), style = "color:red;")
-    })
-  })
-
-  # Event log table — shows all events, rendered reactively (no refresh needed)
+  # The newest events of the same read the dashboard counts (usage_logs()).
   output$feature_usage_table <- reactable::renderReactable({
     cedar_debug("[server.R] FEATURE USAGE TABLE rendering")
     tryCatch({
-      start_date <- if (!is.null(input$feature_start_date)) as.character(input$feature_start_date) else as.character(Sys.Date())
-      end_date   <- if (!is.null(input$feature_end_date))   as.character(input$feature_end_date)   else as.character(Sys.Date())
-
-      logs <- recent_usage_log_entries(feature_usage_data())
+      logs <- recent_usage_log_entries(usage_logs())
       cedar_debug("[server.R] Read ", nrow(logs), " log entries for feature usage table")
 
       if (nrow(logs) == 0) {
@@ -5881,7 +5834,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
 
       .admin_reactable(display, page_size = 20L)
     }, error = function(e) {
-      # req() in feature_usage_data() says "not ready yet" with a silent error,
+      # req() in usage_logs() says "not ready yet" with a silent error,
       # whose message is empty. Catching it logged "*** ERROR in
       # feature_usage_table:  ***" whenever the output ran before its tab was
       # ready; pass it on so Shiny waits quietly.

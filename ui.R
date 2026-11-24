@@ -1994,12 +1994,13 @@ nav_panel(
         catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
       ),
 
-      # ── Tab 2: Usage Overview (lazy loaded) ────────────────────────────
+      # ── Tab 2: Usage (lazy loaded) ─────────────────────────────────────
+      # One date range for the dashboard, its tables and the event log: all
+      # three are counted from one read of the log (server.R, usage_logs()).
       nav_panel(
-        title = "Usage Overview",
+        title = "Usage",
         br(),
 
-        # Date range selector
         fluidRow(
           column(4,
             dateInput("usage_start_date", "Start Date:", value = Sys.Date())
@@ -2063,35 +2064,11 @@ nav_panel(
               reactable::reactableOutput("usage_daily_table")
             )
           )
-        )
-      ),
-
-      # ── Tab 3: Feature Details (lazy loaded) ───────────────────────────
-      nav_panel(
-        title = "Feature Details",
-        br(),
-
-        # Date range selector (shared reactive values from Usage Overview)
-        fluidRow(
-          column(4,
-            dateInput("feature_start_date", "Start Date:", value = Sys.Date())
-          ),
-          column(4,
-            dateInput("feature_end_date", "End Date:", value = Sys.Date())
-          ),
-          column(4,
-            br(),
-            actionButton("refresh_feature_details", "Refresh", class = "btn-primary", icon = icon("sync"))
-          )
         ),
-
-        br(),
-
-        uiOutput("usage_stats_output"),
 
         card(
           card_header("Usage Event Log"),
-          p("Preview shows the newest 500 events in the selected range. Summary counts include all matching events; archived history remains available by selecting older dates.",
+          p("The newest 500 events in the selected range. The counts above include every event in the range; archived history remains available by selecting older dates.",
             class = "text-hint"),
           reactable::reactableOutput("feature_usage_table")
         )

@@ -1213,8 +1213,10 @@ get_usage_stats <- function(start_date = NULL, end_date = NULL,
 
 # Get human-readable usage overview
 # This provides a high-level summary of feature usage that's easy to scan
-get_usage_overview <- function(start_date = NULL, end_date = NULL) {
-  logs <- read_logs(start_date, end_date)
+# `logs` lets a caller that already read the range (the Admin page reads it
+# once for the dashboard and the event log) hand its rows in.
+get_usage_overview <- function(start_date = NULL, end_date = NULL,
+                               logs = read_logs(start_date, end_date)) {
 
   if (nrow(logs) == 0) {
     return(list(

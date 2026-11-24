@@ -62,19 +62,30 @@ try {
   await page.screenshot({ path: '/tmp/cedar-admin-freshness.png', fullPage: true });
 
   await connect(page, { tab: 'data-usage', expect: 'Data & Usage' });
-  await openSubTab(page, 'Feature Details');
+  // One Usage tab: the dashboard, its tables and the event log under one date
+  // range, all from one read of the log.
+  await openSubTab(page, 'Usage');
   await page.waitForFunction(() => {
     const table = document.getElementById('feature_usage_table');
     return table && table.innerText.trim().length > 0 && !table.classList.contains('recalculating');
   });
+  await waitForIdle(page);
   const details = await page.evaluate(() => document.getElementById('feature_usage_table').innerText);
   check('on-demand event preview renders without a read error', !details.includes('Error loading data'));
-  const stats = await page.evaluate(() => document.getElementById('usage_stats_output').innerText);
-  check('shared full-range usage statistics render', !stats.includes('Error loading stats') && stats.includes('Sessions'));
-  await openSubTab(page, 'Usage Overview');
-  await waitForIdle(page);
   const overview = await page.evaluate(() => document.getElementById('usage_overview_ui').innerText);
   check('on-demand usage summary renders', overview.includes('Active sessions') || overview.includes('No usage data'));
+  const usage = await page.evaluate(() => ({
+    dates: document.getElementById('usage_overview_ui').closest('.tab-pane').querySelectorAll('.shiny-date-input input').length,
+    tabs: [...document.querySelectorAll('#data_usage_tabs a')].map((a) => a.textContent.trim()),
+    sameTab: document.getElementById('usage_overview_ui').closest('.tab-pane') === document.getElementById('feature_usage_table').closest('.tab-pane'),
+  }));
+  check(`the dashboard and the event log share one tab (${usage.tabs.join(', ')})`,
+        usage.sameTab && usage.tabs.includes('Usage') && !usage.tabs.includes('Feature Details') && !usage.tabs.includes('Usage Overview'));
+  check(`one date range filters both (${usage.dates} date inputs)`, usage.dates === 2);
+  // This session's own visit is in today's log: the dashboard counts it and
+  // the event log lists it, so the two read the same range.
+  check('the dashboard and the event log read the same range',
+        overview.includes('No usage data') === details.includes('No log data found'));
 
   // Mapping decisions link what to supply to the line (or file) that takes it;
   // the decision is an edit there, never in the running app. Programs, course
