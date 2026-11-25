@@ -38,10 +38,13 @@ courseCohortUI <- function(id) {
 #' @param instructor_password The gate's password ("" when none is configured).
 #' @param view Reactive: the open Downstream subtab's value (NULL when
 #'   Downstream is not open); the comparison runs on "non_takers" and "glance".
+#' @param page_overlay The id of the page's loading overlay, or NULL. At a
+#'   Glance runs this view while its subtab, and the overlay on it, is hidden:
+#'   the wait is then shown on the page's overlay (ISSUES I82).
 courseCohortServer <- function(id, student_terms, attempts, programs, dims, edges,
                                course, campus, applicants = NULL,
                                instructor_access = reactiveVal(FALSE), instructor_password = "",
-                               view = reactive("non_takers")) {
+                               view = reactive("non_takers"), page_overlay = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     result <- reactiveVal(NULL)
@@ -190,7 +193,9 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         data_edges = edges,
         college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
       )
-      cedar_with_loading(session, ns("load"), report_type = "course_cohort", {
+      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else ns("load")
+      cedar_with_loading(session, overlay, label = "Comparing takers with non-takers…",
+                         report_type = "course_cohort", {
         payload <- tryCatch(
           build_course_cohort_context(student_terms, attempts, opt),
           error = function(e) {

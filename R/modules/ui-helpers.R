@@ -1303,11 +1303,17 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   }
 
   // An autorun URL can reveal the overlay from the early <head> script before
-  // Shiny connects. Adopt that already-visible overlay once the DOM is ready so
-  // its later completion message can always finalize and dismiss it.
+  // Shiny connects, and a page that loads on open renders it visible. Adopt
+  // that already-visible overlay once the DOM is ready: it says what one opened
+  // by a button says (the estimate, then how long it has been working), and its
+  // later completion message can always finalize and dismiss it. The estimate
+  // is the one embedded when the app started: Shiny is not connected yet, and
+  // a request for current values would be answered only as the wait ends.
   document.addEventListener("DOMContentLoaded", function() {
     var box = el("-loading-overlay");
-    if (box && box.style.display !== "none") beginMeasurement();
+    if (!box || box.style.display === "none") return;
+    beginMeasurement();
+    startWaiting();
   });
 
   // Track only output values belonging to this overlay. This approximates the
@@ -1396,10 +1402,30 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   var ORIG = { expected: EXPECTED, cached: CACHED, expectedRange: EXPECTED_RANGE, cachedRange: CACHED_RANGE };
   var activeReport = REPORT_TYPE, activeFreshDefault = FRESH_DEFAULT, activeCachedDefault = CACHED_DEFAULT;
   var elapsedTimer = null;
+
+  // What every wait shows, however the overlay was opened: the label with its
+  // estimate, and how long it has been working, so a wait is never a blank
+  // screen.
+  function startWaiting() {
+    if (!el("-loading-overlay")) return;
+    el("-loading-label").textContent = loadingLabel();
+    el("-timing-msg").textContent = "";
+    clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(function() {
+      if (runStartedAt === null) return;
+      var s = Math.round((performance.now() - runStartedAt) / 1000);
+      if (s >= 2) el("-timing-msg").textContent = "Working for " + s + "s";
+    }, 1000);
+  }
+
   function showOverlay(label, reportType, freshDefault) {
     customLabel = (typeof label === "string" && label) ? label : null;
     clearTimeout(hideTimer);
     clearTimeout(finalizeTimer);
+    // A run that starts as the one before it ends (At a Glance runs three in a
+    // row behind one overlay): record the finished run now. Left pending, its
+    // finish would land a moment later and hide the overlay under the new run.
+    if (measurementActive && completionMsg) finalizeMeasurement(true);
     beginMeasurement();
     if (typeof reportType === "string" && reportType && reportType !== REPORT_TYPE) {
       activeReport = reportType;
@@ -1423,19 +1449,17 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }
     var box = el("-loading-overlay");
     if (!box) return;
-    el("-loading-label").textContent = loadingLabel();
-    el("-timing-msg").textContent = "";
-    // How long it has been working, so a wait is never a blank screen.
-    clearInterval(elapsedTimer);
-    elapsedTimer = setInterval(function() {
-      if (runStartedAt === null) return;
-      var s = Math.round((performance.now() - runStartedAt) / 1000);
-      if (s >= 2) el("-timing-msg").textContent = "Working for " + s + "s";
-    }, 1000);
-    box.style.opacity = "0";
-    box.style.display = "flex";
-    box.style.transition = "opacity 0.2s ease";
-    box.offsetWidth;
+    startWaiting();
+    // Fade in only an overlay that was closed: one still open for the run
+    // before stays as it is, with the new label.
+    if (box.style.display === "none") {
+      box.style.opacity = "0";
+      box.style.display = "flex";
+      box.style.transition = "opacity 0.2s ease";
+      box.offsetWidth;
+    } else {
+      box.style.transition = "";
+    }
     box.style.opacity = "1";
   }
 
@@ -1471,7 +1495,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     });
   }
 
-  function finalizeMeasurement() {
+  // keepOpen: record the finished run and leave the overlay as it is, for the
+  // run that is starting behind it.
+  function finalizeMeasurement(keepOpen) {
     if (!measurementActive || !completionMsg || runStartedAt === null) return;
     clearTimeout(finalizeTimer);
     var totalSec = Math.max((performance.now() - runStartedAt) / 1000, 0);
@@ -1502,6 +1528,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
       }, {priority: "event"});
     }
 
+    if (keepOpen === true) { stopMeasurement(); return; }
     var verb = completionMsg.cached === true ? "Loaded from cache"
              : completionMsg.cached === false ? "Generated"
              : "Loaded";
@@ -1536,7 +1563,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     hideTimer = setTimeout(function() {
       box.style.transition = "opacity 0.4s ease";
       box.style.opacity = "0";
-      setTimeout(function() {
+      // Held in hideTimer too, so a run that starts mid-fade cancels the hide.
+      hideTimer = setTimeout(function() {
         box.style.display = "none";
         box.style.transition = "";
         box.style.opacity = "1";

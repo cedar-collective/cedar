@@ -88,6 +88,21 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
   paints at once and the outputs land seconds later, so the page otherwise
   looks finished while empty. The server then owes a `signal_load_complete()`
   for the first load on every path, including the empty state.
+- **A wait is shown where the reader is.** An overlay inside a hidden subtab is
+  not on screen. A view that another view runs for it (Downstream's At a
+  Glance runs Against Non-Takers and Next Courses) opens the page's overlay
+  for that run, with its own label, and its own overlay only on its own subtab
+  (`page_overlay =`; I82). Runs may follow one another behind one overlay: a
+  run that starts as the one before ends keeps it open.
+- An overlay that is already on screen when the page arrives (an autorun
+  link's, or `show_at_start`) says what one opened by a button says: the
+  estimate embedded at start, then how long it has been working (I83).
+- **Nothing table-sized runs when a session starts.** R answers one request at
+  a time, so what a module's server does as a session opens is waited for on
+  every page, and a deep link's run starts only after it. Choices that are the
+  same for every session are built once (`global.R`, or
+  `cedar_shared_result()`); work that reads a whole table waits for its own
+  page (I80).
 - Always show a clear blue info callout when a run succeeds but returns no rows for the selected criteria. If a secondary tab intentionally ignores one filter (e.g., Trends ignoring exact term codes), do not hide useful secondary results just because the primary table is empty.
 
 **User-facing polish review.**

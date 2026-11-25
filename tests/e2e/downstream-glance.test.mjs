@@ -31,6 +31,15 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE}`);
 
+  // Every label the page's loading overlay is given from here on: At a Glance
+  // runs the other views while their subtabs, and the overlays on them, are
+  // hidden, so their waits have to show on the page's (ISSUES I82).
+  await page.evaluate(() => {
+    const label = document.getElementById('cr-loading-label');
+    window.__crLabels = [];
+    new MutationObserver(() => window.__crLabels.push(label.textContent))
+      .observe(label, { childList: true, characterData: true, subtree: true });
+  });
   await openSubTab(page, 'Downstream', { timeout: 300000 });
   await waitForSelector(page, '#cr_downstream_glance_ui .downstream-glance', { timeout: 300000 });
   const active = await page.evaluate(() =>
@@ -62,6 +71,12 @@ try {
   const still = (await pendingSteps().catch(() => [])).filter((st) => st.pending).map((st) => st.title);
   ok(settled, `all five steps settle without a click (${still.length ? `still waiting: ${still.join(', ')}` : 'none waiting'})`);
   await waitForIdle(page, { timeout: 300000 });
+
+  const waits = [...new Set(await page.evaluate(() => window.__crLabels.map((t) => t.replace(/ \(.*$/, ''))))];
+  ok(waits.some((t) => t.startsWith('Comparing takers with non-takers')),
+     `the wait for Against Non-Takers shows on the page while At a Glance is open (${waits.join(' | ') || 'no label'})`);
+  ok(waits.some((t) => t.startsWith('Following students into the later course')),
+     'the wait for Next Courses shows on the page while At a Glance is open');
 
   const cards = await page.evaluate(() =>
     [...document.querySelectorAll('#cr_downstream_glance_ui .downstream-glance-step')].map((c) => ({

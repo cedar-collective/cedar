@@ -5924,7 +5924,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     edges         = data_objects[["cedar_edges"]],
     default_options = cr_downstream_options,
     view          = cr_downstream_active,
-    instructor_access = dfw_authenticated, instructor_password = dfw_password
+    instructor_access = dfw_authenticated, instructor_password = dfw_password,
+    page_overlay  = "cr"
   )
 
   # Course Dynamics > Downstream > Against Non-Takers: the analysed course against the
@@ -5944,7 +5945,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       if (is.null(data)) NULL else data$course_code
     }),
     campus        = reactive(input$cr_campus),
-    view          = cr_downstream_active
+    view          = cr_downstream_active,
+    page_overlay  = "cr"
   )
 
   # Course Dynamics > Downstream > At a Glance: one card a step, each read off
