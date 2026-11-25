@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25). The module servers are now compiled at start; open for the server function itself, which the second session still compiles (about 3 seconds), because Shiny reads `server.R` itself ([M70](#improvements)) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -52,7 +53,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M67 | Improvement | See [Improvements](#improvements) |
+| M1–M70 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -60,6 +61,10 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
+| [I83](#i83--a-deep-links-loading-notice-gave-no-estimate-and-no-running-count) | Defect | A link that runs a report on arrival (`autorun=true`) showed a bare "Loading…" until the report arrived: no estimate and no running count, because the overlay it opens before Shiny connects never went through the code that writes them (resolved 2026-11-25) |
+| [I82](#i82--downstreams-at-a-glance-showed-an-empty-page-while-it-ran-the-other-views) | Defect | Course Dynamics > Downstream opened on an empty page for as long as its analyses ran (two minutes for FYEX 1110 on production, 2026-11-25): At a Glance runs Against Non-Takers and Next Courses, and each showed its wait on its own subtab, which is hidden then (the waits now show on the page's overlay; the length of the run is [M68](#improvements)) |
+| [I80](#i80--every-session-began-by-recounting-headcounts-program-menu) | Defect | Every session spent about 8 seconds starting (10 on production) before it could respond, on whatever page it opened, 4.5 of them rebuilding Headcount's program menu with one read of the declarations table per program; a deep link to a cached dashboard that loads in 0.2 seconds took 12 to 30 (now 2.3 seconds locally: the rows are found in one pass and the opening choices are shared) |
 | [I79](#i79--a-report-whose-conversion-or-read-stopped-part-way-was-stored-as-a-smaller-report) | Defect | `parse-data.R` stored whatever part of an export its converter had written or its reader returned: on 2026-11-23 Fall 2025's Student Holds were stored as the first 211,142 of 300,138 rows (15,152 of 26,890 students) with no error. A converter that does not exit 0, or any warning from the read, now stops the parse (resolved 2026-11-23; what cut that conversion short is not established) |
 | [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
 | [I78](#i78--the-transforms-status-file-lists-only-the-tables-of-the-last-run) | Defect | `cedar-status.json` held only the tables the last transform run built, so a run of one stage (`--tables degrees`, or the holds catch-up) left `scripts/data-status.sh` listing one table (the file now keeps the entries of tables a run did not rebuild) |
@@ -108,6 +113,232 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I84 — The admin browser suite expected the math starting point that was replaced
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, running `./run-tests.sh --changed` for I80 to I83: the
+gate stopped at `e2e: admin`.
+**Severity:** low for the app (nothing on a page is wrong); medium for the
+gate, which stops at the first failing suite and so ran none of the suites
+listed after `admin`.
+**Affects:** `tests/e2e/admin.test.mjs`.
+
+### What was wrong
+
+Commit a76ab5a (2026-11-23) made College Algebra the starting point Degree
+Explorer opens on (`opens` in `degree_roadmap_starts.csv`) and updated
+`degree-explorer.test.mjs`. Admin > Catalog Review opens on the same starting
+point, and `admin.test.mjs` still expected "Math: Calculus-ready" in its
+summary.
+
+### Reproduce (before the fix)
+
+`./run-tests.sh --e2e admin` against the institutional app:
+`AssertionError: selected planning scenario shows the math starting-point
+label`. The summary reads "Math: College-algebra-ready".
+
+### Fix
+
+The step expects the label of the starting point the page opens on.
+
+## I83 — A deep link's loading notice gave no estimate and no running count
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, on production, opening
+`?tab=dept-dashboard&autorun=true&campus=ABQ,EA&dept=HIST&term=202680`: the
+loading notice read "Loading…" for the 30 seconds the page took (I80, I81).
+**Severity:** low: nothing is wrong on the page, but a long wait said nothing.
+**Affects:** `cedar_loading_overlay()` in `R/modules/ui-helpers.R`, for every
+page reached by a link with `autorun=true` and every `show_at_start` page.
+
+### What was wrong
+
+An autorun link's overlay is opened by the script in the page's `<head>`,
+before Shiny connects. The overlay's own script then adopted it by starting its
+clock and nothing else. The label with its estimate ("cached ~2s; fresh ~20s")
+and the count of seconds ("Working for 12s") were written only by
+`showOverlay()`, which runs on a button press or a message from the server. A
+linked run sends neither: it starts on the server.
+
+### Reproduce (before the fix)
+
+Open any link with `autorun=true` and read `#<id>-loading-label` and
+`#<id>-timing-msg` while the overlay is up: "Loading…" and nothing.
+
+### Fix
+
+The adopted overlay writes the same label and starts the same count
+(`startWaiting()`, shared with `showOverlay()`). Its estimate is the one
+embedded when the app started: a request for current values would be answered
+only as the wait ends. `waitlist-deeplink.test.mjs` reads the label as the page
+arrives.
+
+## I82 — Downstream's At a Glance showed an empty page while it ran the other views
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`) for what the page
+shows. How long the run takes is M68.
+**Found:** 2026-11-25, on production: Course Dynamics for FYEX 1110, then
+Downstream. "None of the subtabs display anything."
+**Severity:** medium: the page reads as broken for as long as the run takes,
+and so does every other page of every other session, since R answers one
+request at a time.
+**Affects:** `R/modules/course-cohort.R`, `R/modules/later-course.R`,
+`server.R` (Course Dynamics), the overlay script in `R/modules/ui-helpers.R`.
+
+### What was wrong
+
+Downstream opens on At a Glance, which runs Next Courses, Against Non-Takers
+and Prepared for It on their defaults. Each module showed its wait on the
+overlay inside its own subtab. With At a Glance open those subtabs are hidden,
+and so were their overlays: the page was empty, with no notice, until the last
+of the three began (the only one that used the page's overlay). Clicking
+another subtab meanwhile showed that one empty too, because its outputs were
+queued behind the run.
+
+### Evidence
+
+Production, 2026-11-25 (UTC), `report_timing.csv`, one session:
+
+| Started | Step | Seconds | Overlay it used |
+|---|---|---|---|
+| 14:36:51 | `later_course` | 5.4 | Next Courses' own (hidden) |
+| 14:36:57 | `course_cohort` | 91.2 | Against Non-Takers' own (hidden) |
+| 14:38:33 | `course_sequence` | 19.5 | the page's |
+
+Nothing was on screen from 14:36:51 to 14:38:33. No error was logged and the
+results did arrive.
+
+### Reproduce (before the fix)
+
+Course Dynamics, a large course, Analyze Course, Downstream. Until the
+sequence comparison starts, `#cr-loading-overlay` is hidden and
+`#cr_cohort-load-loading-overlay` is open inside a hidden tab pane.
+
+### Fix
+
+Each module takes the page's overlay (`page_overlay = "cr"`) and opens it, with
+its own label, when At a Glance is the open view; on its own subtab it opens
+its own as before. The overlay script keeps one overlay open across runs that
+follow one another: a run that starts as the one before ends records the
+finished run at once, where its pending finish used to hide the overlay under
+the new run a moment later. `downstream-glance.test.mjs` records every label
+the page's overlay is given and expects both modules' waits among them.
+
+## I81 — The first sessions after a restart wait while the server code is compiled
+
+**Status:** partly resolved 2026-11-25 (branch `perf/session-start`): the
+module servers are compiled at start. Open for the server function (M70).
+**Found:** 2026-11-25, on production: the first visit of the day, by a link to
+a cached dashboard, took 29.6 seconds.
+**Severity:** medium: once per restart, so every morning's first reader.
+**Affects:** `global.R`; `server.R` and how Shiny reads it.
+
+### What is wrong
+
+R compiles a function the first time it is called (a function not defined at
+top level, the second time). The restart's warm-up request fetches the page
+and opens no session, so the first person's session compiled every module's
+server function, and the second session the server function.
+
+### Evidence
+
+Production, 2026-11-25, one session, from `client_render_timing.csv`
+and the usage log: the page was there about 13:33:29; the session's first
+observer ran at 13:33:48 (19 seconds, against 2.5 for a session on 2026-11-23
+in a process already used); the run began at 13:33:58 (I80); the dashboard
+came from cache in 0.17 seconds.
+
+Locally, the same link three times in a fresh process, with a profiler around
+the server function: 19.2 seconds, then 8.5 and 9.1. The first session's
+server function body took 11.0 seconds against 1.1, and the samples are the
+compiler's (`findCenvVar`, `cmpCall`, `putconst`). Compiling the module servers
+alone takes 4.5 seconds, the server function 2.5.
+
+### Reproduce
+
+Restart the app, wait for the preload lines to stop, open any page: the gap
+between the websocket opening and the first output is several seconds longer
+than on the third session.
+
+### Fix, and what remains
+
+`global.R` compiles every module server (`ls(pattern = "Server$")`) after
+loading them: 4.5 seconds added to the start, taken off the first session.
+With I80 fixed too, the first session's deep link is ready in 5.4 seconds
+locally (was 19.2) and later ones in 3.5 (was about 9).
+
+The server function cannot be compiled the same way: Shiny reads `server.R`
+itself for the first session and calls that copy, not the one `global.R`
+sourced (M70). It is compiled on its second call, so the second session still
+waits about 3 seconds (6.0 against 3.5).
+
+## I80 — Every session began by recounting Headcount's program menu
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, on production: a link to a Dept Dashboard that was in
+the cache took 29.6 seconds; the dashboard's own load was 0.17.
+**Severity:** high in effect: every session, on every page, waited about 10
+seconds on production before the server answered anything, and a deep link's
+run could not start until then.
+**Affects:** `program_choices()` in `R/branches/population.R`,
+`R/modules/headcount.R`, `R/modules/pathways.R`.
+
+### What was wrong
+
+Headcount's server fills its Major and Minor menus when a session starts,
+whatever page the session opened (`observeEvent(input$college, …, ignoreInit =
+FALSE)`). The labels say each program's degrees, campuses and years, and
+`program_choices()` found each program's declaration rows with
+`profile[major_code %in% covered, ]` inside a loop over about 250 programs: one
+read of the whole declarations table per program. Pathways' server likewise
+read the subject off every class-list row to list the subjects.
+
+R answers one request at a time, so nothing else in the session ran until this
+finished: not the page's own outputs, and not a link's restore and run.
+
+### Evidence
+
+Production, the same link (cache hit each time, 0.07 to 0.17 seconds of
+calculation), `client_render_timing.csv` against the usage log:
+
+| Session | Page there to ready | Session's first observer to the run |
+|---|---|---|
+| 2026-11-20 18:25 | 20.5 s | 12 s |
+| 2026-11-23 12:39 | 12.8 s | 10 s |
+| 2026-11-25 13:33 (first of the day, I81) | 29.6 s | 10 s |
+
+Locally, a profile of one session's start (not the first of its process), 7.6
+seconds sampled:
+
+| Seconds | Where |
+|---|---|
+| 4.5 | Headcount's menus: 3.4 in `program_choices()`'s per-program lookup |
+| 1.1 | the server function's own body (every module's set-up) |
+| 0.6 | Pathways' subject list (`sub()` over every class-list row) |
+| 0.3 | `course_picker_choices()` for a course picker |
+| 1.1 | everything else |
+
+### Reproduce (before the fix)
+
+Open any page in a fresh browser session and time the websocket's `busy` to
+`idle`: 7.6 to 8.3 seconds locally. Or change College on Headcount: about 4
+seconds before the menus refill.
+
+### Fix
+
+`program_choices()` finds every program's rows in one pass (each code belongs
+to one program, so the rows are split by it once); the labels are unchanged
+(`test-pathways-helpers.R`, and the same labels on the full table before and
+after). Headcount's choices for a scope are built once and shared by every
+session (`cedar_shared_result()`). Pathways reads each course code's subject
+once. A session's start is 2.3 seconds locally, and the link above is ready in
+3.5 (was about 9).
+
+What a session's start still costs, for a later pass: the server function's
+body (1.0 s), Headcount's department list (0.2 s, a `distinct()` in the
+module), a course picker's choices (0.3 s, `course_picker_choices()` over the
+class list per session).
 
 ## I79 — A report whose conversion or read stopped part-way was stored as a smaller report
 
@@ -4836,6 +5067,45 @@ when:* the section reads the students of the page's level (their level that
 term, from `cedar_student_terms`), or the choice to read everyone is recorded
 here as deliberate; and the campus control means one thing on the page, or
 the section has its own.
+
+**M68 — Against Non-Takers takes one to two minutes for a large course, and
+runs when Downstream opens.** FYEX 1110 on production, 2026-11-25:
+`course_cohort` 91.2 seconds, between `later_course` (5.4) and
+`course_sequence` (19.5), during which R answers no other session (I82 is the
+empty page it showed meanwhile). Locally 50 seconds, of which a profile gives:
+20 in `student_term_aid()` (`R/branches/comparison.R`: a
+`summarize(max(…))` per student-term over the whole declarations table, the
+same for every course and every call, and wrapped in `suppressWarnings()` per
+group); 12 in the `touched` table of `get_course_similar_students()`
+(`R/cones/course-similar-students.R`: `arrange()` and `group_by()` over the
+attempts), rebuilt on each of the cone's several calls per run; 6 in
+`build_course_cohort_context()`. Done when the aid table is built once and
+reused (or counted without a per-group function), the cone's calls in one run
+share their prepared rows, and a large course's run is timed again here.
+Whether At a Glance should start all three runs on opening is a product
+choice, in ROADMAP.
+
+**M69 — A soft restart leaves the previous R process running.**
+`restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
+for new sessions and, with `app_idle_timeout 0`, never ends the old one. On
+production on 2026-11-25 the process started after the 10:00 UTC container
+restart was still there at 14:19 beside the one the 11:00 soft restart started:
+1.2 GB resident and 1.4 GB in swap on an 8 GB host, until the next day's
+container restart. Done when the morning job ends with one R process (a hard
+restart there, or the soft restart ends the old worker), checked with `ps` in
+the container.
+
+**M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
+and `app.R` is never used.** With a `server.R` in the directory Shiny ignores
+`app.R`: it sources `ui.R` on the first request and `server.R` on the first
+session, each into its own environment, and calls those copies. So the UI is
+built twice at start (the "Navigation containers" warning appears twice in
+every log), and the server function that runs is not the one `global.R`
+sourced, which is why it cannot be compiled ahead (I81). Done when one of the
+two reads is gone (for instance a `server.R` that only returns the function
+`global.R` already built and compiled), the first two sessions after a restart
+take what the third does, and `docs/developers/index.md` says which file is the
+entry.
 
 ### Documentation and naming
 

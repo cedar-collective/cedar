@@ -556,3 +556,17 @@ cedar_preload_shared_results(c(
 message("[global.R] Loading ui.R and server.R...")
 source("ui.R")
 source("server.R")
+
+# ── Compile the module servers now ──────────────────────────────────────────
+# R compiles a function the first time it is called. Left to that, the first
+# person to open CEDAR after a restart waits while every module's server is
+# compiled (4.5 seconds here, more on production; ISSUES I81). Compiled at
+# start, that wait is part of the start, which the restart's own warm-up
+# request sits through instead. The server function itself cannot be compiled
+# here: Shiny reads server.R again for the first session and calls that copy.
+for (.module_server in ls(globalenv(), pattern = "Server$")) {
+  if (is.function(get(.module_server, envir = globalenv()))) {
+    assign(.module_server, compiler::cmpfun(get(.module_server, envir = globalenv())), envir = globalenv())
+  }
+}
+rm(.module_server)

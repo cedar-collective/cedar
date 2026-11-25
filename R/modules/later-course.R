@@ -392,13 +392,17 @@ later_course_view <- function(r, ns, access) {
 #                     (and on "glance", which reads its result).
 # instructor_access   the session's shared instructor-gate flag.
 # instructor_password the configured password ("" when none is).
+# page_overlay        the id of the page's loading overlay, or NULL. At a Glance
+#                     runs this view while its subtab, and the overlay on it,
+#                     is hidden: the wait is then shown on the page's overlay
+#                     (ISSUES I82).
 LATER_COURSE_PICKER_SLOTS <- "next"
 LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses")
 LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")
 
 laterCourseServer <- function(id, course, campus, students, attempts, programs, applicants,
                               student_terms, edges, default_options, view, instructor_access,
-                              instructor_password) {
+                              instructor_password, page_overlay = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
     result <- reactiveVal(NULL)
@@ -484,7 +488,9 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       opt <- list(course_x = course(), course_y = y, campus = campus(),
                   window_terms = window_terms(), min_n = as.integer(input$min_n %||% 10L),
                   data_edges = edges)
-      cedar_with_loading(session, session$ns("load"), report_type = "later_course", {
+      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else session$ns("load")
+      cedar_with_loading(session, overlay, label = "Following students into the later course…",
+                         report_type = "later_course", {
         payload <- tryCatch(
           build_later_course(students, attempts, opt),
           error = function(e) {

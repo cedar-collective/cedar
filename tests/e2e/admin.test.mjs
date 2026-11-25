@@ -162,7 +162,7 @@ try {
   await page.waitForFunction(() => document.getElementById('catalog_review-rules-summary')?.innerText.includes('History B.A.'));
   check('selected planning scenario shows the math starting-point label',
     await page.$eval('#catalog_review-rules-summary', el =>
-      el.innerText.includes('Math: Calculus-ready') && !el.innerText.includes('Math: NA')));
+      el.innerText.includes('Math: College-algebra-ready') && !el.innerText.includes('Math: NA')));
   const ruleList = await readReactable(page, 'catalog_review-rules-table');
   check('History rules show readable requirements and the catalog wording',
     colIndex(ruleList.headers, 'Readable rule') >= 0 && colIndex(ruleList.headers, 'Catalog wording') >= 0 &&

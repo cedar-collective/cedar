@@ -1336,9 +1336,10 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
 
     # Populate subject code choices for course timing and pairs
     observe({
-      subjects <- sort(unique(sub(" .*", "", students$subject_course[
-        !is.na(students$subject_course) & nzchar(students$subject_course)
-      ])))
+      # Each code once before its subject is read: reading it off every
+      # class-list row took 0.7 s of every session's start (ISSUES I80).
+      codes <- unique(students$subject_course)
+      subjects <- sort(unique(sub(" .*", "", codes[!is.na(codes) & nzchar(codes)])))
       updateSelectizeInput(session, "ct_subject", choices = subjects, server = TRUE)
       updateSelectizeInput(session, "cp_subject", choices = subjects, server = TRUE)
     })
