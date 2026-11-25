@@ -70,6 +70,49 @@ test_that("Pell eligibility and first-generation status are cells when the decla
   expect_equal(res$n_covered, 1L)
   expect_equal(student_term_aid(ss_aid) %>% filter(student_id == "RP_REP") %>% pull(pell), "no")
   expect_error(student_term_aid(ss_aid %>% select(-first_gen)), "first_gen")
+  # `ss_aid_mixed`: one row per student-term; a yes beside a no is a yes, a
+  # no beside a blank is a no, and a term that records nothing has no label.
+  aid <- student_term_aid(ss_aid_mixed)
+  expect_equal(nrow(aid), 6L)
+  expect_equal(aid$pell[match(c("RP_REP", "RP_DROP", "RP_FAIL"), aid$student_id)], c("yes", NA, "no"))
+  expect_equal(aid$first_gen[match(c("RP_REP", "RP_DROP"), aid$student_id)], c("no", "no"))
+})
+
+test_that("a member's course is counted from its classified attempts, under the classified attempt's instructor", {
+  # `ss_attempts_unclassified`: FAIL's HIST 101 row is an ungraded
+  # registration, so FAIL is neither a taker nor a non-taker; BACK's has a
+  # second, ungraded row under RP_I9. One taker, read against DROP, GONE, GRAD
+  # and REP (1 of 4 returned); BACK's other attempt that term is HIST 499.
+  res <- get_course_similar_students(ss_student_terms2, ss_attempts_unclassified, ss_app,
+                                     ss_opt(course = "HIST 101", term = 202010L))
+  expect_equal(res$n_takers, 1L)
+  expect_equal(res$return_expected_pct, 25)
+  expect_equal(res$other_attempts, 1L)
+  by_instructor <- get_course_similar_students(ss_student_terms2, ss_attempts_unclassified, ss_app,
+                                               ss_opt(course = "HIST 101", term = 202010L, grain = "instructor"))
+  expect_equal(by_instructor$instructor_id, "RP_I1")
+  expect_equal(by_instructor$n_takers, 1L)
+})
+
+test_that("a comparison prepared once is read for any rows of its own scope, and stops for another", {
+  opt <- ss_opt(term = 202010L)
+  prepared <- prepare_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, opt, ss_aid)
+  # The readings the payload makes of one preparation: every course, every
+  # course term by term, one course's instructors.
+  by_instructor <- get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                               c(opt, list(course = "HIST 101", grain = "instructor")),
+                                               ss_aid, prepared)
+  expect_equal(sort(by_instructor$instructor_id), c("RP_I1", "RP_I3"))
+  expect_equal(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, c(opt, list(by_term = TRUE)),
+                                           ss_aid, prepared)$term, 202010L)
+  expect_equal(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, opt, ss_aid, prepared)$return_expected_pct,
+               100 / 6)
+  # Prepared for another term, or with other inputs, it is not read.
+  expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, ss_opt(term = 202080L),
+                                           ss_aid, prepared), "prepared")
+  expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app, opt, NULL, prepared), "prepared")
+  expect_error(get_course_similar_students(ss_student_terms2, ss_attempts2, ss_app,
+                                           c(opt, list(match_credits = TRUE)), ss_aid, prepared), "prepared")
 })
 
 test_that("credits already earned are a cell on request, and an invalid timeline is its own", {
