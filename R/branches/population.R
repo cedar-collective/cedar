@@ -1284,7 +1284,15 @@ program_choices <- function(codes, dims, successions = program_successions, prof
     if (length(missing)) {
       stop("[population.R] program_choices(): profile lacks ", paste(missing, collapse = ", "), call. = FALSE)
     }
-    profile <- profile[as.character(profile$major_code) %in% codes, , drop = FALSE]
+    # Each program's declaration rows, found in one pass over the table: every
+    # code belongs to one program, so its rows are that program's. Looking the
+    # rows up once per program instead read the whole table once per program,
+    # which was 3.4 of the 7.6 seconds a session spent starting (ISSUES I80).
+    profile_code <- as.character(profile$major_code)
+    in_scope <- which(profile_code %in% codes)
+    code_program <- stats::setNames(rep(ids, lengths(by_id)), unlist(by_id, use.names = FALSE))
+    profile_rows <- split(in_scope, unname(code_program[profile_code[in_scope]]))
+    profile <- profile[, c("degree", "student_campus", "term"), drop = FALSE]
   }
   labels <- vapply(seq_along(ids), function(i) {
     id <- ids[i]
@@ -1292,9 +1300,9 @@ program_choices <- function(codes, dims, successions = program_successions, prof
     name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
     label <- paste0(name, " (", paste(covered, collapse = ", "), ")")
     if (is.null(profile)) return(label)
-    rows <- profile[as.character(profile$major_code) %in% covered, , drop = FALSE]
-    if (nrow(rows) == 0L) return(label)
-    paste(c(label, .program_profile_parts(rows)), collapse = " \u00b7 ")
+    rows <- profile_rows[[id]]
+    if (length(rows) == 0L) return(label)
+    paste(c(label, .program_profile_parts(profile[rows, , drop = FALSE])), collapse = " \u00b7 ")
   }, character(1))
   stats::setNames(ids, labels)[order(labels)]
 }

@@ -87,9 +87,13 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
     # code, renames joined, a department's own programs only.
     program_labels <- reactiveVal(character(0))
     update_program_choices <- function(which = c("major", "minor", "concentration")) {
-      choices <- headcount_filter_choices(programs, dims, list(
-        college = input$college, dept_code = input$dept,
-        major_codes = input$major, minor_codes = input$minor))
+      scope <- list(college = input$college, dept_code = input$dept,
+                    major_codes = input$major, minor_codes = input$minor)
+      # The choices for a scope are the same for every session, and every
+      # session asks for the unscoped ones as it starts, on whatever page it
+      # opened: counted once and shared (cedar_shared_result(), ISSUES I80).
+      choices <- cedar_shared_result(c(list("headcount_filter_choices"), scope),
+                                     function() headcount_filter_choices(programs, dims, scope))
       # Code to label, so the scope bar names a picked program as the picker did.
       known <- c(choices$major, choices$minor)
       program_labels(c(stats::setNames(names(known), known),
