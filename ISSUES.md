@@ -5093,21 +5093,28 @@ seconds, of which the balance table 1.7, similar students 2.6, the raw
 comparison 1.0. Whether At a Glance should start all three runs on opening is
 a product choice, in ROADMAP's Inbox.
 
-**M71 — The sequence comparison asks each student in turn.** At a Glance's
-last step ("Did passing it first help?") took 19.5 seconds for FYEX 1110 on
-production on 2026-11-25 and 8.4 to 11.6 locally, where the page's estimate
-for it reads "usually ~2–5s". `get_course_sequence_effect()`
-(`R/cones/course-sequence-effect.R`) picks each student's first attempt of
+**M71 — The sequence comparison asked each student in turn.** Resolved
+2026-11-25 (branch `perf/sequence-first-attempt`): 5.7 seconds locally for
+FYEX 1110's default pair, where it was 8.4 to 11.6; 2.2 seconds for a large
+pair on the development machine outside the container, where it was 4.4. At a
+Glance's last step ("Did passing it first help?") took 19.5 seconds for FYEX
+1110 on production on 2026-11-25, where the page's estimate for it reads
+"usually ~2–5s"; production's figure is to be read off `report_timing.csv`
+after deploy. `get_course_sequence_effect()`
+(`R/cones/course-sequence-effect.R`) picked each student's first attempt of
 the later course with a `summarize()` per student-term and a `slice_head()`
 per student, then each student's first pass of the earlier course with a
-`min(term)` per student: 5.2 seconds in the first of those pipelines in a
-profile of the local container (2026-11-25; the container is emulated on this
-machine, so the share on production may differ). Sorting once and keeping
-each student's first row gives the same rows. *Done when:* the three
-are one sort and a `distinct()`, the result is `identical()` on the full
-tables for a large pair, a fixture has a student with a pass and a DFW in the
-later course in one term (the DFW is kept) and one whose first attempt is not
-their only one, and the step is timed again here.
+`min(term)` per student; and `build_comparison()`
+(`R/branches/comparison.R`) picked each student's declaration record with a
+`slice()` per student. Each is now one sort and the first row a student has.
+The results for three large pairs, and the Against Non-Takers balance tables
+that read the same builder, are `identical()` to the code before on the full
+tables. Two picks had no test that held them: `.sequence_repeat_fixture` adds
+a student with an A and an F in the later course in one term (the DFW is
+kept) and one who passed the earlier course before and again after the later
+one (the first pass counts). What the step still costs is the comparison
+builder's as-of joins for entering GPA and credits (about half of the 2.2
+seconds).
 
 **M69 — A soft restart leaves the previous R process running.**
 `restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
