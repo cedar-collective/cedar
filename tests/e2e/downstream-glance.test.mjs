@@ -5,8 +5,9 @@
 // Asserts Downstream opens on At a Glance, its five cards arrive in story
 // order and each settles (ready, or saying why not) without a click, a ready
 // card draws its figure and names its campus, opening a subtab At a Glance
-// already ran does not run it again, and a card's link opens its subtab,
-// which runs once.
+// already ran does not run it again, a card's link opens its subtab, which
+// runs once, and a second session reads the first one's results without
+// building them again (they are shared: cedar_shared_result()).
 //
 //   node tests/e2e/downstream-glance.test.mjs
 
@@ -21,6 +22,30 @@ const STEPS = ['In the Course', 'Coming Back', 'Against Non-Takers', 'Next Cours
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
 
+// What the page's loading overlay says from here on, and how long the server
+// worked with that overlay down. At a Glance runs the other views while their
+// subtabs, and the overlays on them, are hidden, so their waits have to show
+// on the page's (ISSUES I82). A comparison an earlier session already built
+// is read with no wait at all (they are shared), so the labels themselves
+// cannot be required; the time spent working unannounced can be compared.
+const watchWaits = (pg) => pg.evaluate(() => {
+  const label = document.getElementById('cr-loading-label');
+  const overlay = document.getElementById('cr-loading-overlay');
+  window.__crLabels = [];
+  window.__crUnannounced = 0;
+  new MutationObserver(() => window.__crLabels.push(label.textContent))
+    .observe(label, { childList: true, characterData: true, subtree: true });
+  setInterval(() => {
+    const busy = document.documentElement.classList.contains('shiny-busy');
+    const up = overlay.checkVisibility() && overlay.style.display !== 'none';
+    if (busy && !up) window.__crUnannounced += 200;
+  }, 200);
+});
+const readWaits = (pg) => pg.evaluate(() => ({
+  labels: [...new Set(window.__crLabels.map((t) => t.replace(/ \(.*$/, '')))],
+  unannounced: window.__crUnannounced / 1000,
+}));
+
 const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 
 try {
@@ -31,15 +56,7 @@ try {
   await runAndWait(page, 'cr_generate_button');
   console.log(`course loaded: ${COURSE}`);
 
-  // Every label the page's loading overlay is given from here on: At a Glance
-  // runs the other views while their subtabs, and the overlays on them, are
-  // hidden, so their waits have to show on the page's (ISSUES I82).
-  await page.evaluate(() => {
-    const label = document.getElementById('cr-loading-label');
-    window.__crLabels = [];
-    new MutationObserver(() => window.__crLabels.push(label.textContent))
-      .observe(label, { childList: true, characterData: true, subtree: true });
-  });
+  await watchWaits(page);
   await openSubTab(page, 'Downstream', { timeout: 300000 });
   await waitForSelector(page, '#cr_downstream_glance_ui .downstream-glance', { timeout: 300000 });
   const active = await page.evaluate(() =>
@@ -72,11 +89,9 @@ try {
   ok(settled, `all five steps settle without a click (${still.length ? `still waiting: ${still.join(', ')}` : 'none waiting'})`);
   await waitForIdle(page, { timeout: 300000 });
 
-  const waits = [...new Set(await page.evaluate(() => window.__crLabels.map((t) => t.replace(/ \(.*$/, ''))))];
-  ok(waits.some((t) => t.startsWith('Comparing takers with non-takers')),
-     `the wait for Against Non-Takers shows on the page while At a Glance is open (${waits.join(' | ') || 'no label'})`);
-  ok(waits.some((t) => t.startsWith('Following students into the later course')),
-     'the wait for Next Courses shows on the page while At a Glance is open');
+  // Judged against the second session below, which builds nothing.
+  const first = await readWaits(page);
+  console.log(`     waits shown: ${first.labels.join(' | ') || 'none'}; ${first.unannounced}s worked with no wait up`);
 
   const cards = await page.evaluate(() =>
     [...document.querySelectorAll('#cr_downstream_glance_ui .downstream-glance-step')].map((c) => ({
@@ -133,6 +148,38 @@ try {
   console.log(`screenshot: ${shot}`);
 
   ok(jsErrors.length === 0, `no uncaught JS errors (${jsErrors.join(' ; ') || 'none'})`);
+
+  // A second session, the same course and campuses: the three comparisons are
+  // read from what the first session left, so none of them is built again and
+  // the five steps are there once the course's own outcomes are read.
+  const second = await launch({ width: 1500, height: 1100 });
+  try {
+    await connect(second.page, { tab: 'course-dynamics' });
+    await setInput(second.page, 'cr_campus', ['ABQ', 'EA']);
+    await setInput(second.page, 'cr_course', COURSE);
+    await runAndWait(second.page, 'cr_generate_button');
+    await watchWaits(second.page);
+    await openSubTab(second.page, 'Downstream', { timeout: 300000 });
+    await waitForSelector(second.page, '#cr_downstream_glance_ui .downstream-glance', { timeout: 300000 });
+    await waitForIdle(second.page, { timeout: 300000 });
+    const again = await readWaits(second.page);
+    const steps = await second.page.evaluate(() =>
+      [...document.querySelectorAll('#cr_downstream_glance_ui .downstream-glance-step')]
+        .map((c) => c.classList.contains('downstream-glance-step--pending')));
+    const rebuilt = again.labels.filter((t) => /^(Comparing takers|Following students|Building the sequence)/.test(t));
+    ok(rebuilt.length === 0,
+       `a second session builds none of the three comparisons again (${rebuilt.join(' | ') || 'none built'})`);
+    ok(steps.length === 5 && steps.every((pending) => !pending),
+       `the second session's five steps are settled (${steps.filter((p) => !p).length} of ${steps.length})`);
+    // The first session drew the same page, and built whatever was not there
+    // yet: all of that building was behind a wait, so it worked unannounced
+    // for no longer than the session that built nothing (5 seconds' allowance).
+    ok(first.unannounced <= again.unannounced + 5,
+       `whatever the first session built, it built behind a wait (${first.unannounced}s with no wait up; ${again.unannounced}s in the session that built nothing)`);
+    ok(second.jsErrors.length === 0, `no uncaught JS errors in the second session (${second.jsErrors.join(' ; ') || 'none'})`);
+  } finally {
+    await second.browser.close();
+  }
 } finally {
   await browser.close();
 }
