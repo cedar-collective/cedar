@@ -212,27 +212,26 @@ get_course_sequence_effect <- function(students, attempts, programs, applicants 
   # Select one Y outcome per student: the earliest in-scope term with a
   # classifiable outcome. Attempts on several campuses in that term collapse
   # to one outcome, with any DFW taking precedence over a pass.
-  took_y <- scoped %>%
+  # One sort and each student's first row: the earliest term and, within it, a
+  # DFW ahead of a pass. Asking each student in turn (a summarize() per
+  # student-term, then a slice per student) was a third of the run for a large
+  # pair (ISSUES M71).
+  first_y <- scoped %>%
     filter(subject_course %in% course_y) %>%
-    group_by(student_id, term) %>%
-    summarize(
-      y_outcome = if_else(any(outcome == "dfw"), "dfw", "pass"),
-      .groups = "drop"
-    ) %>%
-    arrange(student_id, term) %>%
-    group_by(student_id) %>%
-    slice_head(n = 1L) %>%
-    ungroup() %>%
-    rename(term_y = term)
+    arrange(student_id, term, outcome != "dfw") %>%
+    distinct(student_id, .keep_all = TRUE)
+  took_y <- tibble::tibble(student_id = first_y$student_id, term_y = first_y$term,
+                           y_outcome = if_else(first_y$outcome == "dfw", "dfw", "pass"))
 
   if (nrow(took_y) == 0)
     stop("[course-sequence-effect.R] No students found for course_y: ", y_label)
 
   # When did each student first pass X inside the same campus and grade edge?
-  passed_x <- scoped %>%
+  first_pass_x <- scoped %>%
     filter(subject_course %in% course_x, outcome == "pass") %>%
-    group_by(student_id) %>%
-    summarize(term_x = min(term), .groups = "drop")
+    arrange(student_id, term) %>%
+    distinct(student_id, .keep_all = TRUE)
+  passed_x <- tibble::tibble(student_id = first_pass_x$student_id, term_x = first_pass_x$term)
 
   # Label treatment (passed X strictly before taking Y) vs. control (took Y, no prior X)
   sequence_data <- took_y %>%

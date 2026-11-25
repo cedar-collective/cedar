@@ -307,6 +307,26 @@ test_that("sequence effect uses one canonical Y outcome and scopes both courses"
   expect_match(result$y_attempt_rule, "earliest classifiable")
 })
 
+test_that("a student with a choice of attempts is read by the first pass of the earlier course and the DFW of a split term", {
+  # `.sequence_repeat_fixture`, both campuses: SEQ_R1 passed SEQ 101 before
+  # SEQ 201 and again after it (treatment, by the first pass); SEQ_D1 has an A
+  # and an F in SEQ 201 in one term (one outcome, the DFW).
+  fixture <- .sequence_repeat_fixture
+  result <- suppressMessages(get_course_sequence_effect(
+    fixture$students,
+    keyed_attempts(fixture$students, .impact_edges),
+    fixture$programs,
+    opt = list(course_x = "SEQ 101", course_y = "SEQ 201", campus = c("ABQ", "EA"), min_n = 1L),
+    data_edges = .impact_edges
+  ))
+  outcomes <- result$outcomes
+  expect_equal(result$n_treatment, 3L)
+  expect_equal(result$n_control, 4L)
+  expect_equal(sum(outcomes$n), 7L)
+  expect_equal(outcomes$n[outcomes$group == "treatment" & outcomes$outcome == "pass"], 1L)
+  expect_equal(outcomes$n[outcomes$group == "control" & outcomes$outcome == "dfw"], 1L)
+})
+
 test_that("an active HS GPA band excludes and reports missing GPAs", {
   fixture <- .sequence_audit_fixture
   applicants <- tibble::tibble(
