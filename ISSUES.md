@@ -5216,19 +5216,30 @@ builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
 **M74 — The projection lock test fails when the machine is busy.**
-Open. `test-projection-refresh.R` (the test that a live build keeps its lock
-and a killed one loses it) starts a second R process that holds the lock with
-a heartbeat every second, sleeps 4 seconds, and expects the lock to be
-refused under a stale limit of 3 seconds; then kills the holder, sleeps 5,
-and expects a takeover. On 2026-11-25 a full `./run-tests.sh` started right
-after a container was removed gave 9,077 passed and 2 failed, both there
-(line 319, "Expected ... to throw a error"; line 328, "Rebuild already
-running", the mirror image). The file alone, minutes later: 82 passed, 0
-failed; the full gate an hour before, on the same code path: 0 failed. A
-heartbeat that arrives a second or two late is enough to flip either
-expectation. Done when the test does not depend on a one-second loop keeping
-to a three-second limit on a loaded machine (a wider limit, or a heartbeat
-the test writes itself), shown by ten runs under load.
+Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
+holds a one-second loop to a three-second limit. `test-projection-refresh.R`
+(the test that a live build keeps its lock and a killed one loses it) started
+a second R process that holds the lock with a heartbeat every second, slept 4
+seconds, and expected the lock to be refused under a stale limit of 3
+seconds; then killed the holder, slept 5, and expected a takeover. On
+2026-11-25 a full `./run-tests.sh` started right after a container was
+removed gave 9,077 passed and 2 failed, both there (line 319, "Expected ...
+to throw a error"; line 328, "Rebuild already running", the mirror image).
+The file alone, minutes later: 82 passed, 0 failed. A heartbeat that arrives
+a second or two late was enough to flip either expectation. The limit is now
+600 seconds throughout and the test moves the heartbeat's date itself: set
+back an hour, a live holder's next beat brings it forward (waited for, not
+timed) and the lock is refused; after the kill, set back until it stays back
+(`set_file_time_back()`, `helper-projection-refresh.R`, which the takeover
+test beside it uses too) and the lock is taken over. Ten runs of the file with
+every core busy (ten `yes` processes on eight cores), ten passed, the last
+five as the test now stands; and each of
+four deliberate breaks of the lock fails it (no heartbeat, a live lock taken,
+a dead lock never taken, a heartbeat that outlives its holder). Found on the
+way: the test above it ("automatic runs share the manual lock…") called the
+refresh with its real build behind the lock, so a lock that did not hold
+started a real projections build and the file hung; it now passes a build
+that only records the call, and fails in a minute.
 
 **M73 — The development container has about 400 MB to spare, and building courses ahead takes it.**
 Resolved 2026-11-25 (branch `test/first-suite-session`): a development
