@@ -258,14 +258,15 @@ and DFW Rates:
   worker's `.Renviron` as it does the instructor password
   (`test-ci.R` holds both ends).
 
-What it costs, measured 2026-11-25. In the development container (emulated),
-eight courses took 197 seconds, 25 a course; the longest single job, the
-comparison with non-takers, took 11 to 20. On production the page's own
-builds of the same three results took 17 to 21, 8.5 to 10 and 4 to 6 seconds
-for a large course, so ten courses should occupy the process for about six
-minutes after every start (an estimate until a start there is read from the
-log), one job at a time: a click made meanwhile waits for the job running, 20
-seconds at the longest. The ten courses' results are about 11
+What it costs, measured 2026-11-25. On production, the first start with it
+built ten courses in 366 seconds (37 a course: the comparisons with non-takers
+226 seconds between them, the sequence comparisons 68, Next Courses 51), and
+the whole run, Graduation and DFW Rates included, ended 7.4 minutes after its
+first job. The jobs run one at a time: a click made meanwhile waits for the
+job running, 34 seconds at the longest (one comparison with non-takers). All
+55 jobs built and none failed; the R process stood at 2.7 GB on a host with
+4.7 GB still available. In the development container (emulated), eight
+courses took 197 seconds, 25 a course. The ten courses' results are about 11
 MB of the app's 200 MB cache.
 
 What it gives, in the same container with two courses built ahead: both

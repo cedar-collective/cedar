@@ -46,6 +46,13 @@ try {
   landed === 'Gen Ed' ? ok('connect() returns the landed tab', landed)
                       : bad('connect() returns the landed tab', landed);
 
+  // ISSUES I85: connect() returns once the server has run the session's start
+  // (a busy-to-idle cycle), which a quiet page does not show on a process
+  // that is still compiling.
+  const cycles = await page.evaluate(() => window.__cedarStartCycles);
+  cycles >= 1 ? ok('connect() returns after the session has started', `${cycles} busy-to-idle cycle(s)`)
+              : bad('connect() returns after the session has started', `cycles seen: ${cycles}`);
+
   const all = await page.$$eval('label', ns => ns.length);
   const act = (await queryActive(page, 'label')).length;
   act > 0 && act < all ? ok('queryActive() scopes to the active tab', `${act} of ${all}`)

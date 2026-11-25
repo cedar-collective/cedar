@@ -100,6 +100,15 @@ report tour rewrites the error to say the session dropped and why; the guards
 are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
 the browser stages and names other running CEDAR containers.
 
+The same limit decides one setting. The app builds Course Dynamics >
+Downstream ahead for the courses analysed most when it starts
+([built ahead](shiny-modules.md#downstream-for-the-courses-analysed-most)),
+which leaves the worker larger before a suite has opened a page: measured
+2026-11-25, seven suites in a row peaked at 3.42 GB with no course built ahead,
+and the worker was killed once with two built ahead. A development machine
+therefore sets `CEDAR_PRELOAD_COURSES=0` in its `.env` (`.env.example` has the
+line); production, on 8 GB, builds ten. A restart is also ready sooner.
+
 **Before diagnosing any browser failure:** confirm the app source is current
 (`docker compose up -d --build`) and that nothing else large is resident. A
 stale container produced a completely separate phantom — Dept Trends "rendered
@@ -124,7 +133,19 @@ reaches zero. Only **visible** ones count.
 well before the landing tab's first reactive flush. Inputs set inside that window
 are overwritten by the app's own initialisation — the symptom is a selectize
 still reading "Type to search..." after `setInput`, a page stuck on its empty
-state, and a toast claiming the analysis ran. `connect()` now waits for idle.
+state, and a toast claiming the analysis ran. `connect()` waits for the
+session's first busy-to-idle cycle, and then for idle.
+
+*A quiet page is not a started session.* Waiting for idle alone was not
+enough on a process just started: R compiles the server function as its second
+session starts, and the page shows no busy state until that is done. Measured
+2026-11-25 on the session straight after the warm-up: connected at 0.5 s, busy
+at 3.7 s, the course picker's choices at 5.7 s. "Connected, then quiet for 600
+ms" passed at 3.6 s, the test set a course, and the picker's set-up then
+emptied it (ISSUES I85: four of four such sessions; none of three with the
+wait). A page that looks empty right after a restart: read
+`Shiny.shinyapp.$inputValues` for the input the test set before reading the
+page.
 
 **3. `offsetParent !== null` is not a visibility test.** It also returns null
 inside `position: fixed`/`sticky` ancestors, which in bslib includes the sub-tab
