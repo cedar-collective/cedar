@@ -101,10 +101,11 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
     filter(student_id %in% all_ids) %>%
     inner_join(entry_terms, by = "student_id") %>%
     filter(term <= covariate_term) %>%
-    group_by(student_id) %>%
+    # Each student's latest such record: one sort and the first row a student
+    # has, where a slice per student took a tenth of a large comparison.
     arrange(desc(term)) %>%
-    slice(1) %>%
-    ungroup() %>%
+    distinct(student_id, .keep_all = TRUE) %>%
+    arrange(student_id) %>%
     select(
       student_id, covariate_term,
       student_population, student_classification, student_level, student_campus,
@@ -114,6 +115,9 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
       # the continuous_cols list in compute_balance().
       current_unm_gpa = inst_gpa
     )
+  # A table of its own, built from its columns: the declarations table's
+  # stamps (its schema version) describe that table and are not carried on.
+  prog_covs <- tibble::tibble(!!!prog_covs)
 
   groups <- prog_covs %>%
     mutate(group = if_else(student_id %in% treatment_ids, "treatment", "control"))

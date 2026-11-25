@@ -416,6 +416,32 @@ multi_campus_demo <- local({
   fixture
 })
 
+# The audit fixture plus two students whose rows give a choice of attempt:
+#   SEQ_R1 passed SEQ 101 in 202010, passed SEQ 201 in 202080 and passed
+#     SEQ 101 again in 202110: treatment, by the first pass.
+#   SEQ_D1 sat SEQ 201 on two campuses in 202080, an A on ABQ (listed first)
+#     and an F on EA, with no SEQ 101: control, and one outcome, the DFW.
+# Read with campuses ABQ and EA:
+#   Treatment: SEQ_T1 (Y dfw), SEQ_T2 (Y dfw), SEQ_R1 (Y pass)
+#   Control:   SEQ_C1, SEQ_C2, SEQ_XC (pass), SEQ_D1 (dfw)
+.sequence_repeat_fixture <- local({
+  fixture <- .sequence_audit_fixture
+  fixture$students <- dplyr::bind_rows(
+    fixture$students,
+    .mc_row("SEQ_R1", 202010, "SEQ 101", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_R1", 202080, "SEQ 201", "ABQ", "SEQ", "B", "SEQ_I1"),
+    .mc_row("SEQ_R1", 202110, "SEQ 101", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_D1", 202080, "SEQ 201", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_D1", 202080, "SEQ 201", "EA", "SEQ", "F", "SEQ_I2")
+  )
+  extra <- c("SEQ_R1", "SEQ_D1")
+  fixture$programs <- dplyr::bind_rows(fixture$programs, lapply(seq_along(extra), function(i) {
+    fixture$programs %>% dplyr::slice(1L) %>%
+      dplyr::mutate(student_id = extra[[i]], program_id = paste0("SEQ-PROG-R", i))
+  }))
+  fixture
+})
+
 # ── test-course-overview.R ──────────────────────────────────────────────────────
 
 # A hand-built overview with only the columns the snapshot reads, so expected
