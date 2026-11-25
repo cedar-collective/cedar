@@ -53,7 +53,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M70 | Improvement | See [Improvements](#improvements) |
+| M1–M71 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -5068,22 +5068,46 @@ term, from `cedar_student_terms`), or the choice to read everyone is recorded
 here as deliberate; and the campus control means one thing on the page, or
 the section has its own.
 
-**M68 — Against Non-Takers takes one to two minutes for a large course, and
-runs when Downstream opens.** FYEX 1110 on production, 2026-11-25:
-`course_cohort` 91.2 seconds, between `later_course` (5.4) and
+**M68 — Against Non-Takers took one to two minutes for a large course, and
+runs when Downstream opens.** Resolved 2026-11-25 (branch
+`perf/non-takers-run`) for the length of the run: 12.5 seconds locally for
+FYEX 1110, where it was 46 to 50. Production's figure is to be read off
+`report_timing.csv` once this is deployed. FYEX 1110 on production,
+2026-11-25: `course_cohort` 91.2 seconds, between `later_course` (5.4) and
 `course_sequence` (19.5), during which R answers no other session (I82 is the
-empty page it showed meanwhile). Locally 50 seconds, of which a profile gives:
-20 in `student_term_aid()` (`R/branches/comparison.R`: a
-`summarize(max(…))` per student-term over the whole declarations table, the
-same for every course and every call, and wrapped in `suppressWarnings()` per
-group); 12 in the `touched` table of `get_course_similar_students()`
-(`R/cones/course-similar-students.R`: `arrange()` and `group_by()` over the
-attempts), rebuilt on each of the cone's several calls per run; 6 in
-`build_course_cohort_context()`. Done when the aid table is built once and
-reused (or counted without a per-group function), the cone's calls in one run
-share their prepared rows, and a large course's run is timed again here.
-Whether At a Glance should start all three runs on opening is a product
-choice, in ROADMAP.
+empty page it showed meanwhile). A profile of the local run gave 20 seconds in
+`student_term_aid()` (`R/branches/comparison.R`: a `summarize(max(…))` per
+student-term over the whole declarations table, the same for every course and
+every call, wrapped in `suppressWarnings()` per group), 12 in the `touched`
+table of `get_course_similar_students()` (a `summarize()` per member and
+course), both rebuilt on each of the three readings the payload makes, and 6
+in the balance table. What changed: `student_term_aid()` counts over the whole
+table at once (4.6 seconds to 0.1 on the development machine, the same
+426,241 rows); `prepare_course_similar_students()` builds the members, their
+cells and each course's non-takers once and the payload reads it three times
+(`prepared =`); each member's courses are counted over the rows at once. The
+payloads for FYEX 1110 and ENGL 1110, with everyone else and with Gen Ed
+non-takers, are `identical()` to the code before on the full tables. What the
+run still costs, on the development machine outside the container: 5.6
+seconds, of which the balance table 1.7, similar students 2.6, the raw
+comparison 1.0. Whether At a Glance should start all three runs on opening is
+a product choice, in ROADMAP's Inbox.
+
+**M71 — The sequence comparison asks each student in turn.** At a Glance's
+last step ("Did passing it first help?") took 19.5 seconds for FYEX 1110 on
+production on 2026-11-25 and 8.4 to 11.6 locally, where the page's estimate
+for it reads "usually ~2–5s". `get_course_sequence_effect()`
+(`R/cones/course-sequence-effect.R`) picks each student's first attempt of
+the later course with a `summarize()` per student-term and a `slice_head()`
+per student, then each student's first pass of the earlier course with a
+`min(term)` per student: 5.2 seconds in the first of those pipelines in a
+profile of the local container (2026-11-25; the container is emulated on this
+machine, so the share on production may differ). Sorting once and keeping
+each student's first row gives the same rows. *Done when:* the three
+are one sort and a `distinct()`, the result is `identical()` on the full
+tables for a large pair, a fixture has a student with a pass and a DFW in the
+later course in one term (the DFW is kept) and one whose first attempt is not
+their only one, and the step is timed again here.
 
 **M69 — A soft restart leaves the previous R process running.**
 `restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process

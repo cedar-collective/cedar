@@ -505,11 +505,18 @@ student_term_aid <- function(programs) {
   if (length(missing) > 0) {
     stop("[comparison.R] student_term_aid: programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
-  label <- function(x) if_else(is.na(x), NA_character_, if_else(x, "yes", "no"))
-  programs %>%
-    group_by(student_id, term = as.integer(term)) %>%
-    summarize(pell = suppressWarnings(max(as.logical(pell_eligible), na.rm = TRUE)),
-              first_gen = suppressWarnings(max(as.logical(first_gen), na.rm = TRUE)), .groups = "drop") %>%
-    mutate(pell = label(if_else(is.finite(pell), pell == 1, NA)),
-           first_gen = label(if_else(is.finite(first_gen), first_gen == 1, NA)))
+  # Counted over the whole table at once: which student-term each row belongs
+  # to, then whether any of its rows says yes and whether any says no. Asking
+  # each student-term in turn (a summarize() over half a million groups) took
+  # 20 of the 50 seconds an Against Non-Takers run spent (ISSUES M68).
+  by_term <- tibble::tibble(student_id = programs$student_id, term = as.integer(programs$term)) %>%
+    group_by(student_id, term)
+  student_terms <- group_keys(by_term)
+  row_term <- group_indices(by_term)
+  said <- function(x) {
+    x <- as.logical(x)
+    any_row <- function(rows) tabulate(row_term[rows], nrow(student_terms)) > 0L
+    if_else(any_row(which(x)), "yes", if_else(any_row(which(!x)), "no", NA_character_))
+  }
+  student_terms %>% mutate(pell = said(programs$pell_eligible), first_gen = said(programs$first_gen))
 }

@@ -581,6 +581,23 @@ ss_attempts2 <- local({
   )
 })
 
+# The same attempts with two rows that are not classified attempts, for the
+# count of a member's courses in 202010:
+#   FAIL's HIST 101 is restated as an ungraded registration (no outcome): FAIL
+#     holds a row in the course and is neither its taker nor its non-taker,
+#     which leaves BACK the one taker against DROP, GONE, GRAD and REP.
+#   BACK's HIST 101 is also listed on a second campus, ungraded, under another
+#     instructor (RP_I9), ahead of the graded row: one member-course, whose
+#     instructor is the classified attempt's (RP_I1).
+ss_attempts_unclassified <- bind_rows(
+  ss_attempts2 %>%
+    filter(student_id == "RP_BACK", term == 202010L, subject_course == "HIST 101") %>%
+    mutate(campus = "EA", outcome = NA_character_, instructor_id = "RP_I9", instructor_name = "RP_I9"),
+  ss_attempts2 %>%
+    mutate(outcome = if_else(student_id == "RP_FAIL" & term == 202010L & subject_course == "HIST 101",
+                             NA_character_, outcome))
+)
+
 ss_student_terms2 <- test_student_terms_rp %>%
   mutate(sem_gpa = case_when(
     term == 202080L & student_id == "RP_BACK" ~ 3.0,
@@ -613,6 +630,15 @@ ss_aid <- tibble::tibble(
   pell_eligible = c(TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, NA),
   first_gen     = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, NA)
 )
+
+# The same declarations with a term whose rows disagree and one that records
+# nothing: REP's blank Pell row restated as eligible (a yes beside a no is a
+# yes), and DROP's only row as blank (no label). First-generation status is
+# as it was: REP's no beside a blank is a no.
+ss_aid_mixed <- ss_aid %>%
+  mutate(pell_eligible = case_when(student_id == "RP_REP" & is.na(pell_eligible) ~ TRUE,
+                                   student_id == "RP_DROP" ~ NA,
+                                   TRUE ~ pell_eligible))
 
 # Per-term gaps in by_term's shape, four falls (2019-2022) with a spring and a
 # summer between: GAP 100's return gap climbs 0, 2, 4, 6 (+2 a year) with
