@@ -11,6 +11,9 @@
 #   courseCohortUI(id)
 #   courseCohortServer(id, student_terms, attempts, programs, dims, edges,
 #                      course, campus, applicants, view)
+#   course_cohort_defaults_job(), course_cohort_job()   the view's two shared
+#                      results, each its key and its build, for the server and
+#                      for the build ahead at start (downstream_preload_jobs())
 #
 # It runs when its subtab (or At a Glance) is open and the course has
 # changed, on the page's defaults; Update Results reruns it on the settings.
@@ -26,6 +29,99 @@ courseCohortUI <- function(id) {
   # Opened by the server while it compares (cedar_with_loading()).
   cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Comparing takers with non-takers…",
                         uiOutput(ns("body")))
+}
+
+# ── Shared results ───────────────────────────────────────────────────────────
+#
+# The view's results are the same for every session, so each is built once and
+# shared (cedar_shared_result()). A job is one result's key and its build. The
+# server and the build ahead at start make their jobs here, so a result built
+# ahead is the one the page asks for (R/modules/graduation.R is the pattern).
+#
+# tables   named list: student_terms, attempts, programs, dims, edges and
+#          applicants (programs and applicants may be NULL), as
+#          courseCohortServer() takes them.
+
+# What the controls open on, named once for the control and for the job.
+COURSE_COHORT_MIN_N <- 10L
+COURSE_COHORT_COMPARISON <- "all"
+
+# What the view opens on for a course and the page's campuses.
+course_cohort_defaults_job <- function(tables, crs, campus = NULL) {
+  list(key = list("course_cohort_defaults", crs, campus),
+       build = function() course_cohort_context_defaults(crs, tables$student_terms, tables$attempts,
+                                                         tables$edges, list(campus = campus)))
+}
+
+# The settings the view runs on before anyone has changed one: the defaults,
+# compared with the course's own college.
+course_cohort_opening_settings <- function(defaults) {
+  list(classification = defaults$classification, benchmark = "college", college = defaults$college,
+       campus = defaults$campus, terms = defaults$terms, level = defaults$level)
+}
+
+# Settings name a comparison when they hold a classification and, unless the
+# Gen Ed courses are the benchmark, a college.
+course_cohort_settings_complete <- function(settings) {
+  shiny::isTruthy(settings$classification) &&
+    (identical(settings$benchmark, "gen_ed") || length(settings$college) > 0L)
+}
+
+# The comparison for a course under one set of settings: the takers against
+# the non-takers and, with the applicants table, against similar non-takers.
+# A part caught on its own (the balance table, the similar students) leaves
+# the rest standing; `keep` then declines to store the result, so the next
+# reader builds it whole.
+course_cohort_job <- function(tables, crs, settings, min_n = COURSE_COHORT_MIN_N,
+                              comparison = COURSE_COHORT_COMPARISON) {
+  college_names <- college_code_names(tables$dims)
+  college <- settings$college
+  opt <- list(
+    course = crs,
+    classification = settings$classification,
+    campus = if (length(settings$campus) > 0) settings$campus else NULL,
+    term = if (length(settings$terms) > 0) as.integer(settings$terms) else NULL,
+    benchmark = settings$benchmark,
+    college = college,
+    level = if (length(settings$level) > 0) settings$level else NULL,
+    min_n = as.integer(min_n),
+    data_edges = tables$edges,
+    college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
+  )
+  whole <- TRUE
+  list(
+    key = list("course_cohort", opt[setdiff(names(opt), "data_edges")], comparison),
+    build = function() {
+      payload <- build_course_cohort_context(tables$student_terms, tables$attempts, opt)
+      if (!is.null(payload) && !is.null(tables$programs)) {
+        # The programs table may lack the demographic columns the balance
+        # needs; the groups stand without it, and the page says the table is
+        # missing rather than failing the comparison.
+        payload <- tryCatch(
+          course_cohort_context_balance(payload, tables$student_terms, tables$attempts, tables$programs),
+          error = function(e) {
+            cedar_notify_caught("Balance table unavailable", e, type = "warning", duration = 8)
+            whole <<- FALSE
+            payload
+          }
+        )
+      }
+      matched <- if (!is.null(payload) && !is.null(tables$applicants)) tryCatch(
+        build_course_similar_students(
+          tables$student_terms, tables$attempts, tables$applicants,
+          list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
+               comparison = comparison, match_credits = TRUE, data_edges = tables$edges),
+          tables$programs),
+        error = function(e) {
+          cedar_notify_caught("Similar-students comparison", e)
+          whole <<- FALSE
+          NULL
+        }
+      )
+      if (!is.null(payload)) list(result = payload, similar = matched)
+    },
+    keep = function(value) whole
+  )
 }
 
 #' @param course Reactive: the analysed course's id (NULL before Analyze Course).
@@ -50,6 +146,8 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     result <- reactiveVal(NULL)
     similar <- reactiveVal(NULL)
     college_names <- college_code_names(dims)
+    tables <- list(student_terms = student_terms, attempts = attempts, programs = programs, dims = dims,
+                   edges = edges, applicants = applicants)
     instructorGateServer("instructor_gate", instructor_access, instructor_password,
                          what = "Results by instructor")
 
@@ -66,10 +164,8 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     defaults <- reactive({
       crs <- analysed()
       req(crs, nzchar(crs))
-      home <- campus()
-      cedar_shared_result(list("course_cohort_defaults", crs, home), function() {
-        course_cohort_context_defaults(crs, student_terms, attempts, edges, list(campus = home))
-      })
+      job <- course_cohort_defaults_job(tables, crs, campus())
+      cedar_shared_result(job$key, job$build)
     })
 
     last_run <- reactiveVal(NULL)
@@ -135,11 +231,11 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         fluidRow(
           column(2, checkboxGroupInput(ns("term_type"), "Term types", choices = term_type_choices,
                                        selected = d$term_type, inline = TRUE)),
-          column(2, numericInput(ns("min_n"), "Min students per group:", value = 10, min = 1, max = 1000)),
+          column(2, numericInput(ns("min_n"), "Min students per group:", value = COURSE_COHORT_MIN_N, min = 1, max = 1000)),
           column(2, selectInput(ns("comparison"), "Similar students compared",
                                 choices = stats::setNames(names(course_similar_comparisons()),
                                                           c("Everyone else", "In a Gen Ed course")),
-                                selected = "all")),
+                                selected = COURSE_COHORT_COMPARISON)),
           column(4, helpText(
             "Choosing term types selects every term of those types; narrow them in Terms. Change a setting, then click Update Results."
           )),
@@ -176,75 +272,32 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         NULL
       })
       if (!shown && is.null(d)) return()
-      setting <- function(name, default) if (shown) input[[name]] else default
-      classification <- setting("classification", d$classification)
-      benchmark <- setting("benchmark", "college")
-      college <- setting("college", d$college)
-      req(classification, benchmark == "gen_ed" || length(college) > 0)
-      campus_sel <- setting("campus", d$campus)
-      terms <- setting("terms", d$terms)
-      level <- setting("level", d$level)
+      settings <- if (shown) {
+        list(classification = input$classification, benchmark = input$benchmark, college = input$college,
+             campus = input$campus, terms = input$terms, level = input$level)
+      } else course_cohort_opening_settings(d)
+      req(course_cohort_settings_complete(settings))
       result(NULL)
       similar(NULL)
-      opt <- list(
-        course = crs,
-        classification = classification,
-        campus = if (length(campus_sel) > 0) campus_sel else NULL,
-        term = if (length(terms) > 0) as.integer(terms) else NULL,
-        benchmark = benchmark,
-        college = college,
-        level = if (length(level) > 0) level else NULL,
-        min_n = as.integer(input$min_n %||% 10L),
-        data_edges = edges,
-        college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
-      )
-      comparison <- input$comparison %||% "all"
-      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else ns("load")
       # Shared by every session (cedar_shared_result()): the tables are fixed
       # for the life of the process, so one course's answer to one set of
       # settings is built once, behind the overlay, by the first session to
-      # ask, and read by every later one with no wait. A run that lost a part
-      # to an error is shown to this session and not kept.
-      whole <- TRUE
+      # ask (or ahead, at start, for the courses opened most), and read by
+      # every later one with no wait. A run that lost a part to an error is
+      # shown to this session and not kept.
+      job <- course_cohort_job(tables, crs, settings, min_n = input$min_n %||% COURSE_COHORT_MIN_N,
+                               comparison = input$comparison %||% COURSE_COHORT_COMPARISON)
+      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else ns("load")
       built <- cedar_shared_result(
-        list("course_cohort", opt[setdiff(names(opt), "data_edges")], comparison),
+        job$key,
         function() cedar_with_loading(session, overlay, label = "Comparing takers with non-takers…",
                                       report_type = "course_cohort", {
-          payload <- tryCatch(
-            build_course_cohort_context(student_terms, attempts, opt),
-            error = function(e) {
-              cedar_notify_caught("Comparison with non-takers", e)
-              NULL
-            }
-          )
-          if (!is.null(payload) && !is.null(programs)) {
-            # The programs table may lack the demographic columns the balance
-            # needs; the groups stand without it, and the page says the table is
-            # missing rather than failing the comparison.
-            payload <- tryCatch(
-              course_cohort_context_balance(payload, student_terms, attempts, programs),
-              error = function(e) {
-                cedar_notify_caught("Balance table unavailable", e, type = "warning", duration = 8)
-                whole <<- FALSE
-                payload
-              }
-            )
-          }
-          matched <- if (!is.null(payload) && !is.null(applicants)) tryCatch(
-            build_course_similar_students(
-              student_terms, attempts, applicants,
-              list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
-                   comparison = comparison, match_credits = TRUE, data_edges = edges),
-              programs),
-            error = function(e) {
-              cedar_notify_caught("Similar-students comparison", e)
-              whole <<- FALSE
-              NULL
-            }
-          )
-          if (!is.null(payload)) list(result = payload, similar = matched)
+          tryCatch(job$build(), error = function(e) {
+            cedar_notify_caught("Comparison with non-takers", e)
+            NULL
+          })
         }),
-        keep = function(value) whole
+        keep = job$keep
       )
       similar(built$similar)
       result(built$result)

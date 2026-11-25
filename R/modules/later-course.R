@@ -29,6 +29,10 @@
 #   laterCourseUI(id)
 #   laterCourseServer(id, ...)  returns list(course_y, result, options)
 #   downstream_course_choices(opts, include_rollup, dept)
+#   downstream_course_options_job(), later_course_job(), course_sequence_job()
+#                               each shared result's key and its build
+#   downstream_courses_ahead(), downstream_preload_jobs()
+#                               the courses built ahead at start, and their jobs
 
 LATER_COURSE_WINDOW_CHOICES <- stats::setNames(
   as.character(1:6),
@@ -92,7 +96,7 @@ laterCourseUI <- function(id) {
       fluidRow(
         column(4, selectInput(ns("window_terms"), "Within", choices = LATER_COURSE_WINDOW_CHOICES,
                               selected = as.character(DOWNSTREAM_DEFAULT_WINDOW))),
-        column(4, numericInput(ns("min_n"), "Min students per rate:", value = 10, min = 5, max = 100)),
+        column(4, numericInput(ns("min_n"), "Min students per rate:", value = LATER_COURSE_MIN_N, min = 5, max = 100)),
         column(4, br(), actionButton(ns("update"), "Update Results", icon = icon("rotate"), class = "btn-primary"))
       ),
       tags$p(class = "text-note", "The window also sets which later courses the list offers. Change a setting, then click Update Results."),
@@ -396,6 +400,138 @@ later_course_view <- function(r, ns, access) {
 #                     runs this view while its subtab, and the overlay on it,
 #                     is hidden: the wait is then shown on the page's overlay
 #                     (ISSUES I82).
+# ── Shared results ───────────────────────────────────────────────────────────
+#
+# Downstream's results are the same for every session, so each is built once
+# and shared (cedar_shared_result()). A job is one result's key and its build.
+# The page (this module and server.R) and the build ahead at start make their
+# jobs here, so a result built ahead is the one the page asks for
+# (R/modules/graduation.R is the pattern).
+#
+# tables   named list: registrations, sections, attempts, programs,
+#          applicants, student_terms, dims, edges (programs and applicants may
+#          be NULL). A job reads the ones it names.
+#
+# What a view opens on is named once, for its control and for its job: a
+# result built ahead under another value is one no page asks for.
+LATER_COURSE_MIN_N <- 10L
+COURSE_SEQUENCE_MIN_N <- 15L
+
+# The later courses a course's students took, within a follow-up window.
+downstream_course_options_job <- function(tables, course, campus = NULL,
+                                          window_terms = DOWNSTREAM_DEFAULT_WINDOW) {
+  window_terms <- as.integer(window_terms)
+  list(key = list("downstream_course_options", course, campus, window_terms),
+       build = function() get_downstream_course_options(
+         tables$registrations, tables$attempts, course,
+         list(campus = campus, window_terms = window_terms, min_n = 15L, data_edges = tables$edges)))
+}
+
+# The later course the later views open on: none when the list offers none.
+later_course_opening_choice <- function(options, course, registrations) {
+  downstream_default_course(options, course_sequel(CEDAR_COURSE_SEQUELS, course, registrations))
+}
+
+# Next Courses for one pair of courses: the outcomes and, with the programs
+# table, the instructor balance check. The outcomes stand without the check;
+# `keep` then declines to store the result, so the next reader builds it whole.
+later_course_job <- function(tables, course_x, course_y, campus = NULL,
+                             window_terms = DOWNSTREAM_DEFAULT_WINDOW, min_n = LATER_COURSE_MIN_N) {
+  opt <- list(course_x = course_x, course_y = course_y, campus = campus,
+              window_terms = as.integer(window_terms), min_n = as.integer(min_n),
+              data_edges = tables$edges)
+  whole <- TRUE
+  list(
+    key = list("later_course", opt[setdiff(names(opt), "data_edges")]),
+    build = function() {
+      payload <- build_later_course(tables$registrations, tables$attempts, opt)
+      if (!is.null(payload) && !is.null(tables$programs)) {
+        # The page says the check is missing rather than failing the run.
+        payload <- tryCatch(
+          later_course_balance(payload, tables$registrations, tables$attempts, tables$programs,
+                               tables$applicants, tables$student_terms, list(data_edges = tables$edges)),
+          error = function(e) {
+            cedar_notify_caught("Instructor balance check unavailable", e, type = "warning", duration = 8)
+            whole <<- FALSE
+            payload
+          }
+        )
+      }
+      payload
+    },
+    keep = function(value) whole
+  )
+}
+
+# Did Passing It First Help? for one pair of courses (the course-sequence
+# comparison, drawn by server.R). `settings` holds what its controls hold:
+# act_min, act_max, hs_gpa_min, hs_gpa_max (NULL for no window) and min_n.
+course_sequence_job <- function(tables, course_x, course_y, campus = NULL, settings = list()) {
+  opt <- list(
+    course_x    = course_x,
+    # Both courses by id; the shared picker lists course ids already.
+    course_y    = unique(vapply(course_y, course_id_of, character(1), tbl = tables$sections,
+                                caller = "course_sequence_job", USE.NAMES = FALSE)),
+    act_min     = settings$act_min,
+    act_max     = settings$act_max,
+    min_n       = as.integer(settings$min_n %||% COURSE_SEQUENCE_MIN_N),
+    hs_gpa_min  = settings$hs_gpa_min,
+    hs_gpa_max  = settings$hs_gpa_max,
+    campus      = campus
+  )
+  list(key = list("course_sequence", opt),
+       build = function() get_course_sequence_effect(
+         students = tables$registrations, attempts = tables$attempts, programs = tables$programs,
+         applicants = tables$applicants, opt = opt, student_terms = tables$student_terms,
+         data_edges = tables$edges))
+}
+
+# ── Built ahead at start ─────────────────────────────────────────────────────
+#
+# Downstream is opened for a course the reader picks, so no one view can be
+# built ahead for everyone. The courses analysed most are: for each, what At a
+# Glance asks for as it opens, on the campuses the page opens on, so the first
+# reader of the day does not wait either. Any other course, campus or setting
+# is built when first asked for.
+
+# How far back the timing log is read for the courses analysed most.
+DOWNSTREAM_AHEAD_DAYS <- 30L
+
+# The `n` courses analysed most in the last DOWNSTREAM_AHEAD_DAYS days, most
+# first, as their readers picked them (the code in the course picker).
+downstream_courses_ahead <- function(timings, n, today = Sys.Date()) {
+  most_run_report_values(timings, "course_report", "course", n = n, since = today - DOWNSTREAM_AHEAD_DAYS)
+}
+
+# The jobs for those courses, five a course, each a turn of its own (R answers
+# one request at a time, and a click made meanwhile is answered between two):
+# the later-course list, Next Courses for the later course it opens on, the
+# settings Against Non-Takers opens on, that comparison, and Did Passing It
+# First Help? for the same later course. The later course and the settings
+# are read off results built a turn before, so every job is made when its
+# turn comes; a course with no later course, or no comparison to open on, has
+# nothing to build there. A picked code is resolved to its course as the page
+# resolves it (course_id_of()).
+downstream_preload_jobs <- function(tables, courses, campus = NULL,
+                                    cache = function() shiny::getShinyOption("cache")) {
+  campus <- if (length(campus) > 0L) campus else NULL
+  shared <- function(job) cedar_shared_result(job$key, job$build, cache())
+  one_course <- function(code) {
+    id <- function() course_id_of(tables$sections, code, "downstream_preload_jobs")
+    later <- function() later_course_opening_choice(
+      shared(downstream_course_options_job(tables, id(), campus)), id(), tables$registrations)
+    settings <- function() course_cohort_opening_settings(shared(course_cohort_defaults_job(tables, id(), campus)))
+    list(
+      function() downstream_course_options_job(tables, id(), campus),
+      function() { y <- later(); if (length(y) > 0L) later_course_job(tables, id(), y, campus) },
+      function() course_cohort_defaults_job(tables, id(), campus),
+      function() { s <- settings(); if (course_cohort_settings_complete(s)) course_cohort_job(tables, id(), s) },
+      function() { y <- later(); if (length(y) > 0L) course_sequence_job(tables, id(), y, campus) }
+    )
+  }
+  as.list(do.call(c, lapply(courses, one_course)))
+}
+
 LATER_COURSE_PICKER_SLOTS <- "next"
 LATER_COURSE_LIST_VIEWS <- c("glance", "next_courses")
 LATER_COURSE_RUN_VIEWS <- c("glance", "next_courses")
@@ -407,6 +543,8 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
     ns <- session$ns
     result <- reactiveVal(NULL)
     last_run <- reactiveVal(NULL)
+    tables <- list(registrations = students, attempts = attempts, programs = programs,
+                   applicants = applicants, student_terms = student_terms, edges = edges)
     # The later course(s) both subtabs read; each picker writes it.
     chosen <- reactiveVal(character())
     instructorGateServer("instructor_gate", instructor_access, instructor_password,
@@ -424,8 +562,8 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       k <- window_terms()
       tryCatch(
         if (identical(k, DOWNSTREAM_DEFAULT_WINDOW)) default_options() else {
-          get_downstream_course_options(students, attempts, course(), list(
-            campus = campus(), window_terms = k, min_n = 15L, data_edges = edges))
+          job <- downstream_course_options_job(tables, course(), campus(), k)
+          cedar_shared_result(job$key, job$build)
         },
         error = function(e) {
           cedar_notify_caught("Later-course list", e)
@@ -441,8 +579,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
       offered <- if (is.null(opts)) character() else opts$subject_course
       current <- chosen()
       keep <- intersect(current, c(offered, CR_ROLLUP_SENTINEL))
-      if (length(keep) == 0L) chosen(downstream_default_course(
-        opts, course_sequel(CEDAR_COURSE_SEQUELS, course(), students)))
+      if (length(keep) == 0L) chosen(later_course_opening_choice(opts, course(), students))
       else if (!identical(keep, current)) chosen(keep)
     })
 
@@ -485,43 +622,24 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
 
     run_later_course <- function(y) {
       result(NULL)
-      opt <- list(course_x = course(), course_y = y, campus = campus(),
-                  window_terms = window_terms(), min_n = as.integer(input$min_n %||% 10L),
-                  data_edges = edges)
-      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else session$ns("load")
       # Shared by every session (cedar_shared_result()): the tables are fixed
       # for the life of the process, so one pair of courses under one set of
       # settings is followed once, behind the overlay, by the first session to
-      # ask. A run that lost its balance check to an error is shown to this
-      # session and not kept.
-      whole <- TRUE
+      # ask (or ahead, at start, for the courses opened most). A run that
+      # lost its balance check to an error is shown to this session and not
+      # kept.
+      job <- later_course_job(tables, course(), y, campus(), window_terms(), input$min_n %||% LATER_COURSE_MIN_N)
+      overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else session$ns("load")
       result(cedar_shared_result(
-        list("later_course", opt[setdiff(names(opt), "data_edges")]),
+        job$key,
         function() cedar_with_loading(session, overlay, label = "Following students into the later course…",
                                       report_type = "later_course", {
-          payload <- tryCatch(
-            build_later_course(students, attempts, opt),
-            error = function(e) {
-              cedar_notify_caught("Next Courses", e)
-              NULL
-            }
-          )
-          if (!is.null(payload) && !is.null(programs)) {
-            # The outcomes stand without the balance check; the page says it is
-            # missing rather than failing the run.
-            payload <- tryCatch(
-              later_course_balance(payload, students, attempts, programs, applicants, student_terms,
-                                   list(data_edges = edges)),
-              error = function(e) {
-                cedar_notify_caught("Instructor balance check unavailable", e, type = "warning", duration = 8)
-                whole <<- FALSE
-                payload
-              }
-            )
-          }
-          payload
+          tryCatch(job$build(), error = function(e) {
+            cedar_notify_caught("Next Courses", e)
+            NULL
+          })
         }),
-        keep = function(value) whole
+        keep = job$keep
       ))
     }
 

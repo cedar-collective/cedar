@@ -995,7 +995,7 @@ nav_panel(
           label = "Campus",
           multiple = TRUE,
           choices  = sort(unique(cedar_sections$campus)),
-          selected = cedar_campus_default(cedar_sections)
+          selected = cedar_course_dynamics_campuses
         )
       ),
       column(4,

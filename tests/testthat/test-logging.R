@@ -671,3 +671,25 @@ test_that("reset_client_render_timings removes browser observations", {
   expect_false(file.exists(log_file))
   expect_equal(nrow(get_client_render_timing_summary(log_file)), 0L)
 })
+
+test_that("a report's most-run parameter values are counted from the rows that name one and did not fail", {
+  # `.timing_log_rows` (fixtures/scenario_tables.R) gives the expected counts.
+  since <- as.Date("2026-11-01")
+  expect_message(
+    top <- most_run_report_values(.timing_log_rows, "course_report", "course", n = 10L, since = since),
+    "1 course_report timing row"
+  )
+  expect_equal(top, c("HIST 1110", "BIOL 1140", "CHEM 1215", "ENGL 1110"))
+  expect_equal(suppressMessages(most_run_report_values(.timing_log_rows, "course_report", "course", n = 2L, since = since)),
+               c("HIST 1110", "BIOL 1140"))
+  # A day later, the run on the first leaves the list.
+  expect_equal(suppressMessages(most_run_report_values(.timing_log_rows, "course_report", "course", since = since + 1L)),
+               c("HIST 1110", "BIOL 1140", "CHEM 1215"))
+  # Another report's rows are its own; a report with no rows names nothing.
+  expect_equal(most_run_report_values(.timing_log_rows, "dept_dashboard", "course"), "MATH 1220")
+  expect_equal(most_run_report_values(.timing_log_rows, "dept_dashboard", "dept"), "MATH")
+  expect_equal(most_run_report_values(.timing_log_rows, "course_cohort", "course"), character(0))
+  expect_equal(most_run_report_values(empty_report_timings(), "course_report", "course"), character(0))
+  expect_error(most_run_report_values(.timing_log_rows[c("timestamp", "report_type")], "course_report", "course"),
+               "lacks report_params, success")
+})

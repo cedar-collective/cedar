@@ -1643,9 +1643,15 @@ cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache
 
 # Build shared results ahead of their first reader, in the background once the
 # app is running. `jobs` is a list of list(key, build), each as
-# cedar_shared_result() takes them; a page's module makes its jobs with the
-# same function its reactives call, so a result built ahead is the one the
-# page asks for (graduation_preload_jobs() is the pattern).
+# cedar_shared_result() takes them (with `keep`, where the page passes one); a
+# page's module makes its jobs with the same function its reactives call, so a
+# result built ahead is the one the page asks for (graduation_preload_jobs()
+# is the pattern).
+#
+# A job whose key waits on an earlier job's result is given as a function that
+# returns the job, and is made when its turn comes (a course's later course is
+# read off its list of later courses, built by the job before). A function
+# that returns NULL has nothing to build. One that fails is a job that failed.
 #
 # R answers one request at a time, so the jobs do not run in one piece: the
 # first waits `start_after` seconds from the moment the event loop starts, so
@@ -1659,21 +1665,35 @@ cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache
 cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedule = later::later,
                                          cache = function() shiny::getShinyOption("cache")) {
   is_job <- function(job) is.list(job) && is.list(job$key) && length(job$key) > 0L && is.function(job$build)
-  if (!all(vapply(jobs, is_job, logical(1)))) {
-    stop("[ui-helpers.R] cedar_preload_shared_results() takes jobs of list(key, build).", call. = FALSE)
+  if (!all(vapply(jobs, function(job) is.function(job) || is_job(job), logical(1)))) {
+    stop("[ui-helpers.R] cedar_preload_shared_results() takes jobs of list(key, build), ",
+         "or functions that return one.", call. = FALSE)
   }
   if (length(jobs) == 0L) return(invisible(0L))
   run <- function(i) {
-    job <- jobs[[i]]
-    parts <- vapply(job$key, function(k) paste(k, collapse = "+"), character(1))
-    label <- paste(parts[nzchar(parts)], collapse = ", ")
+    # Each line says where the run is, so the log shows when it finished.
+    place <- sprintf("%d of %d", i, length(jobs))
+    label <- "a job made in its turn"
     started <- Sys.time()
     built <- FALSE
     outcome <- tryCatch({
-      value <- cedar_shared_result(job$key, function() { built <<- TRUE; job$build() }, cache())
-      if (is.null(value)) "the build returned nothing; not kept" else if (built) "built" else "already built"
+      job <- jobs[[i]]
+      if (is.function(job)) job <- job()
+      if (is.null(job)) "nothing to build" else {
+        if (!is_job(job)) stop("the job made is not list(key, build)")
+        parts <- vapply(job$key, function(k) paste(k, collapse = "+"), character(1))
+        label <- substr(paste(parts[nzchar(parts)], collapse = ", "), 1L, 160L)
+        keep <- job$keep %||% function(value) TRUE
+        kept <- TRUE
+        value <- cedar_shared_result(job$key, function() { built <<- TRUE; job$build() }, cache(),
+                                     keep = function(value) { kept <<- isTRUE(keep(value)); kept })
+        if (is.null(value)) "the build returned nothing; not kept"
+        else if (!built) "already built"
+        else if (kept) "built"
+        else "built without a part; not kept"
+      }
     }, error = function(e) paste("failed:", conditionMessage(e)))
-    message(sprintf("[preload] %s: %s (%.1fs)", label, outcome,
+    message(sprintf("[preload] %s: %s: %s (%.1fs)", place, label, outcome,
                     as.numeric(difftime(Sys.time(), started, units = "secs"))))
     if (i < length(jobs)) schedule(function() run(i + 1L), gap)
   }
@@ -1685,10 +1705,13 @@ cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedu
 
 # An error a page caught: told to the reader and written to the log. The
 # notice closes by itself, so without the log line a page left empty by a
-# caught error leaves nothing to find afterwards (ISSUES I85).
+# caught error leaves nothing to find afterwards (ISSUES I85). Where there is
+# no session to tell (a result built ahead at start), the log line is all.
 cedar_notify_caught <- function(what, e, type = "error", duration = 10) {
   message("[caught] ", what, ": ", conditionMessage(e))
-  showNotification(paste0(what, ": ", conditionMessage(e)), type = type, duration = duration)
+  if (!is.null(shiny::getDefaultReactiveDomain())) {
+    showNotification(paste0(what, ": ", conditionMessage(e)), type = type, duration = duration)
+  }
 }
 
 signal_load_complete <- function(session, id, duration_sec = NULL,

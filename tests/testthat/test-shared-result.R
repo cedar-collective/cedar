@@ -76,3 +76,44 @@ test_that("a preload builds each job once, in order, and a job that fails stops 
   expect_error(cedar_preload_shared_results(list(list(key = "page", build = function() 1)), schedule = at_once),
                "jobs of list(key, build)", fixed = TRUE)
 })
+
+test_that("a preload makes a job when its turn comes, and stores what the job says to keep", {
+  cache <- cachem::cache_mem()
+  at_once <- function(callback, delay) callback()
+  made <- character(0)
+  job <- function(name, value, keep = NULL) {
+    c(list(key = list("page", name), build = function() value), if (!is.null(keep)) list(keep = keep))
+  }
+  jobs <- list(
+    job("list", c("B", "A")),
+    # Made after the job before it: its key is read off that job's result.
+    function() {
+      first <- cedar_shared_result(list("page", "list"), function() stop("built twice"), cache)[[1]]
+      made <<- c(made, first)
+      job(first, "later")
+    },
+    function() NULL,
+    function() stop("no such course"),
+    function() "not a job",
+    job("in part", "lost a part", keep = function(value) FALSE),
+    job("whole", "all of it", keep = function(value) TRUE)
+  )
+  log <- testthat::capture_messages(
+    expect_equal(cedar_preload_shared_results(jobs, schedule = at_once, cache = function() cache), 7L))
+  expect_equal(made, "B")
+  expect_equal(cedar_shared_result(list("page", "B"), function() stop("built twice"), cache), "later")
+  expect_equal(grepl("nothing to build", log, fixed = TRUE), c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE))
+  expect_equal(grepl("failed: no such course", log, fixed = TRUE), c(FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE))
+  expect_equal(grepl("failed: the job made is not list(key, build)", log, fixed = TRUE),
+               c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE))
+  # A job that declines to keep its result stores nothing, and the log says so:
+  # the page builds it.
+  expect_equal(grepl("built without a part; not kept", log, fixed = TRUE),
+               c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE))
+  expect_match(log[[7]], "[preload] 7 of 7: page, whole: built (", fixed = TRUE)
+  expect_equal(cedar_shared_result(list("page", "in part"), function() "built by the page", cache), "built by the page")
+  expect_equal(cedar_shared_result(list("page", "whole"), function() stop("built twice"), cache), "all of it")
+  # Anything else in the list is refused before a job runs.
+  expect_error(cedar_preload_shared_results(list("not a job"), schedule = at_once, cache = function() cache),
+               "takes jobs of list\\(key, build\\)")
+})

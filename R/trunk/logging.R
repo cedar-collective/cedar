@@ -946,6 +946,35 @@ end_report_timer <- function(timing_context, cached = FALSE, result,
   return(duration_sec)
 }
 
+# The values one parameter of a report took, most often first: the courses
+# analysed most since a date, say. Counted from the timing log's rows
+# (read_report_timings()) of runs that did not fail. A row whose parameters
+# are not JSON, or do not name the field with one value, names nothing and is
+# not counted; the first kind is reported. Ties go in the value's own order,
+# so the same log gives the same list.
+most_run_report_values <- function(timings, report_type, field, n = 10L, since = NULL) {
+  missing <- setdiff(c("timestamp", "report_type", "report_params", "success"), names(timings))
+  if (length(missing) > 0L) {
+    stop("[logging.R] most_run_report_values(): timings lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  rows <- timings[timings$report_type %in% report_type & !timings$success %in% 0L &
+                    !is.na(timings$report_params), , drop = FALSE]
+  if (!is.null(since)) rows <- rows[as.Date(substr(rows$timestamp, 1L, 10L)) >= as.Date(since), , drop = FALSE]
+  readable <- vapply(rows$report_params, function(params) isTRUE(jsonlite::validate(params)), logical(1),
+                     USE.NAMES = FALSE)
+  if (any(!readable)) {
+    message("[logging.R] ", sum(!readable), " ", report_type,
+            " timing row(s) hold parameters that are not JSON; not counted.")
+  }
+  values <- unlist(lapply(rows$report_params[readable], function(params) {
+    value <- jsonlite::fromJSON(params)[[field]]
+    if (is.character(value) && length(value) == 1L && !is.na(value) && nzchar(value)) value
+  }))
+  if (length(values) == 0L) return(character(0))
+  counts <- table(values)
+  utils::head(names(counts)[order(-as.integer(counts), names(counts))], n)
+}
+
 # Get average timing for a specific report type.
 # By default excludes cache hits so the estimate reflects actual compute time.
 # Set cached_only = TRUE to average only cache hits (fast path); it takes
