@@ -5,8 +5,10 @@
 // latest-term and trend cards, the term bars split into the four kinds of DFW
 // grade with each bar's total labelled, the concentration figure whose parts
 // add to its headline, the course bars and table, the rising/falling/swinging
-// cards with the slope chart, the section strip and table, the campus and
-// college tables; every method slot filled; no instructor anywhere; a re-read
+// cards with the slope chart; how far apart sections are and where the listed
+// courses' sections are heading, the term-by-term line, the bars and a table
+// ranked furthest apart first with each course's direction in words; the
+// campus and college tables; every method slot filled; no instructor anywhere; a re-read
 // when the term type changes; ABQ and EA as the opening campuses, with the
 // campus table still setting every campus side by side; trend cells that are
 // a line with no word; no Swings column; a From term that shortens the series;
@@ -83,10 +85,32 @@ try {
   const slopes = await plot('slope_plot');
   ok(slopes && slopes.names.every((n) => ['Rising', 'Falling'].includes(n)), `the slope chart holds rising and falling courses (${slopes?.names})`);
 
-  const strip = await plot('section_strip');
-  ok(strip && strip.names[0] === "The course's rate that term", `the section strip marks each course's rate (${strip?.names})`);
-  const sectionRows = await readReactable(page, `${NS}section_table`, { limit: 5 });
-  ok(sectionRows.rows?.length > 0, `the section table lists tested courses (${sectionRows.rows?.length})`);
+  const section = await cards('section_finding');
+  ok(section.map((c) => c.title).join('|') === 'How far apart|Direction', `how-far-apart and direction cards (${section.map((c) => c.title)})`);
+  ok(/^\d+\.\d$/.test(section[0]?.headline || ''), `the first card leads with points apart (${section[0]?.headline})`);
+  const spreading = parseInt((section[1]?.headline || '').replace(/,/g, ''), 10);
+  ok(section[1]?.parts.length === 3 && section[1].parts[0] === spreading,
+     `the direction card splits the listed courses three ways, led by the ${spreading} spreading (${section[1]?.parts})`);
+  const listedCourses = (section[1]?.parts || []).reduce((a, b) => a + b, 0);
+  const spreadTerms = await plot('spread_terms_plot');
+  ok(spreadTerms && spreadTerms.names.join('|') === 'Every course' && spreadTerms.n[0] >= 4,
+     `the term-by-term line reads every course over ${spreadTerms?.n[0]} terms (${spreadTerms?.names})`);
+  const directions = ['Spreading', 'Consolidating', 'No clear change'];
+  const spreadBars = await plot('spread_course_bars');
+  const nBars = (spreadBars?.n || []).reduce((a, b) => a + b, 0);
+  ok(spreadBars && spreadBars.names.every((n) => directions.includes(n)) && nBars === Math.min(15, listedCourses),
+     `a bar for each of the ${Math.min(15, listedCourses)} courses furthest apart, by direction (${nBars}: ${spreadBars?.names})`);
+  const sectionTable = await readReactable(page, `${NS}section_table`, { limit: 15 });
+  // Headers are read as drawn, in capitals.
+  const direction = (sectionTable.headers || []).findIndex((h) => /^direction$/i.test(h));
+  ok(sectionTable.rows?.length > 0 && sectionTable.rows.every((r) => directions.includes(r[direction])),
+     `the section table names each course's direction (${[...new Set(sectionTable.rows?.map((r) => r[direction]))]})`);
+  const points = (sectionTable.rows || []).map((r) => parseFloat(r[2]));
+  ok(points.length > 1 && points.every((v, i) => i === 0 || v <= points[i - 1]),
+     `the section table runs from the course furthest apart (${points.slice(0, 3)})`);
+  const sectionPages = await page.$eval('#dfw_rates-section_table .rt-page-info', (el) => el.innerText).catch(() => '');
+  ok(new RegExp(`of ${listedCourses} rows`).test(sectionPages.replace(/,/g, '')),
+     `the section table lists the ${listedCourses} courses the direction card counts (${sectionPages})`);
 
   for (const id of ['campus_table', 'college_table']) {
     const t = await readReactable(page, `${NS}${id}`, { limit: 5 });

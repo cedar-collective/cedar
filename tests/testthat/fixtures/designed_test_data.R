@@ -57,8 +57,8 @@
 #
 #   DF01 — cedar_registrations_df (591 rows). Four lower-division
 #          course-campuses over Fall 2019-2022 (graded edge Fall 2022,
-#          df01_edges) for Bird's Eye > DFW: one rising with uneven sections
-#          (MATH 1220 ABQ), one falling (ENGL 1110 ABQ, with an NR), one steady
+#          df01_edges) for Bird's Eye > DFW: one rising whose sections move
+#          apart (MATH 1220 ABQ), one falling (ENGL 1110 ABQ, with an NR), one steady
 #          on EA, one that swings (PSYC 1110 ABQ), plus rows outside the scope.
 #          Pinned values beside the rows.
 #
@@ -4935,10 +4935,13 @@ cedar_registrations_cm <- dplyr::bind_rows(
 #     1220 EA steady (33.3% each fall), PSYC 1110 ABQ steady (10, 40, 10,
 #     40%) and the one that swings: the typical course's scatter beyond
 #     chance is 0, so it is judged against chance, at 0.05 over 4 courses.
-#   Sections, window: MATH 1220 ABQ tested in 3 falls, uneven in Fall 2021
-#     (0, 4 and 8 of 10) and Fall 2022 (2, 4 and 10 of 10); ENGL 1110 ABQ
-#     tested in 3, uneven in none. MATH 1220 EA and PSYC 1110 ABQ have one
-#     section a fall and are not tested.
+#   Sections, every fall: MATH 1220 ABQ (3 sections) and ENGL 1110 ABQ (4)
+#     are read in all four. MATH's sections sit 24.9 points apart beyond
+#     chance on average (0, 0, 36.9 and 38.5 by fall; lowest 17.5%, highest
+#     57.5% on average): spreading. ENGL's sit closer than chance every
+#     fall, 0 on average: no clear change. The eight course-terms pooled,
+#     MATH's at weight 20 and ENGL's at 30: 13.1 points. MATH 1220 EA and
+#     PSYC 1110 ABQ have one section a fall and are not read.
 .df_section <- function(course, term, campus, sec, n, dfw, college, level = "lower", nr = 0L) {
   cycle <- c("F", "W", "D")
   grades <- c(rep_len(cycle, dfw), rep("A", n - dfw))
