@@ -61,10 +61,15 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     analysed <- reactiveVal(NULL)
     observe(analysed(course()), priority = 2)
 
+    # Shared by every session (cedar_shared_result()): what the view opens on
+    # for a course and the page's campuses is the same for everyone.
     defaults <- reactive({
       crs <- analysed()
       req(crs, nzchar(crs))
-      course_cohort_context_defaults(crs, student_terms, attempts, edges, list(campus = campus()))
+      home <- campus()
+      cedar_shared_result(list("course_cohort_defaults", crs, home), function() {
+        course_cohort_context_defaults(crs, student_terms, attempts, edges, list(campus = home))
+      })
     })
 
     last_run <- reactiveVal(NULL)
@@ -78,7 +83,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         return(empty_state("Select a course and click Analyze Course first, then open this tab."))
       }
       d <- tryCatch(defaults(), error = function(e) {
-        showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
+        cedar_notify_caught("Comparison with non-takers", e)
         NULL
       })
       if (is.null(d)) return(empty_state(paste0("No graded attempt of ", crs, " to read.")))
@@ -167,7 +172,7 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
     run_comparison <- function(crs) {
       shown <- !is.null(input$run)
       d <- if (!shown) tryCatch(defaults(), error = function(e) {
-        showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
+        cedar_notify_caught("Comparison with non-takers", e)
         NULL
       })
       if (!shown && is.null(d)) return()
@@ -193,45 +198,56 @@ courseCohortServer <- function(id, student_terms, attempts, programs, dims, edge
         data_edges = edges,
         college_label = if (length(college) && college %in% names(college_names)) unname(college_names[[college]]) else college
       )
+      comparison <- input$comparison %||% "all"
       overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else ns("load")
-      cedar_with_loading(session, overlay, label = "Comparing takers with non-takers…",
-                         report_type = "course_cohort", {
-        payload <- tryCatch(
-          build_course_cohort_context(student_terms, attempts, opt),
-          error = function(e) {
-            showNotification(paste("Comparison with non-takers:", conditionMessage(e)), type = "error", duration = 10)
-            NULL
-          }
-        )
-        if (!is.null(payload) && !is.null(programs)) {
-          # The programs table may lack the demographic columns the balance
-          # needs; the groups stand without it, and the page says the table is
-          # missing rather than failing the comparison.
+      # Shared by every session (cedar_shared_result()): the tables are fixed
+      # for the life of the process, so one course's answer to one set of
+      # settings is built once, behind the overlay, by the first session to
+      # ask, and read by every later one with no wait. A run that lost a part
+      # to an error is shown to this session and not kept.
+      whole <- TRUE
+      built <- cedar_shared_result(
+        list("course_cohort", opt[setdiff(names(opt), "data_edges")], comparison),
+        function() cedar_with_loading(session, overlay, label = "Comparing takers with non-takers…",
+                                      report_type = "course_cohort", {
           payload <- tryCatch(
-            course_cohort_context_balance(payload, student_terms, attempts, programs),
+            build_course_cohort_context(student_terms, attempts, opt),
             error = function(e) {
-              showNotification(paste("Balance table unavailable:", conditionMessage(e)),
-                               type = "warning", duration = 8)
-              payload
+              cedar_notify_caught("Comparison with non-takers", e)
+              NULL
             }
           )
-        }
-        if (!is.null(payload) && !is.null(applicants)) {
-          similar(tryCatch(
+          if (!is.null(payload) && !is.null(programs)) {
+            # The programs table may lack the demographic columns the balance
+            # needs; the groups stand without it, and the page says the table is
+            # missing rather than failing the comparison.
+            payload <- tryCatch(
+              course_cohort_context_balance(payload, student_terms, attempts, programs),
+              error = function(e) {
+                cedar_notify_caught("Balance table unavailable", e, type = "warning", duration = 8)
+                whole <<- FALSE
+                payload
+              }
+            )
+          }
+          matched <- if (!is.null(payload) && !is.null(applicants)) tryCatch(
             build_course_similar_students(
               student_terms, attempts, applicants,
               list(course = crs, classification = opt$classification, campus = opt$campus, term = opt$term,
-                   comparison = input$comparison %||% "all", match_credits = TRUE, data_edges = edges),
+                   comparison = comparison, match_credits = TRUE, data_edges = edges),
               programs),
             error = function(e) {
-              showNotification(paste("Similar-students comparison:", conditionMessage(e)), type = "error", duration = 10)
+              cedar_notify_caught("Similar-students comparison", e)
+              whole <<- FALSE
               NULL
             }
-          ))
-        }
-        result(payload)
-        payload
-      })
+          )
+          if (!is.null(payload)) list(result = payload, similar = matched)
+        }),
+        keep = function(value) whole
+      )
+      similar(built$similar)
+      result(built$result)
     }
 
     # The results in Downstream's order: the answer (against similar

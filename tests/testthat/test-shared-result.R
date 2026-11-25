@@ -24,6 +24,23 @@ test_that("a shared result is built once, and a failed build is not kept", {
   expect_error(cedar_shared_result(list("page"), build(1), cache = NULL), "needs the app's cache")
 })
 
+test_that("a built result its caller declines to keep is handed back and built again", {
+  cache <- cachem::cache_mem()
+  builds <- 0L
+  build <- function(value) function() { builds <<- builds + 1L; value }
+  # A result that lost a part: this reader gets it, the next reader builds.
+  expect_equal(cedar_shared_result(list("page", "UG"), build("in part"), cache, keep = function(value) FALSE), "in part")
+  expect_equal(cedar_shared_result(list("page", "UG"), build("whole"), cache, keep = function(value) TRUE), "whole")
+  expect_equal(cedar_shared_result(list("page", "UG"), build("again"), cache, keep = function(value) FALSE), "whole")
+  expect_equal(builds, 2L)
+  # `keep` sees the built value.
+  expect_equal(cedar_shared_result(list("page", "GR"), build(list(whole = FALSE)), cache,
+                                   keep = function(value) value$whole), list(whole = FALSE))
+  expect_equal(cedar_shared_result(list("page", "GR"), build(list(whole = TRUE)), cache,
+                                   keep = function(value) value$whole), list(whole = TRUE))
+  expect_equal(builds, 4L)
+})
+
 test_that("a preload builds each job once, in order, and a job that fails stops nothing", {
   cache <- cachem::cache_mem()
   waits <- numeric(0)

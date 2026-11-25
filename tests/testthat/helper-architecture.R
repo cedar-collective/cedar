@@ -72,7 +72,7 @@ architecture_silent_fallback <- function(handler) {
   argument <- sub(paste0(prefix, ".*$"), "\\1", handler)
   body <- gsub("#[^\n]*", "", sub(prefix, "", handler))
   reported <- paste0(
-    "showNotification\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
+    "showNotification\\(|cedar_notify_caught\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
     "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\(|",
     "conditionMessage\\("
   )

@@ -152,6 +152,19 @@ input that changes the result, with the result's name first. Only a built
 value is stored; a build that fails stores nothing and is tried again
 (ISSUES I75 is what `bindCache(cache = "app")` did instead).
 
+A result that depends on what the reader picked is shared the same way, with
+the pick in the key. Course Dynamics > Downstream keeps each course's three
+comparisons (`course_cohort`, `later_course`, `course_sequence`: the course,
+the campuses and every setting are the key) and what they start from (the
+later-course list, the settings Against Non-Takers opens on), so the first
+session to open a course builds them behind the overlay and every later
+session reads them with no wait (ISSUES M72). A page whose result is assembled from parts, each caught
+on its own, passes `keep =`: a result that lost a part to an error is shown to
+the session that built it and is not stored, so the next reader builds it
+whole. The caught error itself goes through `cedar_notify_caught()`, which
+tells the reader and writes the log: a notice closes by itself, and a page
+left empty by a caught error otherwise leaves nothing to find (ISSUES I85).
+
 Sharing leaves one wait: the first person to open the page after each restart
 (every morning's refresh, every deploy) pays for the build, and so does
 everyone else using the app at that moment. Where the page opens on the same

@@ -36,6 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left with its heading and no step in one local session of 14: two of its steps never ran and the log held no error. Seen once, not reproduced; the caught errors on that path are now logged |
 | [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25). The module servers are now compiled at start; open for the server function itself, which the second session still compiles (about 3 seconds), because Shiny reads `server.R` itself ([M70](#improvements)) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -53,7 +54,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M71 | Improvement | See [Improvements](#improvements) |
+| M1–M72 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -113,6 +114,62 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I85 — At a Glance was left with no step in one session, and nothing in the log said why
+
+**Status:** open. Seen once, not reproduced. What a recurrence leaves behind
+is in place (below).
+**Found:** 2026-11-25, timing Downstream in the local container for M72.
+**Severity:** medium when it happens: the page keeps its heading and shows no
+step, for good, which is also what "none of the subtabs display anything"
+(I82) looks like.
+**Affects:** `server.R` (Course Dynamics > Downstream),
+`R/modules/later-course.R`.
+
+### What was seen
+
+The first session on a container just started (the app took 138 seconds to
+answer, where a restart takes about 85; later in the same run the Docker VM
+had 73 MB of its 3.8 GiB available). Course Dynamics for FYEX 1110 on ABQ and
+EA, Analyze Course, then Downstream:
+
+- "Reading the course's outcomes…" ran (2.2 seconds) and the overlay closed;
+- "Comparing takers with non-takers…" ran next (20 seconds). Next Courses,
+  which every other session runs before it, did not run;
+- the page then went idle with no step drawn. Next Courses and the sequence
+  comparison never ran: `report_timing.csv` has no row for either from that
+  session. The log held no error, and no "Computing next-term persistence"
+  line, which the second step writes when At a Glance is drawn.
+
+Thirteen later sessions opened the same way ran every step, twelve of them
+for the same course and one of those the first session after another restart;
+so did every session of the browser suites run afterwards, across four more
+restarts.
+
+### What it is consistent with
+
+Two errors caught on the page: the later-course list's ("Later-course list:
+…", which leaves no later course chosen, so neither later step runs) and At a
+Glance's own ("At a Glance: …", which left the heading with no step). Each was
+told to the reader in a notice that closes after 10 seconds and was written
+nowhere, and the script watching the session did not record notices. Both
+read the whole class list, so running out of memory on a full VM would give
+exactly this pair. That is a guess.
+
+### What changed, so the next one can be read
+
+- The caught errors on this path are written to the log as
+  `[caught] <what>: <message>` (`cedar_notify_caught()`,
+  `R/modules/ui-helpers.R`).
+- At a Glance says on the page that it could not be put together, with the
+  message, instead of showing a heading over nothing; a summary that is only
+  not ready yet waits, as before.
+
+### Reproduce
+
+None. To look for it: as the first session on a container started while
+memory is short, open Downstream for a course no session has opened since the
+restart (so its steps are built, M72), then `grep '\[caught\]'` in the log.
 
 ## I84 — The admin browser suite expected the math starting point that was replaced
 
@@ -5071,8 +5128,8 @@ the section has its own.
 **M68 — Against Non-Takers took one to two minutes for a large course, and
 runs when Downstream opens.** Resolved 2026-11-25 (branch
 `perf/non-takers-run`) for the length of the run: 12.5 seconds locally for
-FYEX 1110, where it was 46 to 50. Production's figure is to be read off
-`report_timing.csv` once this is deployed. FYEX 1110 on production,
+FYEX 1110, where it was 46 to 50; on production after the deploy, 17.4 and
+20.6 seconds in two sessions. FYEX 1110 on production before it,
 2026-11-25: `course_cohort` 91.2 seconds, between `later_course` (5.4) and
 `course_sequence` (19.5), during which R answers no other session (I82 is the
 empty page it showed meanwhile). A profile of the local run gave 20 seconds in
@@ -5090,8 +5147,9 @@ payloads for FYEX 1110 and ENGL 1110, with everyone else and with Gen Ed
 non-takers, are `identical()` to the code before on the full tables. What the
 run still costs, on the development machine outside the container: 5.6
 seconds, of which the balance table 1.7, similar students 2.6, the raw
-comparison 1.0. Whether At a Glance should start all three runs on opening is
-a product choice, in ROADMAP's Inbox.
+comparison 1.0. At a Glance starts all three runs on opening (decided
+2026-11-25); M72 is what keeps a course's results for the sessions after the
+first.
 
 **M71 — The sequence comparison asked each student in turn.** Resolved
 2026-11-25 (branch `perf/sequence-first-attempt`): 5.7 seconds locally for
@@ -5099,8 +5157,8 @@ FYEX 1110's default pair, where it was 8.4 to 11.6; 2.2 seconds for a large
 pair on the development machine outside the container, where it was 4.4. At a
 Glance's last step ("Did passing it first help?") took 19.5 seconds for FYEX
 1110 on production on 2026-11-25, where the page's estimate for it reads
-"usually ~2–5s"; production's figure is to be read off `report_timing.csv`
-after deploy. `get_course_sequence_effect()`
+"usually ~2–5s"; after the deploy, 8.5 and 10.0 seconds in two sessions.
+`get_course_sequence_effect()`
 (`R/cones/course-sequence-effect.R`) picked each student's first attempt of
 the later course with a `summarize()` per student-term and a `slice_head()`
 per student, then each student's first pass of the earlier course with a
@@ -5116,6 +5174,32 @@ one (the first pass counts). What the step still costs is the comparison
 builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
+**M72 — Downstream's three comparisons were built again by every session.**
+Resolved 2026-11-25 (branch `perf/downstream-shared-results`). At a Glance
+runs Next Courses, Against Non-Takers and Prepared for It as Downstream opens,
+and each session built all three for itself. On production after M68 and M71,
+two sessions one after the other opened Downstream for FYEX 1110: ready in 46
+and 38 seconds (the comparison with non-takers 20.6 and 17.4, the sequence
+comparison 10.0 and 8.5, the later course 5.6 and 4.1), during which R
+answers no other session. Each result is now read through
+`cedar_shared_result()`, keyed by the course, the campuses and every setting:
+the first session to ask builds it, behind the overlay as before, and every
+later session on that process reads it. In the local container, three
+sessions in turn for FYEX 1110: 47 seconds for the one that built, then 11.8
+and 7.3. The later-course list and the settings Against Non-Takers opens on,
+which every session also worked out for itself, are shared the same way. A
+result that lost a part to a caught error is shown to its session and not
+kept (`keep =`). What it
+saves, from production's timing log for the 30 days to 2026-11-25: of 156
+course analyses over 83 courses, 27 (17%) were of a course already analysed
+that day. A course's three results are about 1.1 MB (0.95, 0.12 to 0.25 and
+0.04) of the app's 200 MB cache, which drops the least recently read first.
+Still paid by every session: reading the course's own outcomes (about 2
+seconds, behind the overlay) and drawing At a Glance (about 4, with no wait
+shown: the course's return rates and the page itself). Building the
+most-opened courses ahead at start, so their first reader does not wait
+either, is in ROADMAP's Inbox.
+
 **M69 — A soft restart leaves the previous R process running.**
 `restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
 for new sessions and, with `app_idle_timeout 0`, never ends the old one. On
@@ -5124,7 +5208,10 @@ restart was still there at 14:19 beside the one the 11:00 soft restart started:
 1.2 GB resident and 1.4 GB in swap on an 8 GB host, until the next day's
 container restart. Done when the morning job ends with one R process (a hard
 restart there, or the soft restart ends the old worker), checked with `ps` in
-the container.
+the container. Production's 11:00 UTC job was changed to
+`restart-cedar.sh --hard-restart` on 2026-11-25; its first run is 2026-11-26.
+`docs/developers/droplet-installation.md` still gives a new host one job with
+a soft restart.
 
 **M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
 and `app.R` is never used.** With a `server.R` in the directory Shiny ignores

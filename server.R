@@ -3915,17 +3915,21 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # against a curricular sequence. Valid pathways routinely cross department
   # boundaries. The grouped labels are downstream_course_choices()
   # (R/modules/later-course.R).
+  # Shared by every session (cedar_shared_result()): a course's list on a set
+  # of campuses is the same for everyone, and reading it follows the whole
+  # class list.
   cr_downstream_options <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
-    get_downstream_course_options(
-      cr_students,
-      data_objects[["cedar_attempts"]],
-      cr_course_id(),
-      list(campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
-           min_n  = 15L,
-           data_edges = data_objects[["cedar_edges"]])
-    )
+    campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
+    cedar_shared_result(list("downstream_course_options", cr_course_id(), campus), function() {
+      get_downstream_course_options(
+        cr_students,
+        data_objects[["cedar_attempts"]],
+        cr_course_id(),
+        list(campus = campus, min_n = 15L, data_edges = data_objects[["cedar_edges"]])
+      )
+    })
   })
 
   # ── Prepared for It (Course Sequence in code; "Against Students Who Didn't
@@ -3994,28 +3998,30 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       campus      = if (length(input$cr_campus) > 0) input$cr_campus else NULL
     )
 
-    # Behind Course Dynamics' own overlay, labelled for this comparison.
-    cedar_with_loading(session, "cr", label = "Building the sequence comparison…",
-                       report_type = "course_sequence", {
-      tryCatch({
-        result <- get_course_sequence_effect(
-          students     = cr_students,
-          attempts     = data_objects[["cedar_attempts"]],
-          programs     = data_objects[["cedar_programs"]],
-          applicants   = data_objects[["cedar_applicants"]],
-          opt          = opt,
-          student_terms = data_objects[["cedar_student_terms"]],
-          data_edges   = data_objects[["cedar_edges"]]
+    # Shared by every session (cedar_shared_result()): one pair of courses
+    # under one set of settings is compared once, by the first session to ask,
+    # behind Course Dynamics' own overlay, labelled for this comparison.
+    cr_impact_sequence_data(cedar_shared_result(
+      list("course_sequence", opt),
+      function() cedar_with_loading(session, "cr", label = "Building the sequence comparison…",
+                                    report_type = "course_sequence", {
+        tryCatch(
+          get_course_sequence_effect(
+            students     = cr_students,
+            attempts     = data_objects[["cedar_attempts"]],
+            programs     = data_objects[["cedar_programs"]],
+            applicants   = data_objects[["cedar_applicants"]],
+            opt          = opt,
+            student_terms = data_objects[["cedar_student_terms"]],
+            data_edges   = data_objects[["cedar_edges"]]
+          ),
+          error = function(e) {
+            cedar_notify_caught("Sequence analysis failed", e)
+            NULL
+          }
         )
-        cr_impact_sequence_data(result)
-        result
-      }, error = function(e) {
-        showNotification(paste("Sequence analysis failed:", conditionMessage(e)),
-                         type = "error", duration = 10)
-        message("[server.R] cr_impact_seq error: ", conditionMessage(e))
-        NULL
       })
-    })
+    ))
   }
 
   observe({
@@ -5958,6 +5964,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     course <- input$cr_course
     if (is.null(course) || !nzchar(course) || is.null(course_report_data()))
       return(empty_state("Select a course and click Analyze Course first, then open this tab."))
+    # A summary that cannot be read says so on the page: the notice closes by
+    # itself, and a page with a heading and no step looked like one still
+    # loading (ISSUES I85).
+    failed <- NULL
     rows <- tryCatch(
       downstream_glance(
         course,
@@ -5971,7 +5981,10 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         sequence = cr_impact_sequence_data()
       ),
       error = function(e) {
-        showNotification(paste("At a Glance:", conditionMessage(e)), type = "error", duration = 10)
+        # Not ready yet (a req() upstream) is not a failure: the output waits.
+        if (inherits(e, "shiny.silent.error")) stop(e)
+        cedar_notify_caught("At a Glance", e)
+        failed <<- conditionMessage(e)
         NULL
       })
     tagList(
@@ -5984,6 +5997,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
         )
       ),
       if (!is.null(rows)) div(class = "downstream-glance", lapply(seq_along(rows), function(i) .downstream_glance_card(i, rows[[i]])))
+      else if (!is.null(failed)) empty_state(paste0("This summary could not be put together: ", failed))
     )
   })
 

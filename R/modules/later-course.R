@@ -428,7 +428,7 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
             campus = campus(), window_terms = k, min_n = 15L, data_edges = edges))
         },
         error = function(e) {
-          showNotification(paste("Later-course list:", conditionMessage(e)), type = "error", duration = 10)
+          cedar_notify_caught("Later-course list", e)
           NULL
         }
       )
@@ -489,31 +489,40 @@ laterCourseServer <- function(id, course, campus, students, attempts, programs, 
                   window_terms = window_terms(), min_n = as.integer(input$min_n %||% 10L),
                   data_edges = edges)
       overlay <- if (identical(view(), "glance") && !is.null(page_overlay)) page_overlay else session$ns("load")
-      cedar_with_loading(session, overlay, label = "Following students into the later course…",
-                         report_type = "later_course", {
-        payload <- tryCatch(
-          build_later_course(students, attempts, opt),
-          error = function(e) {
-            showNotification(paste("Next Courses:", conditionMessage(e)), type = "error", duration = 10)
-            NULL
-          }
-        )
-        if (!is.null(payload) && !is.null(programs)) {
-          # The outcomes stand without the balance check; the page says it is
-          # missing rather than failing the run.
+      # Shared by every session (cedar_shared_result()): the tables are fixed
+      # for the life of the process, so one pair of courses under one set of
+      # settings is followed once, behind the overlay, by the first session to
+      # ask. A run that lost its balance check to an error is shown to this
+      # session and not kept.
+      whole <- TRUE
+      result(cedar_shared_result(
+        list("later_course", opt[setdiff(names(opt), "data_edges")]),
+        function() cedar_with_loading(session, overlay, label = "Following students into the later course…",
+                                      report_type = "later_course", {
           payload <- tryCatch(
-            later_course_balance(payload, students, attempts, programs, applicants, student_terms,
-                                 list(data_edges = edges)),
+            build_later_course(students, attempts, opt),
             error = function(e) {
-              showNotification(paste("Instructor balance check unavailable:", conditionMessage(e)),
-                               type = "warning", duration = 8)
-              payload
+              cedar_notify_caught("Next Courses", e)
+              NULL
             }
           )
-        }
-        result(payload)
-        payload
-      })
+          if (!is.null(payload) && !is.null(programs)) {
+            # The outcomes stand without the balance check; the page says it is
+            # missing rather than failing the run.
+            payload <- tryCatch(
+              later_course_balance(payload, students, attempts, programs, applicants, student_terms,
+                                   list(data_edges = edges)),
+              error = function(e) {
+                cedar_notify_caught("Instructor balance check unavailable", e, type = "warning", duration = 8)
+                whole <<- FALSE
+                payload
+              }
+            )
+          }
+          payload
+        }),
+        keep = function(value) whole
+      ))
     }
 
     # Run when this view is wanted and its question has changed: another

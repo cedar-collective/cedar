@@ -1626,14 +1626,18 @@ cedar_with_loading <- function(session, id, expr, label = NULL, report_type = NU
 # not, so the next read tries again; and nothing here can store a failed req(),
 # which bindCache() does and which left a page blank for every session (I75).
 # `key` is every input that changes the result, with the result's name first.
-cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache")) {
+# `keep` is asked of a built value: FALSE hands it to this session and stores
+# nothing, for a result that lost a part to a caught error (the session sees
+# what there is and the error; the next reader builds it whole).
+cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache"),
+                                keep = function(value) TRUE) {
   if (is.null(cache)) stop("[ui-helpers.R] cedar_shared_result() needs the app's cache.", call. = FALSE)
   hash <- cedar_content_hash(key)
   held <- cache$get(hash)
   # cachem is shiny's own cache package; its marker tells a miss from a stored value.
   if (!cachem::is.key_missing(held)) return(held)
   value <- build()
-  if (!is.null(value)) cache$set(hash, value)
+  if (!is.null(value) && isTRUE(keep(value))) cache$set(hash, value)
   value
 }
 
@@ -1677,6 +1681,14 @@ cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedu
   # the first job is counted from there, not from this call during startup.
   schedule(function() schedule(function() run(1L), start_after), 0)
   invisible(length(jobs))
+}
+
+# An error a page caught: told to the reader and written to the log. The
+# notice closes by itself, so without the log line a page left empty by a
+# caught error leaves nothing to find afterwards (ISSUES I85).
+cedar_notify_caught <- function(what, e, type = "error", duration = 10) {
+  message("[caught] ", what, ": ", conditionMessage(e))
+  showNotification(paste0(what, ": ", conditionMessage(e)), type = type, duration = duration)
 }
 
 signal_load_complete <- function(session, id, duration_sec = NULL,
