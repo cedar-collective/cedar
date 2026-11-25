@@ -36,7 +36,7 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left with its heading and no step in one local session of 14: two of its steps never ran and the log held no error. Seen once, not reproduced; the caught errors on that path are now logged |
+| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the second session of a just-started process, four times on 2026-11-25. Cause found: the browser-test driver sets the course before the picker's one-time set-up lands, and the set-up empties it. Not a path a reader can take; the driver is not yet fixed |
 | [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25). The module servers are now compiled at start; open for the server function itself, which the second session still compiles (about 3 seconds), because Shiny reads `server.R` itself ([M70](#improvements)) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -54,7 +54,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M72 | Improvement | See [Improvements](#improvements) |
+| M1–M74 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -117,44 +117,65 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I85 — At a Glance was left with no step in one session, and nothing in the log said why
 
-**Status:** open. Seen once, not reproduced. What a recurrence leaves behind
-is in place (below).
-**Found:** 2026-11-25, timing Downstream in the local container for M72.
-**Severity:** medium when it happens: the page keeps its heading and shows no
-step, for good, which is also what "none of the subtabs display anything"
-(I82) looks like.
-**Affects:** `server.R` (Course Dynamics > Downstream),
-`R/modules/later-course.R`.
+**Status:** open. Cause found 2026-11-25, on a traced recurrence: the
+browser-test driver, in the second session of a just-started process. A reader
+cannot take this path. Done when a suite's first session cannot set an input
+before the page's own set-up has landed.
+**Found:** 2026-11-25, timing Downstream in the local container for M72; seen
+three more times the same day, checking the courses built ahead.
+**Severity:** low for readers (none can reach it); medium for the test gate: a
+first suite run after a restart can fail on an empty page.
+**Affects:** `tests/e2e/lib.mjs` (`connect()`, `runAndWait()`),
+`tests/e2e/warmup.mjs`.
 
 ### What was seen
 
-The first session on a container just started (the app took 138 seconds to
-answer, where a restart takes about 85; later in the same run the Docker VM
-had 73 MB of its 3.8 GiB available). Course Dynamics for FYEX 1110 on ABQ and
-EA, Analyze Course, then Downstream:
+The first time: Course Dynamics for FYEX 1110 on ABQ and EA, Analyze Course,
+then Downstream, as the first session after the warm-up on a container just
+started. "Reading the course's outcomes…" ran and the overlay closed;
+"Comparing takers with non-takers…" ran (20 seconds); Next Courses and the
+sequence comparison never ran, and the page went idle with no step drawn. The
+log held no error. Thirteen later sessions opened the same way ran every step.
 
-- "Reading the course's outcomes…" ran (2.2 seconds) and the overlay closed;
-- "Comparing takers with non-takers…" ran next (20 seconds). Next Courses,
-  which every other session runs before it, did not run;
-- the page then went idle with no step drawn. Next Courses and the sequence
-  comparison never ran: `report_timing.csv` has no row for either from that
-  session. The log held no error, and no "Computing next-term persistence"
-  line, which the second step writes when At a Glance is drawn.
+It came back on each of the next three fresh starts, each time in the session
+straight after the warm-up, and never in a later session of the same process.
+One of them was traced in the browser:
 
-Thirteen later sessions opened the same way ran every step, twelve of them
-for the same course and one of those the first session after another restart;
-so did every session of the browser suites run afterwards, across four more
-restarts.
+- the report ran for FYEX 1110 (7.1 seconds in the log) and its outcomes were
+  read (1.4 seconds);
+- when the page went idle the browser's value for the course picker
+  (`cr_course`) was the empty string, and At a Glance held "Select a course
+  and click Analyze Course first, then open this tab.";
+- in another, `runAndWait()` returned before the report had drawn its tabs,
+  and the click on Downstream found no such tab.
 
-### What it is consistent with
+### Cause
 
-Two errors caught on the page: the later-course list's ("Later-course list:
-…", which leaves no later course chosen, so neither later step runs) and At a
-Glance's own ("At a Glance: …", which left the heading with no step). Each was
-told to the reader in a notice that closes after 10 seconds and was written
-nowhere, and the script watching the session did not record notices. Both
-read the whole class list, so running out of memory on a full VM would give
-exactly this pair. That is a guess.
+The course picker gets its choices once a session, from the server
+(`cedar_linked_server_selectize()`, when the link bootstrap arrives), and that
+message leaves the picker empty whatever it held. A reader cannot pick a
+course before it lands: until then the picker has no choices. The driver can,
+because `setInput()` writes the value itself.
+
+A process compiles the server function as its second session starts (about 3
+seconds, M70). The browser shows no busy state while the server has not begun
+to answer, `connect()` reads the quiet page as settled (its own comment names
+the symptom: a picker that still reads "Type to search" and a page on its
+empty state after the analysis ran), and `runAndWait()` gives the server 400 ms
+to say it is busy. So the driver sets the course and clicks Analyze, the
+report runs for that course, and the set-up message then lands and empties the
+picker. The page answers as it does when a reader picks another course
+without analysing it: it asks for a course. Against Non-Takers reads the
+analysed course and so ran the first time; Next Courses and the sequence
+comparison read the picker and did not.
+
+The suite warm-up opens one session (the home page), so the first session of
+any suite run after a restart is that second session. The four occurrences
+were scratch scripts built on `connect()`, `setInput()` and `runAndWait()` as
+the suites are; the committed suites are exposed in the same way.
+
+The earlier guess, two caught errors on a VM out of memory, is withdrawn: the
+traced occurrences had 1.3 GiB free and no `[caught]` line.
 
 ### What changed, so the next one can be read
 
@@ -165,11 +186,23 @@ exactly this pair. That is a guess.
   message, instead of showing a heading over nothing; a summary that is only
   not ready yet waits, as before.
 
+Neither is the fix: no error is raised.
+
 ### Reproduce
 
-None. To look for it: as the first session on a container started while
-memory is short, open Downstream for a course no session has opened since the
-restart (so its steps are built, M72), then `grep '\[caught\]'` in the log.
+Start the app and wait for the `[preload]` lines to stop. Run
+`node tests/e2e/warmup.mjs`, then at once a script that connects to Course
+Dynamics, sets `cr_course`, clicks Analyze Course with `runAndWait()` and
+opens Downstream. Read `Shiny.shinyapp.$inputValues.cr_course` when the page
+is idle: it is empty and At a Glance asks for a course. Run the same script
+again on the same process: five steps.
+
+### Fix (not made)
+
+In the driver. Either the warm-up opens a second session, so a suite's first
+is the process's third, or `connect()` waits for the page's set-up to have
+landed (the picker's choices) and not for a quiet page. Confirm on three
+fresh starts.
 
 ## I84 — The admin browser suite expected the math starting point that was replaced
 
@@ -5174,6 +5207,40 @@ one (the first pass counts). What the step still costs is the comparison
 builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
+**M74 — The projection lock test fails when the machine is busy.**
+Open. `test-projection-refresh.R` (the test that a live build keeps its lock
+and a killed one loses it) starts a second R process that holds the lock with
+a heartbeat every second, sleeps 4 seconds, and expects the lock to be
+refused under a stale limit of 3 seconds; then kills the holder, sleeps 5,
+and expects a takeover. On 2026-11-25 a full `./run-tests.sh` started right
+after a container was removed gave 9,077 passed and 2 failed, both there
+(line 319, "Expected ... to throw a error"; line 328, "Rebuild already
+running", the mirror image). The file alone, minutes later: 82 passed, 0
+failed; the full gate an hour before, on the same code path: 0 failed. A
+heartbeat that arrives a second or two late is enough to flip either
+expectation. Done when the test does not depend on a one-second loop keeping
+to a three-second limit on a loaded machine (a wider limit, or a heartbeat
+the test writes itself), shown by ten runs under load.
+
+**M73 — The development container has about 400 MB to spare, and building courses ahead takes it.**
+Open. The app image runs emulated in a Docker VM of 3.8 GiB on the
+development Mac. On 2026-11-25, seven browser suites in a row (the five
+Course Dynamics suites, Graduation, DFW Rates) against a process that built
+no course ahead passed, with the container at 3.2 GiB after the first suite
+and 3.42 at the most. The same suites against a process that had built two
+courses ahead (2.7 GiB once the build-ahead finished): the R process was
+killed for memory during the DFW Rates suite, at its spring build, the page
+reloaded, and the suite failed with "Execution context was destroyed"
+(`docker inspect --format '{{.State.OOMKilled}}'` gave `true`, and the log
+shows a second start). One run each, so the build-ahead is not shown to be
+the cause; the margin is what is shown. Production's host has 8 GB and is not
+close. On the development machine, `CEDAR_PRELOAD_COURSES=0` in `.env`
+(`.env.example`) builds none ahead, which also makes a restart ready sooner;
+raising Docker's memory is the other way. Done when a development start
+cannot be killed for memory by an ordinary suite run: that setting in the
+developer's `.env`, or a larger VM, and a line in
+`docs/developers/testing.md` saying which.
+
 **M72 — Downstream's three comparisons were built again by every session.**
 Resolved 2026-11-25 (branch `perf/downstream-shared-results`). At a Glance
 runs Next Courses, Against Non-Takers and Prepared for It as Downstream opens,
@@ -5196,9 +5263,10 @@ that day. A course's three results are about 1.1 MB (0.95, 0.12 to 0.25 and
 0.04) of the app's 200 MB cache, which drops the least recently read first.
 Still paid by every session: reading the course's own outcomes (about 2
 seconds, behind the overlay) and drawing At a Glance (about 4, with no wait
-shown: the course's return rates and the page itself). Building the
-most-opened courses ahead at start, so their first reader does not wait
-either, is in ROADMAP's Inbox.
+shown: the course's return rates and the page itself). The ten courses
+analysed most are built ahead at start since 2026-11-25, so their first reader
+does not wait for the three comparisons either
+([built ahead](docs/developers/shiny-modules.md#downstream-for-the-courses-analysed-most)).
 
 **M69 — A soft restart leaves the previous R process running.**
 `restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
