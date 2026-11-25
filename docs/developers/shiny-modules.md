@@ -171,7 +171,7 @@ everyone else using the app at that moment. Where the page opens on the same
 view for everyone, that build is done ahead instead:
 `cedar_preload_shared_results(jobs)`, called at the end of `global.R`, builds a
 list of jobs in the background once the app is running. A job is
-`list(key, build)`.
+`list(key, build)`, with `keep` where the page passes one.
 
 Graduation is the pattern (`R/modules/graduation.R`):
 
@@ -203,9 +203,13 @@ How the runner behaves, and why:
 - Nothing is saved to disk. A saved payload would need a key over the data and
   over every source file that shapes it, and a deploy that forgot one would
   show yesterday's numbers; a result held in the process cannot be stale.
-- The log line for each job (`built`, `already built`, its seconds) is the
-  evidence that the preload ran. A page build that still appears in
+- The log line for each job (its place in the run, `built`, `already built`,
+  `built without a part; not kept`, its seconds) is the evidence that the
+  preload ran, and the last line (`12 of 12`) that it finished. A page build that still appears in
   `report_timing.csv` under the opening scope means the key drifted.
+- **A job whose key waits on an earlier job's result is given as a function
+  that returns the job**, and is made when its turn comes. A function that
+  returns `NULL` has nothing to build; one that fails is a job that failed.
 
 Before adding a page: the preload occupies the process right after every
 start, so add what is slow and opened on a fixed view, and say what it costs.
@@ -218,6 +222,57 @@ DFW Rates is built ahead too, after Graduation (`dfw_rates_payload_job()`,
 `dfw_rates_page_scope()`). Until 2026-11-23 each session built its own copy.
 Its one timed build on production took 12 seconds; on a development machine
 it takes 7 to 16.
+
+### Downstream, for the courses analysed most
+
+Course Dynamics > Downstream is opened for a course the reader picks, so no
+one view can be built ahead for everyone. The courses analysed most are
+(`downstream_preload_jobs()`, `R/modules/later-course.R`), after Graduation
+and DFW Rates:
+
+- **Which courses.** The ten analysed most in the timing log's last 30 days
+  (`downstream_courses_ahead()`, over `most_run_report_values()` in
+  `R/trunk/logging.R`: the `course` of each `course_report` run that did not
+  fail, ties by name). `global.R` writes the list to the log at start. On
+  production, in the 30 days to 2026-11-25, ten courses were 40% of 156 course
+  analyses over 83 courses.
+- **What is built**, five jobs a course, each a turn of its own: the
+  later-course list, Next Courses for the later course the page opens on, the
+  settings Against Non-Takers opens on, that comparison, and the sequence
+  comparison for the same later course. The later course and the settings are
+  read off the results built a turn before, which is why these jobs are made
+  in turn. A course with no later course has nothing to build there.
+- **One function makes the job for both**, as for Graduation:
+  `downstream_course_options_job()`, `later_course_job()`,
+  `course_sequence_job()` (`later-course.R`), `course_cohort_defaults_job()`
+  and `course_cohort_job()` (`course-cohort.R`) give the page and the preload
+  the same key and the same build. The page wraps the build in its overlay and
+  its notice; the preload logs it. What a control opens on is a constant its
+  job's default also reads (`LATER_COURSE_MIN_N`, `COURSE_COHORT_MIN_N`,
+  `COURSE_COHORT_COMPARISON`, `COURSE_SEQUENCE_MIN_N`,
+  `DOWNSTREAM_DEFAULT_WINDOW`), and the campuses are
+  `cedar_course_dynamics_campuses` (`global.R`), which `ui.R` selects.
+- **How many** is `CEDAR_PRELOAD_COURSES` (ten when unset, 0 for none).
+  shiny-server starts its R process with a clean environment, so the value
+  reaches `global.R` only through `entrypoint.sh`, which writes it to the
+  worker's `.Renviron` as it does the instructor password
+  (`test-ci.R` holds both ends).
+
+What it costs, measured 2026-11-25. In the development container (emulated),
+eight courses took 197 seconds, 25 a course; the longest single job, the
+comparison with non-takers, took 11 to 20. On production the page's own
+builds of the same three results took 17 to 21, 8.5 to 10 and 4 to 6 seconds
+for a large course, so ten courses should occupy the process for about six
+minutes after every start (an estimate until a start there is read from the
+log), one job at a time: a click made meanwhile waits for the job running, 20
+seconds at the longest. The ten courses' results are about 11
+MB of the app's 200 MB cache.
+
+What it gives, in the same container with two courses built ahead: both
+opened Downstream in 10 to 11 seconds with one wait shown (the course's own
+outcomes) and no build in `report_timing.csv`; a course not built ahead took
+44.5 seconds behind its three labels. A course outside the list, another
+campus or a changed setting is built when first asked for, as before.
 
 ## URL deep links & shareable state
 

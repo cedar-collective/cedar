@@ -3917,19 +3917,19 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # (R/modules/later-course.R).
   # Shared by every session (cedar_shared_result()): a course's list on a set
   # of campuses is the same for everyone, and reading it follows the whole
-  # class list.
+  # class list. Its job, and the other Downstream results', are made in
+  # R/modules/later-course.R, for this page and for the build ahead at start.
+  cr_downstream_tables <- list(
+    registrations = cr_students, sections = data_objects[["cedar_sections"]],
+    attempts = data_objects[["cedar_attempts"]], programs = data_objects[["cedar_programs"]],
+    applicants = data_objects[["cedar_applicants"]], student_terms = data_objects[["cedar_student_terms"]],
+    dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]])
   cr_downstream_options <- reactive({
     course <- input$cr_course
     req(course, nzchar(course))
-    campus <- if (length(input$cr_campus) > 0) input$cr_campus else NULL
-    cedar_shared_result(list("downstream_course_options", cr_course_id(), campus), function() {
-      get_downstream_course_options(
-        cr_students,
-        data_objects[["cedar_attempts"]],
-        cr_course_id(),
-        list(campus = campus, min_n = 15L, data_edges = data_objects[["cedar_edges"]])
-      )
-    })
+    job <- downstream_course_options_job(
+      cr_downstream_tables, cr_course_id(), if (length(input$cr_campus) > 0) input$cr_campus else NULL)
+    cedar_shared_result(job$key, job$build)
   })
 
   # ── Prepared for It (Course Sequence in code; "Against Students Who Didn't
@@ -3956,7 +3956,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
       info_panel(
         "Settings",
         fluidRow(
-          column(2, numericInput("cr_impact_seq_min_n", "Min students per group:", value = 15, min = 5, max = 100)),
+          column(2, numericInput("cr_impact_seq_min_n", "Min students per group:", value = COURSE_SEQUENCE_MIN_N, min = 5, max = 100)),
           column(2, numericInput("cr_impact_seq_gpa_min", "HS GPA min:", value = NA, min = 0, max = 5, step = 0.1)),
           column(2, numericInput("cr_impact_seq_gpa_max", "HS GPA max:", value = NA, min = 0, max = 5, step = 0.1)),
           column(2, numericInput("cr_impact_seq_act_min", "ACT min:", value = NA, min = 1, max = 36, step = 1)),
@@ -3984,42 +3984,27 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   cr_run_sequence <- function(course_y) {
     cr_impact_sequence_data(NULL)
     window_value <- function(v) if (is.numeric(v) && length(v) == 1L && !is.na(v)) v else NULL
-    opt <- list(
-      course_x    = cr_course_id(),
-      # Both courses by id; the shared picker lists course ids already.
-      course_y    = unique(vapply(course_y, course_id_of, character(1),
-                                  tbl = data_objects[["cedar_sections"]],
-                                  caller = "server.R Course Sequence", USE.NAMES = FALSE)),
-      act_min     = window_value(input$cr_impact_seq_act_min),
-      act_max     = window_value(input$cr_impact_seq_act_max),
-      min_n       = as.integer(input$cr_impact_seq_min_n %||% 15L),
-      hs_gpa_min  = window_value(input$cr_impact_seq_gpa_min),
-      hs_gpa_max  = window_value(input$cr_impact_seq_gpa_max),
-      campus      = if (length(input$cr_campus) > 0) input$cr_campus else NULL
-    )
-
     # Shared by every session (cedar_shared_result()): one pair of courses
-    # under one set of settings is compared once, by the first session to ask,
-    # behind Course Dynamics' own overlay, labelled for this comparison.
+    # under one set of settings is compared once, by the first session to ask
+    # (or ahead, at start, for the courses opened most), behind Course
+    # Dynamics' own overlay, labelled for this comparison.
+    job <- course_sequence_job(
+      cr_downstream_tables, cr_course_id(), course_y,
+      campus = if (length(input$cr_campus) > 0) input$cr_campus else NULL,
+      settings = list(
+        act_min    = window_value(input$cr_impact_seq_act_min),
+        act_max    = window_value(input$cr_impact_seq_act_max),
+        min_n      = input$cr_impact_seq_min_n %||% COURSE_SEQUENCE_MIN_N,
+        hs_gpa_min = window_value(input$cr_impact_seq_gpa_min),
+        hs_gpa_max = window_value(input$cr_impact_seq_gpa_max)))
     cr_impact_sequence_data(cedar_shared_result(
-      list("course_sequence", opt),
+      job$key,
       function() cedar_with_loading(session, "cr", label = "Building the sequence comparison…",
                                     report_type = "course_sequence", {
-        tryCatch(
-          get_course_sequence_effect(
-            students     = cr_students,
-            attempts     = data_objects[["cedar_attempts"]],
-            programs     = data_objects[["cedar_programs"]],
-            applicants   = data_objects[["cedar_applicants"]],
-            opt          = opt,
-            student_terms = data_objects[["cedar_student_terms"]],
-            data_edges   = data_objects[["cedar_edges"]]
-          ),
-          error = function(e) {
-            cedar_notify_caught("Sequence analysis failed", e)
-            NULL
-          }
-        )
+        tryCatch(job$build(), error = function(e) {
+          cedar_notify_caught("Sequence analysis failed", e)
+          NULL
+        })
       })
     ))
   }

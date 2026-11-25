@@ -1259,6 +1259,36 @@ tp_attempts <- keyed_attempts(cedar_registrations_tp, tp01_edges)
 # TP01's two reviewed merges, read as the app reads topic_titles.csv.
 tp_topic_titles <- validate_topic_titles(cedar_topic_titles_tp)
 
+# ── test-logging.R ──────────────────────────────────────────────────────────────
+
+# Rows of the timing log, as most_run_report_values() reads them. For report
+# "course_report" and field "course", since 2026-11-01:
+#   HIST 1110  3   two runs and one with no success recorded (an older row);
+#                  a fourth is from October
+#   BIOL 1140  2   ties with CHEM 1215 and comes first, by name
+#   CHEM 1215  2   a third run failed: counted, it would tie with HIST 1110
+#                  and come first
+#   ENGL 1110  1   on 2026-11-01 itself: the date is inside
+# With no date, HIST 1110 has 4.
+# Naming no course to count: a dept_dashboard run that names one, a row whose
+# parameters are not JSON (the one row reported), a run naming two courses,
+# and a run with no parameters.
+.timing_log_rows <- data.frame(
+  timestamp = c(
+    "2026-11-20 10:00:00", "2026-11-21 10:00:00", "2026-11-22 10:00:00", "2026-11-22 11:00:00",
+    "2026-10-15 10:00:00", "2026-11-05 10:00:00", "2026-11-06 10:00:00", "2026-11-07 10:00:00",
+    "2026-11-08 10:00:00", "2026-11-01 00:00:05", "2026-11-10 10:00:00", "2026-11-11 10:00:00",
+    "2026-11-12 10:00:00", "2026-11-13 10:00:00"),
+  report_type = c(rep("course_report", 10L), "dept_dashboard", rep("course_report", 3L)),
+  report_params = c(
+    '{"course":"HIST 1110"}', '{"course":"HIST 1110"}', '{"course":"HIST 1110"}', '{"course":"CHEM 1215"}',
+    '{"course":"HIST 1110"}', '{"course":"CHEM 1215"}', '{"course":"CHEM 1215"}', '{"course":"BIOL 1140"}',
+    '{"course":"BIOL 1140"}', '{"course":"ENGL 1110"}', '{"course":"MATH 1220","dept":"MATH"}',
+    '{course: FYEX 1110', '{"course":["PHYS 1230","PHYS 1240"]}', NA),
+  success = c(1L, 1L, NA, 0L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L),
+  stringsAsFactors = FALSE
+)
+
 # ── test-later-course.R ─────────────────────────────────────────────────────────
 
 # DS01's attempt table, built to its edges (graded through Summer 2022).

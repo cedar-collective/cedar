@@ -21,6 +21,9 @@ services:
     # results stay closed and the page says so (ISSUES.md I55).
     environment:
       CEDAR_DFW_PASSWORD: ${CEDAR_DFW_PASSWORD:-}
+      # How many of the most-analysed courses have Course Dynamics > Downstream
+      # built ahead at start (global.R). 0 turns it off, for a small machine.
+      CEDAR_PRELOAD_COURSES: ${CEDAR_PRELOAD_COURSES:-10}
     volumes:
       - ${CEDAR_DATA_DIR}:/srv/shiny-server/cedar/data
       # Public catalog archives stay separate from Banner data. The app reads

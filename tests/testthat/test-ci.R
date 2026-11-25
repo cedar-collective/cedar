@@ -186,3 +186,18 @@ test_that("the instructor-gate password is handed from .env to the Shiny worker"
   expect_true(any(grepl('worker_renviron="$HOME/.Renviron"', entrypoint, fixed = TRUE)))
   expect_lt(writes, starts)
 })
+
+test_that("the count of courses built ahead is handed from the environment to the Shiny worker", {
+  # As the password above: a variable Compose passes to the container reaches
+  # global.R only if the entrypoint writes it where the worker's R reads it.
+  # Without that the app builds ten ahead whatever the environment says.
+  compose <- readLines(file.path(cedar_base_dir, "docker-compose.yml"))
+  expect_length(grep("^      CEDAR_PRELOAD_COURSES: \\$\\{CEDAR_PRELOAD_COURSES:-10\\}$", compose), 1L)
+  entrypoint <- readLines(file.path(cedar_base_dir, "entrypoint.sh"))
+  writes <- grep('printf "CEDAR_PRELOAD_COURSES=%s\\n"', entrypoint, fixed = TRUE)
+  starts <- grep("^exec /usr/bin/shiny-server", entrypoint)
+  expect_length(writes, 1L)
+  expect_lt(writes, starts)
+  global <- readLines(file.path(cedar_base_dir, "global.R"))
+  expect_length(grep('Sys.getenv("CEDAR_PRELOAD_COURSES", "10")', global, fixed = TRUE), 1L)
+})
