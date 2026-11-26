@@ -22,9 +22,14 @@
 // Prints, and does not hold, each session's whole start. The sessions after
 // the second differ among themselves by a second and a half (4.2 to 5.9
 // seconds, 2026-11-25), which is as much as the first session still adds
-// (ISSUES M75), so no allowance separates the two.
+// (ISSUES M75), so no allowance separates the two. It keeps them, though: the
+// run is added to a history on this machine and printed beside the last run
+// on other code (lib.mjs, "What a start took last time").
 
-import { launch, connect, setInput, waitForIdle, sessionStart } from './lib.mjs';
+import {
+  launch, connect, setInput, waitForIdle, sessionStart,
+  startHistoryFile, checkedOutCode, readStartHistory, recordStarts, lastRunOnOtherCode, compareStarts,
+} from './lib.mjs';
 
 const SESSIONS = 6;
 // From the websocket opening to the page's first busy state, held to the
@@ -36,12 +41,14 @@ const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
 
 const waited = [];
+const started = [];
 for (let n = 1; n <= SESSIONS; n++) {
   const { browser, page } = await launch({ width: 1200, height: 900 });
   try {
     await connect(page, { tab: 'home', timeout: 300000 });
     const at = await sessionStart(page);
     waited.push(at.busy - at.connected);
+    started.push(at.started);
     console.log(`     session ${n}: started ${at.started.toFixed(1)} s after it was opened; ` +
       `the server began ${(at.busy - at.connected).toFixed(1)} s after the connection`);
 
@@ -62,6 +69,17 @@ for (const n of [1, 2]) {
   ok(waited[n - 1] <= allowed,
     `session ${n}: the server began ${waited[n - 1].toFixed(1)} s after the connection; ` +
     `for the four after it, ${later.map((x) => x.toFixed(1)).join(', ')} s (allowed ${allowed.toFixed(1)} s)`);
+}
+
+// A run whose checks failed is not one to compare a later run with.
+if (!fail.length) {
+  const round = (xs) => xs.map((x) => Math.round(x * 100) / 100);
+  const file = startHistoryFile();
+  const now = { at: new Date().toISOString(), code: checkedOutCode(), started: round(started), began: round(waited) };
+  const before = lastRunOnOtherCode(readStartHistory(file), now.code, SESSIONS);
+  recordStarts(file, now);
+  console.log('');
+  for (const line of compareStarts(now, before)) console.log(`     ${line}`);
 }
 
 if (fail.length) { console.log(`\n${fail.length} failed`); process.exit(1); }

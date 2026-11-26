@@ -192,7 +192,9 @@ The whole start is printed and not held. Sessions after the second differ by
 a second and a half among themselves, about one in four taking that much
 longer, which is as much as the first session still adds (ISSUES M75);
 compiling every function at start cost 33 seconds and changed neither. Run it
-alone: a second heavy job on the machine moves every number.
+alone: a second heavy job on the machine moves every number. What it prints
+is kept, and shown beside the last run on other code
+([what is held, and what is only printed](performance-monitoring.html#what-is-held-and-what-is-only-printed)).
 
 ## E2E rules — the four that cause every flake
 
