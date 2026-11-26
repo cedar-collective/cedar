@@ -168,10 +168,21 @@ profile; the rows are there all the same. The wrapper's own call is
 `server_main.R#…`, and every other file keeps its name.
 
 - **Compare sessions line by line.** What a process does once shows as lines
-  the first session's profile has and the second's has not. On 2026-11-25 the
-  first session sampled 4.3 seconds inside the server function against 2.0
-  and 2.1 for the next two, and 1.3 of the difference sat on one line
-  (ISSUES M75).
+  the first session's profile has and the second's has not. That is how the
+  Headcount module's choices, built by the first session and read by the
+  rest, were found (ISSUES M75).
+- **Compare like with like, and more than one process.** The first reading
+  of M75 set a process that had also built ten courses ahead beside ones that
+  had not, and took one run for the size of the saving: two seconds, where
+  three processes before and three after gave a third of one.
+- **A profile names a file by its base name.** `headcount.R#195` is a line of
+  `R/modules/headcount.R` or of `R/branches/headcount.R`; open both before
+  saying what a line is. M75's first reading took a line of the branch for
+  the module's download control.
+- **A stall in an unlikely place may be a garbage collection.** The recipe's
+  `Rprof()` does not record collections, so a second spent collecting is
+  given to whatever was running: `paste0()`, the creation of one observer.
+  `Rprof(gc.profiling = TRUE)` shows it as `<GC>`.
 - **The container runs the source its image was built with** (all of it but
   the `server.R` mounted here). Rebuild the image first, or mount the checkout
   as `compose.dev.yml` does.
@@ -182,6 +193,9 @@ profile; the rows are there all the same. The wrapper's own call is
   ends the first one's file.
 - **Wait for the build-ahead's last `[preload]` line** in the container's log
   before opening the page, or a job of the build-ahead is measured with it.
+  Shiny Server starts the R process on the first request, so a container
+  just started or restarted logs nothing until the page is asked for:
+  request it (`curl`), then wait.
 - **A process's first session costs more than its later ones** (ISSUES M75).
   Profile the first for what a restart adds, and the third for what every
   reader pays.

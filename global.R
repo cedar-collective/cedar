@@ -548,6 +548,10 @@ cedar_course_dynamics_campuses <- intersect(
 # they are counted from (cedar_preload_shared_results(), R/modules/ui-helpers.R).
 # DFW Rates opens on one view too (12 seconds on production), and is built
 # after Graduation: the jobs run one at a time.
+# Headcount's program choices with nothing picked are asked for by every
+# session as it starts, on whatever page it opened (the module's set-up fills
+# its pickers). They are built first: about a second, and the first session of
+# a process otherwise counts them itself (headcount_preload_jobs(), ISSUES M75).
 # Course Dynamics > Downstream is opened for a course the reader picks, so no
 # one view can be built ahead for everyone; the courses analysed most in the
 # last month are, after the two pages above (downstream_preload_jobs(),
@@ -564,6 +568,7 @@ cedar_preload_courses <- downstream_courses_ahead(read_report_timings(), cedar_p
 message("[global.R] Downstream built ahead for: ",
         if (length(cedar_preload_courses) > 0L) paste(cedar_preload_courses, collapse = ", ") else "no course")
 cedar_preload_shared_results(c(
+  headcount_preload_jobs(data_objects[["cedar_programs"]], data_objects[["cedar_dims"]]),
   graduation_preload_jobs(
     list(student_terms = data_objects[["cedar_student_terms"]], programs = data_objects[["cedar_programs"]],
          degrees = data_objects[["cedar_degrees"]], terms = data_objects[["cedar_terms"]],
