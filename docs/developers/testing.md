@@ -392,17 +392,75 @@ grepl("cedar-subtab-title", h)                   # assert what should have rende
 
 ### Prove a new test catches the bug
 
-A test written alongside a fix often passes for the wrong reason. Reintroduce
-the bug and confirm it fails; this is mandatory for a guard on a join key, a
-grouping grain or a dedup:
+A test written alongside a fix often passes for the wrong reason: the fixture
+is single-valued on the axis the bug needed, or the assertion reads something
+the bug never touched. Put the bug back and see the test fail. This is
+mandatory for a guard on a join key, a grouping grain or a dedup, and worth
+doing for every line a fix or a rewrite changed.
+
+`scripts/check-test-catches.R` does it from a list of breaks, each one piece
+of text in one file and the tests that should then fail:
+
+```yaml
+- name: the scope joined on the student alone
+  file: R/cones/course-band-dfw.R
+  old: 'by = c("student_id", "term")'
+  new: 'by = "student_id"'
+  tests: [test-course-band-dfw.R]
+- name: the enrolled filter dropped
+  file: R/branches/student-terms.R
+  old: |-
+    rows <- student_terms %>% filter(enrolled)
+  new: |-
+    rows <- student_terms
+  tests: [test-student-terms.R, test-return-rates.R]
+```
 
 ```bash
-cp R/cones/thing.R /tmp/thing.bak
-# revert the fix by hand
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect FAIL
-cp /tmp/thing.bak R/cones/thing.R
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect PASS
+Rscript --vanilla scripts/check-test-catches.R /path/to/breaks.yml
 ```
+
+```
+2 breaks against 3 test files, in a copy of the tree. The checkout is not edited.
+
+As the tree stands: test-course-band-dfw.R passes (9 tests).
+…
+1. the scope joined on the student alone  [R/cones/course-band-dfw.R]
+   CAUGHT by test-course-band-dfw.R:
+     BD02: the students read are those of the level and home campus asked for
+
+2. the enrolled filter dropped  [R/branches/student-terms.R]
+   CAUGHT by test-student-terms.R:
+     RS01: a scope is the enrolled student-terms of a level and a home campus
+   NOT CAUGHT: test-return-rates.R passes with the break in place.
+
+2 of 2 breaks caught.
+```
+
+- **The checkout is never edited.** The script copies the tree (what git
+  tracks, plus new files git does not ignore) to a temporary directory, runs
+  the named tests there as the tree stands, and breaks only the copy. So an
+  interrupted run leaves nothing to restore, uncommitted work is safe, a
+  container that mounts the checkout never sees a break, and no `_problems/`
+  is left behind.
+- **`old` must be in the file exactly once**; write enough of the line to make
+  it so. A `|` block ends with a line break and `|-` does not.
+- **A test that fails as the tree stands stops the run**: under a break its
+  failure would prove nothing.
+- **Each run has a time limit** (`--timeout`, 300 seconds; an entry may carry
+  its own `timeout`). A break can send code somewhere slow: one once started a
+  projection build and ran eight minutes. Past the limit is not a catch.
+- **A break is caught when a test fails or errors with it in place.** If the
+  test file cannot run at all (the break stops the suite's set-up), no test is
+  shown to hold it, and it is reported as stopped, with R's error.
+- Exit status 0 when every break is caught, 1 when one is not, 2 when the
+  breaks file cannot be used.
+
+A break that is not caught means the fixture cannot express the bug: add the
+row that can to `fixtures/scenario_tables.R` and run it again. The breaks file
+is a working note. Keep it out of the repository (the text it matches goes
+stale with the next edit) and list the breaks, and how many were caught, in
+the pull request.
 
 ### After a failing run
 
