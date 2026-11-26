@@ -717,12 +717,15 @@ test_that("the Enrollment table's display keeps one column order for each grain"
 test_that("Enrollment term filter opens on the shared configured default term", {
   # global.R resolves cedar_default_term once so every term picker opens on the
   # same term; the resolution itself is covered in test-utils.R. This pins the
-  # Enrollment picker to that shared default rather than a tab-local choice.
+  # Enrollment bar to that shared default rather than a tab-local choice: its
+  # scope inputs are built by cedar_section_scope_inputs() with
+  # cedar_default_term, and test-scope-bar.R holds that the builder opens the
+  # term input on the term it is given.
   ui_source <- paste(readLines("../../ui.R", warn = FALSE), collapse = "\n")
   term_filter <- regmatches(
     ui_source,
     regexpr(
-      'inputId = "enrl_term"[\\s\\S]{0,500}selected = as.character\\(cedar_default_term\\)',
+      'cedar_section_scope_inputs\\(\\s*identity, "enrl", cedar_sections, \\.dept_choices, cedar_default_term,',
       ui_source,
       perl = TRUE
     )

@@ -721,6 +721,48 @@ cedar_section_scope_inputs <- function(ns, prefix, sections, dept_choices,
   lapply(fields, function(field) column(col_width(field), input_for(field)))
 }
 
+# ── Folded thresholds ────────────────────────────────────────────────────────
+# A page's thresholds are a reader's adjustment, not a filter: they stay folded
+# under one line that says whether the standard values are in force, so a
+# shared link that changed one is visible while closed (ISSUES M43). A link
+# still restores them: hidden inputs keep binding.
+#   state_id  the id (ns() applied) of the line's state, a text output the
+#             server fills with cedar_threshold_state().
+#   ...       the row's columns, one per threshold input.
+cedar_threshold_fold <- function(state_id, ..., title = "Adjust thresholds") {
+  tags$details(
+    class = "cedar-scope-details cedar-threshold-details",
+    tags$summary(
+      tags$span(class = "filter-context-title", title),
+      tags$span(class = "cedar-scope-details-hint", textOutput(state_id, inline = TRUE))
+    ),
+    fluidRow(...)
+  )
+}
+
+# What the closed line says: "standard values", or each value that differs
+# from its standard one, in `labels` order.
+#   values    the inputs' values, named like `labels`; a blank one (NULL or
+#             NA) is not a change.
+#   standard  the standard value of each, named alike.
+#   labels    each threshold's name for a reader.
+cedar_threshold_state <- function(values, standard, labels) {
+  unknown <- setdiff(names(labels), names(standard))
+  if (is.null(names(labels)) || length(unknown) > 0) {
+    stop("cedar_threshold_state(): every label is named by a threshold with a standard value",
+         if (length(unknown) > 0) paste0(" (none for ", paste(unknown, collapse = ", "), ")"), ".")
+  }
+  changed <- Filter(function(key) {
+    value <- values[[key]]
+    length(value) == 1 && !is.na(value) &&
+      !isTRUE(all.equal(as.numeric(value), as.numeric(standard[[key]])))
+  }, names(labels))
+  if (length(changed) == 0) return("standard values")
+  paste0("changed: ", paste(vapply(changed, function(key) sprintf(
+    "%s %s (standard %s)", labels[[key]], values[[key]], standard[[key]]), character(1)),
+    collapse = "; "))
+}
+
 # Light green scope strip shown at the bottom of a filter bar.
 filter_scope_stripe <- function(...) {
   div(class = "filter-scope-strip", ...)

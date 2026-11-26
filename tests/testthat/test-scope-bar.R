@@ -91,3 +91,17 @@ test_that("the scope inputs stop on a field they do not make, or a table without
                                           c(History = "HIST")),
                "needs sections column\\(s\\): part_term")
 })
+
+test_that("a folded threshold line says the standard values are in force, or names each one changed", {
+  standard <- c(lower = 12, upper = 12, min_enrl = 1)
+  labels <- c(lower = "Lower division", upper = "Upper division", min_enrl = "Smallest section listed")
+  expect_equal(cedar_threshold_state(list(lower = 12, upper = 12L, min_enrl = 1), standard, labels),
+               "standard values")
+  expect_equal(cedar_threshold_state(list(lower = 15, upper = 12, min_enrl = 0), standard, labels),
+               "changed: Lower division 15 (standard 12); Smallest section listed 0 (standard 1)")
+  # An input still blank (not yet bound, or cleared) is not a change.
+  expect_equal(cedar_threshold_state(list(lower = NA, upper = NULL, min_enrl = 1), standard, labels),
+               "standard values")
+  expect_error(cedar_threshold_state(list(grad = 5), standard, c(grad = "Graduate")),
+               "none for grad")
+})
