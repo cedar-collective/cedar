@@ -273,8 +273,9 @@ try {
 
   // Where the sections sit: the classes semester by semester, then year by
   // year; the two summer sections together; every heading once.
-  const headings = await page.evaluate(() => [...document.querySelectorAll('.tab-pane.active .cedar-dashboard-section-title')]
-    .map((h) => h.innerText.trim()));
+  // This page's own pane: another page's open sub-tab is an active pane too.
+  const headings = await page.evaluate((id) => [...document.getElementById(id).closest('.tab-pane')
+    .querySelectorAll('.cedar-dashboard-section-title')].map((h) => h.innerText.trim()), `${NS}overall_plot`);
   const at = (title) => headings.indexOf(title);
   ok(at('Each Entering Class, Semester by Semester') >= 0 &&
      at('Still Here, and Moving Forward?') === at('Each Entering Class, Semester by Semester') + 1,
