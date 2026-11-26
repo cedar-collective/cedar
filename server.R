@@ -1890,7 +1890,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
     cr_load_tab(input$cr_tabs)
   }, ignoreInit = TRUE)
 
-  # Course Dynamics > Section Plan reads the saved bundles Registration >
+  # Course Dynamics > Section Plan reads the saved bundles Courses >
   # Projections reads, one per published target term, through the same loader
   # and view (enrollment-projections.md: Shiny never fits a model). Each file is
   # read once per session; a bundle this build cannot read is reported and left

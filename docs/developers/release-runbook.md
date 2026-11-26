@@ -141,7 +141,7 @@ nginx setup and marker-file behavior.
 
 ### Projection artifact
 
-For a release that includes Registration > Projections, publish the validated
+For a release that includes Courses > Projections, publish the validated
 latest bundle on the host before restarting the app. `docker-compose.yml`
 mounts the gitignored repository `output/` directory read-only:
 
