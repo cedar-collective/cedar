@@ -433,9 +433,7 @@ test_that("legacy custom test runners stay retired", {
 test_that("tests do not wait a fixed time, and the waits there are do not grow", {
   r_tests <- list.files(file.path(cedar_base_dir, "tests", "testthat"), "\\.R$",
                         recursive = TRUE, full.names = TRUE)
-  in_r <- architecture_count_by_file(r_tests, function(file) {
-    sum(gregexpr("\\bSys\\.sleep\\(", read_code(file), perl = TRUE)[[1]] > 0L)
-  })
+  in_r <- architecture_count_matches(r_tests, "\\bSys\\.sleep\\(")
   architecture_expect_ratchet(in_r, c(
     # set_file_time_back(): set, wait, look, up to 20 times.
     "tests/testthat/helper-projection-refresh.R" = 1L,
@@ -551,10 +549,7 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
     r_files_under("R"),
     file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
   )
-  measured <- architecture_count_by_file(files, function(file) {
-    hits <- gregexpr("alert alert-info|alert-box alert-box--info", read_code(file))[[1]]
-    sum(hits > 0L)
-  })
+  measured <- architecture_count_matches(files, "alert alert-info|alert-box alert-box--info")
   # Measured 2026-11-14. Lower a number when you fold one away; never raise one.
   allowance <- c(
     "R/modules/cancellations.R" = 1L,
@@ -568,6 +563,237 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
     "ui.R" = 1L
   )
   architecture_expect_ratchet(measured, allowance, "open blue box(es)")
+})
+
+test_that("the counters leave out a comment and a stated exception, and count the rest", {
+  file <- architecture_scratch_file(architecture_latest_term_lines)
+  latest <- architecture_latest_term_pattern
+  expect_equal(unname(architecture_count_lines(file, latest)), 5L)
+  expect_equal(unname(architecture_count_lines(file, latest, marker = "MAX-TERM-OK:")), 3L)
+  expect_equal(unname(architecture_count_matches(file, latest)), 6L)
+})
+
+test_that("inline styles given a fixed string do not grow, and the backlog shrinks on record (M17)", {
+  # AGENTS.md: shared UI helpers and CSS classes only. A `style =` given a
+  # fixed string is a class waiting for a name, and a colour in one does not
+  # follow dark mode. A style built from a value (a bar's width) is not
+  # counted: the value has to be written somewhere.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
+  )
+  measured <- architecture_count_matches(files, "\\bstyle\\s*=\\s*[\"']")
+  # Measured 2026-11-26. Lower a number when you move one to a class; never raise one.
+  allowance <- c(
+    "R/features/dept-dashboard.R" = 1L,
+    "R/modules/dept-trends.R" = 10L,
+    "R/modules/gen-ed.R" = 3L,
+    "R/modules/headcount.R" = 2L,
+    "R/modules/pathways.R" = 4L,
+    "R/modules/regstats.R" = 7L,
+    "R/modules/retention.R" = 3L,
+    "R/modules/ui-helpers.R" = 3L,
+    "server.R" = 61L,
+    "ui.R" = 8L
+  )
+  architecture_expect_ratchet(measured, allowance, "inline style(s) given a fixed string")
+})
+
+test_that("bare headings do not grow, and the backlog shrinks on record (M18)", {
+  # AGENTS.md: a section is subtab_header(), dashboard_section() or
+  # dashboard_subsection(), each with its sentence and its method slot; never
+  # a bare h3() to h6(). The helpers' own file is where a heading tag is
+  # written.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
+  )
+  files <- files[!grepl("/R/modules/ui-helpers\\.R$", files)]
+  measured <- architecture_count_matches(files, "(?<![\\w.])h[3-6]\\(")
+  # Measured 2026-11-26. Lower a number when you give one its section; never raise one.
+  allowance <- c(
+    "R/modules/enrollment-projections.R" = 1L,
+    "R/modules/gen-ed.R" = 4L,
+    "R/modules/instructor-gate.R" = 2L,
+    "R/modules/pathways.R" = 3L,
+    "R/modules/retention.R" = 1L,
+    "server.R" = 22L,
+    "ui.R" = 4L
+  )
+  architecture_expect_ratchet(measured, allowance, "bare heading(s)")
+})
+
+test_that("colours written into R code do not grow, and the backlog shrinks on record (M58)", {
+  # AGENTS.md: every colour is a token with a light and a dark value, and a
+  # chart's colours come from build_color_map(), CEDAR_PALETTE or
+  # CEDAR_SEMANTIC_COLORS. Their file, R/trunk/utils.R, is the one place a
+  # hex value is written; one written anywhere else stays as it was drawn for
+  # a white page.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
+  )
+  files <- files[!grepl("/R/trunk/utils\\.R$", files)]
+  measured <- architecture_count_matches(
+    files, "#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9A-Za-z_-])")
+  # Measured 2026-11-26. Lower a number when you move one to a token or the palette; never raise one.
+  allowance <- c(
+    "R/branches/credit-hours.R" = 2L,
+    "R/cones/cancellations.R" = 1L,
+    "R/cones/concurrent-courses-by-major.R" = 3L,
+    "R/cones/course-neighbors.R" = 3L,
+    "R/cones/pathway.R" = 1L,
+    "R/cones/population-trend.R" = 6L,
+    "R/features/course-report.R" = 5L,
+    "R/features/dept-dashboard.R" = 3L,
+    "R/features/dept-trends.R" = 1L,
+    "R/features/dfw-dashboard-view.R" = 2L,
+    "R/features/registration-watch.R" = 2L,
+    "R/modules/cancellations.R" = 12L,
+    "R/modules/dept-trends.R" = 1L,
+    "R/modules/gen-ed.R" = 1L,
+    "R/modules/pathways.R" = 21L,
+    "R/modules/regstats.R" = 29L,
+    "R/modules/retention.R" = 12L,
+    "R/modules/ui-helpers.R" = 5L,
+    "server.R" = 13L
+  )
+  architecture_expect_ratchet(measured, allowance, "colour(s) written as a hex value")
+})
+
+test_that("a max(term) is a stated latest term, or it does not grow (M3)", {
+  # AGENTS.md, Right edges: never bound an analysis with max(term); the edges
+  # are cedar_report_edges()'s, computed in R/branches/data-edges.R. A
+  # student's or a group's own latest term is not an edge: say so with
+  # MAX-TERM-OK: and the reason, on the line or within three above, and it is
+  # not counted. What is counted is every max(term) and slice_max(term)
+  # nobody has yet called one or the other.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R", "ui.R"))
+  )
+  files <- files[!grepl("/R/branches/data-edges\\.R$", files)]
+  measured <- architecture_count_lines(files, architecture_latest_term_pattern, marker = "MAX-TERM-OK:")
+  # Measured 2026-11-26. Lower a number when you mark one or replace it with an edge; never raise one.
+  allowance <- c(
+    "R/branches/course-topics.R" = 1L,
+    "R/branches/courses.R" = 4L,
+    "R/branches/enrl.R" = 6L,
+    "R/branches/enrollment-projection-context.R" = 2L,
+    "R/branches/enrollment-projection-inputs.R" = 2L,
+    "R/branches/population.R" = 8L,
+    "R/branches/retention-context.R" = 1L,
+    "R/cones/cancellations.R" = 1L,
+    "R/cones/concurrent-courses-by-major.R" = 1L,
+    "R/cones/course-offering-pattern.R" = 2L,
+    "R/cones/course-topics.R" = 1L,
+    "R/cones/exit-credits.R" = 2L,
+    "R/cones/gen-ed-conversion.R" = 2L,
+    "R/cones/gen-ed-grads.R" = 2L,
+    "R/features/admin.R" = 2L,
+    "R/features/course-report.R" = 2L,
+    "R/features/course-topics.R" = 1L,
+    "R/features/dept-dashboard.R" = 4L,
+    "R/features/dept-trends.R" = 1L,
+    "R/features/dfw-dashboard.R" = 1L,
+    "R/features/graduation-dashboard.R" = 1L,
+    "R/features/retention-dashboard.R" = 3L,
+    "R/modules/pathways.R" = 4L
+  )
+  architecture_expect_ratchet(measured, allowance, "max(term) with no MAX-TERM-OK: reason")
+})
+
+test_that("readers that classify the class list themselves do not grow (M53)", {
+  # A grade-reading analysis reads cedar_attempts, classified once by the
+  # transform. classify_enrollment_outcomes() (R/trunk/utils.R) is for where
+  # no attempts table exists.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R"))
+  )
+  files <- files[!grepl("/R/trunk/utils\\.R$", files)]
+  measured <- architecture_count_matches(files, "\\bclassify_enrollment_outcomes\\(")
+  # Measured 2026-11-26. Lower a number when you move a reader to cedar_attempts; never raise one.
+  allowance <- c(
+    # Projection model source: moving it rebuilds both bundles.
+    "R/branches/enrollment-projection-inputs.R" = 1L,
+    # Runs in the transform before cedar_attempts exists.
+    "R/branches/student-terms.R" = 1L,
+    "R/cones/course-outcomes.R" = 1L,
+    "R/cones/stopout.R" = 1L
+  )
+  architecture_expect_ratchet(measured, allowance, "call(s) of classify_enrollment_outcomes()")
+})
+
+test_that("a DFW count divided by hand does not grow (M54)", {
+  # AGENTS.md: DFW counts and rates come from summarize_attempt_outcomes()
+  # (get_course_outcome_rates() for a course page), which owns the floor and
+  # leaves rounding to the display. Counted: a line that divides a name
+  # holding `dfw` (turning a percent into a share, `/ 100`, is not one). The
+  # pattern cannot tell a rate from a statistic built on one (a standard
+  # error, a z score), so today's few of those are in the allowances too.
+  # A rate over counts that are not attempts rows has no shared helper yet:
+  # the next one writes it (ISSUES M54), not one more copy.
+  files <- c(
+    r_files_under("R"),
+    file.path(cedar_base_dir, c("global.R", "server.R"))
+  )
+  measured <- architecture_count_lines(files, "dfw[A-Za-z0-9_.]*\\)?\\s*/(?!\\s*100\\b)")
+  # Measured 2026-11-26. Lower a number when you move one to the helper; never raise one.
+  allowance <- c(
+    # The share of a student's courses that were DFW, not a course's rate.
+    "R/branches/course-attempts.R" = 1L,
+    # Projection model source, as is enrollment-projection-inputs.R.
+    "R/branches/enrollment-projection-history.R" = 2L,
+    "R/branches/enrollment-projection-inputs.R" = 1L,
+    # A standard error and a z score built on a rate.
+    "R/cones/course-pair-dfw.R" = 2L,
+    "R/cones/course-sequence-effect.R" = 5L,
+    "R/cones/course-similar-students.R" = 1L,
+    # One is a course's share of the DFWs.
+    "R/cones/dfw-course-board.R" = 2L,
+    # One is a variance built on a rate.
+    "R/cones/dfw-section-spread.R" = 4L,
+    "R/cones/downstream-outcomes.R" = 1L,
+    "R/cones/stopout.R" = 2L,
+    "R/features/course-report.R" = 1L,
+    "R/features/course-topics.R" = 2L,
+    "R/features/dfw-dashboard-view.R" = 1L,
+    "R/features/gen-ed.R" = 1L
+  )
+  architecture_expect_ratchet(measured, allowance, "line(s) dividing a DFW count by hand")
+})
+
+test_that("a student scope written by hand does not grow (M76)", {
+  # scope_student_terms() (R/branches/student-terms.R) is the enrolled
+  # student-terms of a level and a home campus. Counted: a line in a branch,
+  # a cone or a feature that tests student_level or student_campus against an
+  # option. Each copy decides for itself what an unenrolled row or a missing
+  # level means. The pattern cannot tell student-terms from declarations
+  # (cedar_programs), which carry the same two columns, so the branches that
+  # scope declarations are in the allowances with that said.
+  files <- c(r_files_under("R", "branches"), r_files_under("R", "cones"), r_files_under("R", "features"))
+  files <- files[!grepl("/R/branches/student-terms\\.R$", files)]
+  measured <- architecture_count_lines(files, "student_(?:level|campus)\\s*%in%\\s*(?:opt\\$|\\.env\\$)")
+  # Measured 2026-11-26. Lower a number when you move one to scope_student_terms(); never raise one.
+  allowance <- c(
+    # Scopes declarations (cedar_programs).
+    "R/branches/headcount.R" = 1L,
+    # Scopes declarations (cedar_programs).
+    "R/branches/major-change-detection.R" = 1L,
+    # Scopes declarations (cedar_programs): what build_population() is for.
+    "R/branches/population.R" = 4L,
+    "R/branches/retention-context.R" = 2L,
+    "R/cones/course-cohort-effect.R" = 1L,
+    "R/cones/course-similar-students.R" = 1L,
+    "R/cones/credit-ceiling.R" = 2L,
+    "R/cones/exit-credits.R" = 4L,
+    "R/cones/return-rates.R" = 2L,
+    "R/cones/summer-finishers.R" = 2L,
+    "R/features/course-cohort-context.R" = 2L,
+    "R/features/retention-dashboard.R" = 2L
+  )
+  architecture_expect_ratchet(measured, allowance, "level or home-campus scope(s) written by hand")
 })
 
 test_that("scope bars hold facts, never an explanation row", {
