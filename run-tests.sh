@@ -138,7 +138,7 @@ plan_from_changes() {
       global.R|entrypoint.sh)
         need_r=1; need_fresh=1; only_docs=0; reason="how the app starts -> R suite + first sessions" ;;
       # Everything else under R/ plus the fixtures is pure computation.
-      R/*|tests/testthat/*|config/*|app.R|setup.R)
+      R/*|tests/testthat/*|config/*|setup.R)
         need_r=1; only_docs=0; reason="computation -> R suite" ;;
       docs/*|*.md)
         reason="docs only" ;;

@@ -88,8 +88,7 @@ cedar/
 ├── tests/              # Test suite (testthat + e2e browser tests)
 ├── global.R            # Runs once as the app starts: data, functions, then ui.R and server.R
 ├── ui.R                # Shiny UI; Shiny reads it itself for the first request
-├── server.R            # Shiny server; Shiny reads it itself and runs what its last line returns
-└── app.R               # Not used: with a server.R beside it, Shiny never reads app.R
+└── server.R            # Shiny server; Shiny reads it itself and runs what its last line returns
 ```
 
 ## The "Cones" Concept
