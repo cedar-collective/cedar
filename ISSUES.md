@@ -36,8 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the second session of a just-started process, four times on 2026-11-25. Cause found: the browser-test driver sets the course before the picker's one-time set-up lands, and the set-up empties it. Not a path a reader can take; the driver is not yet fixed |
-| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25). The module servers are now compiled at start; open for the server function itself, which the second session still compiles (about 3 seconds), because Shiny reads `server.R` itself ([M70](#improvements)) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -62,10 +60,12 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
 | [I86](#i86--retentions-course-list-stopped-with-an-error-when-its-students-held-no-graded-course) | Defect | Retention's "Courses Where a DFW Costs the Most" stopped with `object 'pop_p_value' not found` when the students of the chosen level and home campus held no graded course in the terms it reads: an error notice where an empty list belongs. Not seen on a page; found on the fixtures 2026-11-25 |
+| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the session straight after the warm-up of a just-started process, four of four times on 2026-11-25. It was the browser-test driver: `connect()` took a quiet page for a started session, the test set the course, and the picker's one-time set-up then emptied it. A reader cannot do that. `connect()` now waits for the session's first busy-to-idle cycle (three of three fresh starts pass) |
+| [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
 | [I83](#i83--a-deep-links-loading-notice-gave-no-estimate-and-no-running-count) | Defect | A link that runs a report on arrival (`autorun=true`) showed a bare "Loading…" until the report arrived: no estimate and no running count, because the overlay it opens before Shiny connects never went through the code that writes them (resolved 2026-11-25) |
 | [I82](#i82--downstreams-at-a-glance-showed-an-empty-page-while-it-ran-the-other-views) | Defect | Course Dynamics > Downstream opened on an empty page for as long as its analyses ran (two minutes for FYEX 1110 on production, 2026-11-25): At a Glance runs Against Non-Takers and Next Courses, and each showed its wait on its own subtab, which is hidden then (the waits now show on the page's overlay; the length of the run is [M68](#improvements)) |
+| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25), and the second about 3 more. `global.R` now compiles the module servers and the server function at start, and `server.R`'s last line hands the compiled function to Shiny, which reads that file itself. In the development container the second session's server began 2.8 s after the connection before and 0.2 after. `./run-tests.sh --all --fresh` holds it. The first session's remaining 2 seconds are not compilation ([M75](#improvements)) |
 | [I80](#i80--every-session-began-by-recounting-headcounts-program-menu) | Defect | Every session spent about 8 seconds starting (10 on production) before it could respond, on whatever page it opened, 4.5 of them rebuilding Headcount's program menu with one read of the declarations table per program; a deep link to a cached dashboard that loads in 0.2 seconds took 12 to 30 (now 2.3 seconds locally: the rows are found in one pass and the opening choices are shared) |
 | [I79](#i79--a-report-whose-conversion-or-read-stopped-part-way-was-stored-as-a-smaller-report) | Defect | `parse-data.R` stored whatever part of an export its converter had written or its reader returned: on 2026-11-23 Fall 2025's Student Holds were stored as the first 211,142 of 300,138 rows (15,152 of 26,890 students) with no error. A converter that does not exit 0, or any warning from the read, now stops the parse (resolved 2026-11-23; what cut that conversion short is not established) |
 | [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
@@ -152,10 +152,10 @@ read the latest graded falls' students") holds it.
 
 ## I85 — At a Glance was left with no step in one session, and nothing in the log said why
 
-**Status:** open. Cause found 2026-11-25, on a traced recurrence: the
-browser-test driver, in the second session of a just-started process. A reader
-cannot take this path. Done when a suite's first session cannot set an input
-before the page's own set-up has landed.
+**Status:** resolved 2026-11-25 (branch `test/first-suite-session`). It was
+the browser-test driver, in the second session of a just-started process; a
+reader cannot take this path. `connect()` now waits for the session to have
+started.
 **Found:** 2026-11-25, timing Downstream in the local container for M72; seen
 three more times the same day, checking the courses built ahead.
 **Severity:** low for readers (none can reach it); medium for the test gate: a
@@ -197,9 +197,12 @@ seconds, M70). The browser shows no busy state while the server has not begun
 to answer, `connect()` reads the quiet page as settled (its own comment names
 the symptom: a picker that still reads "Type to search" and a page on its
 empty state after the analysis ran), and `runAndWait()` gives the server 400 ms
-to say it is busy. So the driver sets the course and clicks Analyze, the
-report runs for that course, and the set-up message then lands and empties the
-picker. The page answers as it does when a reader picks another course
+to say it is busy. Timed on the session straight after the warm-up: connected
+at 0.5 seconds, busy at 3.7, idle with the picker's choices at 5.7; the two
+sessions after it went busy 0.1 seconds after connecting. `connect()` slept
+2.5 seconds, saw 600 ms of quiet and returned at about 3.6. So the driver sets
+the course and clicks Analyze, the report runs for that course, and the set-up
+message then lands and empties the picker. The page answers as it does when a reader picks another course
 without analysing it: it asks for a course. Against Non-Takers reads the
 analysed course and so ran the first time; Next Courses and the sequence
 comparison read the picker and did not.
@@ -232,12 +235,17 @@ opens Downstream. Read `Shiny.shinyapp.$inputValues.cr_course` when the page
 is idle: it is empty and At a Glance asks for a course. Run the same script
 again on the same process: five steps.
 
-### Fix (not made)
+### Fix
 
-In the driver. Either the warm-up opens a second session, so a suite's first
-is the process's third, or `connect()` waits for the page's set-up to have
-landed (the picker's choices) and not for a quiet page. Confirm on three
-fresh starts.
+In the driver. `connect()` (`tests/e2e/lib.mjs`) counts the page's
+busy-to-idle cycles from the first moment of the document and waits for the
+first one, which is the server running the session's start, before its floor
+and its wait for idle; a session that never starts fails with that message.
+On three fresh starts, the session straight after the warm-up kept its course
+and drew its five steps each time (it had failed four of four). The harness
+suite checks that `connect()` returns with a cycle seen. Not changed:
+`runAndWait()`'s 400 ms beat, which a started session answers in 0.1 seconds,
+and the warm-up, which still opens one session.
 
 ## I84 — The admin browser suite expected the math starting point that was replaced
 
@@ -352,8 +360,10 @@ the page's overlay is given and expects both modules' waits among them.
 
 ## I81 — The first sessions after a restart wait while the server code is compiled
 
-**Status:** partly resolved 2026-11-25 (branch `perf/session-start`): the
-module servers are compiled at start. Open for the server function (M70).
+**Status:** resolved 2026-11-25: the module servers are compiled at start
+(branch `perf/session-start`), and so is the server function, which is handed
+to Shiny (branch `perf/first-sessions`). What the first session still adds is
+not compilation and is M75.
 **Found:** 2026-11-25, on production: the first visit of the day, by a link to
 a cached dashboard, took 29.6 seconds.
 **Severity:** medium: once per restart, so every morning's first reader.
@@ -393,10 +403,23 @@ loading them: 4.5 seconds added to the start, taken off the first session.
 With I80 fixed too, the first session's deep link is ready in 5.4 seconds
 locally (was 19.2) and later ones in 3.5 (was about 9).
 
-The server function cannot be compiled the same way: Shiny reads `server.R`
-itself for the first session and calls that copy, not the one `global.R`
-sourced (M70). It is compiled on its second call, so the second session still
-waits about 3 seconds (6.0 against 3.5).
+The server function could not be compiled the same way: Shiny reads
+`server.R` itself for the first session and runs what that read returns, not
+the function `global.R` made from the same file (M70). It was compiled on its
+second call, so the second session waited about 3 seconds.
+
+Since `perf/first-sessions`: `global.R` compiles its copy
+(`cedar_compile_server()`, `R/trunk/utils.R`; 2 of the 6.3 seconds the start
+now spends compiling) and the last line of `server.R` returns it
+(`cedar_server_to_run()`), so the function Shiny runs is the compiled one. A
+`server.R` changed since the start is run as it now reads. On fresh starts in
+the development container, from the connection to the server's first sign of
+work: 2.8 seconds for the second session before, 0.2 after, against 0.1 to
+0.2 for later sessions; the second session's whole start went from 6.7 to 8.1
+seconds to 4.5. `tests/e2e/fresh-start.test.mjs` holds that wait for the
+first two sessions of a new process (`./run-tests.sh --all --fresh`), and
+fails with the hand-over taken out. `test-utils.R` holds the two functions and
+`test-ci.R` both ends of the wiring.
 
 ## I80 — Every session began by recounting Headcount's program menu
 
@@ -4836,10 +4859,15 @@ mrgather removes that lock when it starts, because a fetch stopped part-way
 leaves one behind. So a refresh started by hand while the scheduled one is
 fetching (or twice by hand) puts two browsers in one profile and writes two
 sets of exports to one folder. Found 2026-11-23 reading mrgather's code; not
-seen to happen. *Done when:* the fetch step fails with "another fetch is
-running" when a `cedar-mrgather-fetch-*` container is already up, checked
-through `docker ps` so that a fetch that died leaves nothing to clear, and
-`test-data-update-pipeline.R` covers it.
+seen to happen. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): before it starts a fetch the script
+asks `docker ps` for a `cedar-mrgather-fetch-*` container, and with one up the
+step fails as "another fetch is running (<its name>)" without starting
+mrgather. Nothing is parsed from that run, a file from today included, since
+the other fetch may still be writing it. A fetch that died leaves no
+container, so there is nothing to clear; and a run that finds every file
+already from today needs no fetch and does not ask. `test-data-update-pipeline.R`
+covers the three.
 
 ### Architecture rules (`AGENTS.md`)
 
@@ -5158,8 +5186,11 @@ With an empty `students` table, `max(as.integer(students$exit_term))`
 app's log for a scope with no far-along leaver, such as a small level on one
 campus. Found 2026-11-22 while testing the Graduation preload. *Reproduce:*
 `build_graduation_dashboard()` on XC01 with `attempts` and `boards`, given
-`parts` whose `exit$students` has no rows. *Done when:* the cone returns its
-empty result before it reads the last term, and a test covers the empty scope.
+`parts` whose `exit$students` has no rows. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): with no student the cone reads no
+last term and no course is readable; the result is the same empty one, without
+the warning. `test-exit-requirements.R` runs XC01 with no student who left and
+expects no warning.
 
 **M65 — The list of MyReports reports is kept in three places.** Until
 2026-11-22 a report's code, file signature or stage was typed in about a
@@ -5286,39 +5317,72 @@ one (the first pass counts). What the step still costs is the comparison
 builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
+**M75 — The first session of a process starts about 2 seconds slower than
+later ones, and it is not compilation.** Open. On fresh starts of the
+development container (2026-11-25, `tests/e2e/fresh-start.test.mjs`, home
+page, from opening the page to the end of the session's first busy-to-idle
+cycle), the first session took 6.1 and 6.5 seconds with the server function
+compiled at start, and 6.1 to 7.6 before; sessions three to six took 4.2 to
+5.0, apart from the one below. Its server begins 0.2 to 0.4 seconds after the
+connection, like any other, so the time is inside the session's own start.
+Compiling every function in the global environment at start (33 seconds
+against 6.3) left it at 5.9, so it is not R compiling CEDAR's functions. Not
+traced: what a process does once on its first session (Shiny's own first
+read of `server.R`, files read on first use, the first render of the home
+page) is where to look, by profiling the server function on a new process
+(`Rprof()` started before it and stopped in `session$onFlushed()`), first
+session against second. Seen beside it and also not traced:
+about one later session in four takes 1.2 to 1.6 seconds longer than its
+neighbours (5.6 to 6.2 against 4.2 to 4.5), most often the fourth. It is not
+garbage collection either: with `gcinfo(TRUE)` on, no full collection fell
+inside any of seven sessions' starts (the first at 6.7 seconds, the fourth at
+5.7), and each start saw one level-1 collection at most. Production's morning restart
+is followed by a request that fetches the page and opens no session, so the
+first reader of the day is this first session. *Done when:* the cause is
+named, and either the start does that work or the entry says why it stays.
+
 **M74 — The projection lock test fails when the machine is busy.**
-Open. `test-projection-refresh.R` (the test that a live build keeps its lock
-and a killed one loses it) starts a second R process that holds the lock with
-a heartbeat every second, sleeps 4 seconds, and expects the lock to be
-refused under a stale limit of 3 seconds; then kills the holder, sleeps 5,
-and expects a takeover. On 2026-11-25 a full `./run-tests.sh` started right
-after a container was removed gave 9,077 passed and 2 failed, both there
-(line 319, "Expected ... to throw a error"; line 328, "Rebuild already
-running", the mirror image). The file alone, minutes later: 82 passed, 0
-failed; the full gate an hour before, on the same code path: 0 failed. A
-heartbeat that arrives a second or two late is enough to flip either
-expectation. Done when the test does not depend on a one-second loop keeping
-to a three-second limit on a loaded machine (a wider limit, or a heartbeat
-the test writes itself), shown by ten runs under load.
+Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
+holds a one-second loop to a three-second limit. `test-projection-refresh.R`
+(the test that a live build keeps its lock and a killed one loses it) started
+a second R process that holds the lock with a heartbeat every second, slept 4
+seconds, and expected the lock to be refused under a stale limit of 3
+seconds; then killed the holder, slept 5, and expected a takeover. On
+2026-11-25 a full `./run-tests.sh` started right after a container was
+removed gave 9,077 passed and 2 failed, both there (line 319, "Expected ...
+to throw a error"; line 328, "Rebuild already running", the mirror image).
+The file alone, minutes later: 82 passed, 0 failed. A heartbeat that arrives
+a second or two late was enough to flip either expectation. The limit is now
+600 seconds throughout and the test moves the heartbeat's date itself: set
+back an hour, a live holder's next beat brings it forward (waited for, not
+timed) and the lock is refused; after the kill, set back until it stays back
+(`set_file_time_back()`, `helper-projection-refresh.R`, which the takeover
+test beside it uses too) and the lock is taken over. Ten runs of the file with
+every core busy (ten `yes` processes on eight cores), ten passed, the last
+five as the test now stands; and each of
+four deliberate breaks of the lock fails it (no heartbeat, a live lock taken,
+a dead lock never taken, a heartbeat that outlives its holder). Found on the
+way: the test above it ("automatic runs share the manual lock…") called the
+refresh with its real build behind the lock, so a lock that did not hold
+started a real projections build and the file hung; it now passes a build
+that only records the call, and fails in a minute.
 
 **M73 — The development container has about 400 MB to spare, and building courses ahead takes it.**
-Open. The app image runs emulated in a Docker VM of 3.8 GiB on the
-development Mac. On 2026-11-25, seven browser suites in a row (the five
-Course Dynamics suites, Graduation, DFW Rates) against a process that built
-no course ahead passed, with the container at 3.2 GiB after the first suite
-and 3.42 at the most. The same suites against a process that had built two
-courses ahead (2.7 GiB once the build-ahead finished): the R process was
-killed for memory during the DFW Rates suite, at its spring build, the page
-reloaded, and the suite failed with "Execution context was destroyed"
+Resolved 2026-11-25 (branch `test/first-suite-session`): a development
+machine builds no course ahead. The app image runs emulated in a Docker VM of
+3.8 GiB on the development Mac. On 2026-11-25, seven browser suites in a row
+(the five Course Dynamics suites, Graduation, DFW Rates) against a process
+that built no course ahead passed, with the container at 3.2 GiB after the
+first suite and 3.42 at the most. The same suites against a process that had
+built two courses ahead (2.7 GiB once the build-ahead finished): the R process
+was killed for memory during the DFW Rates suite, at its spring build, the
+page reloaded, and the suite failed with "Execution context was destroyed"
 (`docker inspect --format '{{.State.OOMKilled}}'` gave `true`, and the log
 shows a second start). One run each, so the build-ahead is not shown to be
 the cause; the margin is what is shown. Production's host has 8 GB and is not
-close. On the development machine, `CEDAR_PRELOAD_COURSES=0` in `.env`
-(`.env.example`) builds none ahead, which also makes a restart ready sooner;
-raising Docker's memory is the other way. Done when a development start
-cannot be killed for memory by an ordinary suite run: that setting in the
-developer's `.env`, or a larger VM, and a line in
-`docs/developers/testing.md` saying which.
+close. The developer's `.env` sets `CEDAR_PRELOAD_COURSES=0` (decided
+2026-11-25), `.env.example` carries the line, and
+`docs/developers/e2e-testing.md` says why beside the other memory limits.
 
 **M72 — Downstream's three comparisons were built again by every session.**
 Resolved 2026-11-25 (branch `perf/downstream-shared-results`). At a Glance
@@ -5363,14 +5427,22 @@ a soft restart.
 **M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
 and `app.R` is never used.** With a `server.R` in the directory Shiny ignores
 `app.R`: it sources `ui.R` on the first request and `server.R` on the first
-session, each into its own environment, and calls those copies. So the UI is
-built twice at start (the "Navigation containers" warning appears twice in
-every log), and the server function that runs is not the one `global.R`
-sourced, which is why it cannot be compiled ahead (I81). Done when one of the
-two reads is gone (for instance a `server.R` that only returns the function
-`global.R` already built and compiled), the first two sessions after a restart
-take what the third does, and `docs/developers/index.md` says which file is the
-entry.
+session, each into its own environment, and uses what those reads return. So
+the UI is built twice at start (the "Navigation containers" warning appears
+twice in every log), and the server function Shiny runs is not the one
+`global.R` made. Partly resolved 2026-11-25 (branch `perf/first-sessions`):
+`server.R`'s last line now returns the function `global.R` compiled, which is
+what I81 needed, and `docs/developers/index.md` and `AGENTS.md` say which file
+does what. What remains costs the start and no reader: the UI is still built
+twice, 2.1 seconds each in the development container, once in `global.R` and
+once at the first request (the restart's own warm-up request); `server.R` is
+still read twice; and `app.R` is a file nothing reads. `global.R`'s read of
+`ui.R` is also what puts `cedar_sections`, `cedar_registrations`,
+`cedar_programs` and `cedar_degrees` in the global environment, where
+`server.R` reads them as bare names (on 42 lines), so that read cannot simply go.
+*Done when:* the UI is built once (`ui.R` returning what `global.R` built, the
+way `server.R` now does), `server.R` no longer depends on names `ui.R`
+defines, and `app.R` is deleted or used.
 
 ### Documentation and naming
 

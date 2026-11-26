@@ -238,6 +238,7 @@ browser coverage are separate decisions.
 | UI, routing or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the change; look at layout changes |
 | Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
 | PR acceptance | The synthetic CI gate ([below](#pull-request-checks-without-institutional-data)) |
+| What the app or a session does as it starts (`global.R`, `entrypoint.sh`, the last line of `server.R`, `connect()` in `tests/e2e/lib.mjs`) | `./run-tests.sh --all --fresh`: rebuild, then the new process's first sessions ([a process just started](e2e-testing.md#a-process-just-started)) |
 | Release candidate or major pipeline change | `./run-tests.sh --all`: rebuild and run every institutional browser suite |
 | Dependency, R or Docker toolchain | Native and Docker dependency checks, their R gates and synthetic acceptance; the institutional release gate stays separate |
 | Documentation or presentation only | Check links or appearance; no full run for prose, spacing or colour |
@@ -265,12 +266,15 @@ Run from the host repository root.
 ./run-tests.sh --e2e reports           # full 16-scenario institutional report tour
 ./run-tests.sh --all                   # rebuild + every institutional browser suite
 ./run-tests.sh --all smoke             # rebuild + smoke only
+./run-tests.sh --e2e --fresh           # restart the app, then time its first sessions
+./run-tests.sh --all --fresh           # the same on a rebuilt container (tests the diff)
 ```
 
 Focused report scopes are `dept-trends`, `roadblocks`, `retention` and
 `headcount`; other named suites include `nav`, `admin`, `credit-timeline`
 (Course Timing wiring and the truncation disclosure, one population setup),
-`harness` (run it when `tests/e2e/lib.mjs` changes) and `demo`.
+`harness` (run it when `tests/e2e/lib.mjs` changes) and `demo`. `fresh-start`
+runs only with `--fresh`, first, and is no part of `--all`'s tour.
 
 The gate stops at the first failed suite and the report tour at its first
 failed step; neither retries. Diagnose app, setup or resource failures before
@@ -289,6 +293,7 @@ source; never call focused or synthetic success a full institutional pass.
 | `tests/e2e/lib.mjs` | `harness` |
 | `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
 | `dev/**` | R suite + `demo` |
+| `global.R`, `entrypoint.sh` | R suite, and a note that the app's start changed: run `--all --fresh` and the demo gate afterwards |
 | `docs/**`, `*.md` only | nothing |
 
 It selects; it never certifies. It cannot know a cone change moved a rendered

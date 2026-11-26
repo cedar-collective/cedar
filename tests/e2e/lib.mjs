@@ -115,6 +115,10 @@ export async function launch({ width = 1440, height = 1000 } = {}) {
 // is a false signal here (it's only a real signal from the bare URL, which
 // ui.R stamps with ?tab=home after connecting). After this returns, the active
 // tab's outputs still need a beat to render — see the recipe.
+// Pages that already carry the session-start watcher below (an init script
+// runs again on every navigation, so one registration a page is enough).
+const startWatched = new WeakSet();
+
 export async function connect(page, opts = {}) {
   // Reject a URL string loudly. This signature destructures, so passing
   // `connect(page, 'http://localhost:3838/?tab=gen-ed')` used to leave `tab`
@@ -131,6 +135,42 @@ export async function connect(page, opts = {}) {
   } = opts;
 
   const query = search == null ? `tab=${encodeURIComponent(tab)}` : String(search).replace(/^\?/, '');
+  // Count the session's busy-to-idle cycles from the first moment of the
+  // document, so "the server has run this session's start" can be waited for.
+  if (!startWatched.has(page)) {
+    startWatched.add(page);
+    await page.evaluateOnNewDocument(() => {
+      window.__cedarStartCycles = 0;
+      // Milliseconds from the navigation: the websocket open, the server's
+      // first sign of work, and the end of the first cycle.
+      window.__cedarStart = { connected: null, busy: null, started: null };
+      const connecting = setInterval(() => {
+        const app = window.Shiny && window.Shiny.shinyapp;
+        if (app && app.isConnected && app.isConnected()) {
+          window.__cedarStart.connected = performance.now();
+          clearInterval(connecting);
+        }
+      }, 10);
+      const watch = () => {
+        const root = document.documentElement;
+        let busy = root.classList.contains('shiny-busy');
+        new MutationObserver(() => {
+          const now = root.classList.contains('shiny-busy');
+          const at = window.__cedarStart;
+          if (!busy && now && at.busy === null) at.busy = performance.now();
+          if (busy && !now) {
+            window.__cedarStartCycles += 1;
+            if (at.started === null) at.started = performance.now();
+          }
+          busy = now;
+        }).observe(root, { attributes: true, attributeFilter: ['class'] });
+      };
+      if (document.documentElement) watch();
+      else new MutationObserver((_, self) => {
+        if (document.documentElement) { self.disconnect(); watch(); }
+      }).observe(document, { childList: true });
+    });
+  }
   expectNavigation(page); // Declared, so it is not counted as an app self-reload.
   await page.goto(`${BASE}?${query}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const ok = await waitFor(page,
@@ -144,7 +184,21 @@ export async function connect(page, opts = {}) {
   // that window are overwritten when the app's own initialisation lands — the
   // symptom is a selectize that still reads "Type to search..." after setInput,
   // and a page stuck on its empty state while the toast says the analysis ran.
-  // The sleep is kept as a floor because Shiny reports idle between flushes.
+  //
+  // A quiet page is not a started session. A process compiles the server
+  // function as its second session starts, and the page shows no busy state
+  // until that is done: measured 2026-11-25, the session after the warm-up
+  // connected at 0.5 s, went busy at 3.7 s and had its course picker's choices
+  // at 5.7 s, so "connected, then quiet for 600 ms" passed at 3.6 s and the
+  // picker's set-up emptied a course the test had already set (ISSUES I85).
+  // Wait for the first busy-to-idle cycle, which is the server running the
+  // session's start; then the floor, because Shiny reports idle between flushes.
+  const started = await waitFor(page, () => window.__cedarStartCycles > 0, { timeout, interval: 100 });
+  if (!started) {
+    throw new Error(
+      `connect({ tab: '${tab}' }): Shiny connected but the session never finished ` +
+      `starting within ${timeout}ms (no busy-to-idle cycle seen).`);
+  }
   await sleep(settle);
   await waitForIdle(page, { timeout: 120000 }).catch(() => {});
 
@@ -165,6 +219,21 @@ export async function connect(page, opts = {}) {
 }
 
 // The label of the currently active top-level nav tab, or '(none)'.
+// How the session's start went, as connect() watched it, in seconds from the
+// navigation: `connected` (the websocket is open), `busy` (the server's first
+// sign of work) and `started` (the end of the first busy-to-idle cycle, which
+// is what a reader waits for before anything they do can be answered). The
+// stretch from connected to busy is the server not yet running the session at
+// all: on a process still compiling its server function it was 3 seconds
+// against a tenth of one.
+export function sessionStart(page) {
+  return page.evaluate(() => {
+    const at = window.__cedarStart;
+    const s = (ms) => (ms === null ? null : ms / 1000);
+    return { connected: s(at.connected), busy: s(at.busy), started: s(at.started) };
+  });
+}
+
 export function activeTab(page) {
   return page.evaluate(() => {
     const a = [...document.querySelectorAll('.navbar a')]

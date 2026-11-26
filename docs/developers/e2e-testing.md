@@ -100,10 +100,75 @@ report tour rewrites the error to say the session dropped and why; the guards
 are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
 the browser stages and names other running CEDAR containers.
 
+The same limit decides one setting. The app builds Course Dynamics >
+Downstream ahead for the courses analysed most when it starts
+([built ahead](shiny-modules.md#downstream-for-the-courses-analysed-most)),
+which leaves the worker larger before a suite has opened a page: measured
+2026-11-25, seven suites in a row peaked at 3.42 GB with no course built ahead,
+and the worker was killed once with two built ahead. A development machine
+therefore sets `CEDAR_PRELOAD_COURSES=0` in its `.env` (`.env.example` has the
+line); production, on 8 GB, builds ten. A restart is also ready sooner.
+
 **Before diagnosing any browser failure:** confirm the app source is current
 (`docker compose up -d --build`) and that nothing else large is resident. A
 stale container produced a completely separate phantom — Dept Trends "rendered
 hidden charts" purely because the image predated the fix.
+
+## A process just started
+
+Every browser run but one meets a process already in use: the app was started
+some time ago and a warm-up session has been through it. What a process does
+for its first readers was therefore tested by nobody until a deploy, and two
+things lived there unseen: R compiled the server function while the second
+session waited (ISSUES I81), and the test driver itself lost an input on that
+session (I85).
+
+```bash
+./run-tests.sh --e2e --fresh     # restart the running app, then its first sessions
+./run-tests.sh --all --fresh     # the same on a rebuilt container
+```
+
+`--fresh` restarts whichever container answers on the app's port (the
+institutional stack, the synthetic one or a one-off test container), waits for
+the build-ahead's last job in its log (`[preload] 5 of 5: …`: a session opened
+before then waits behind the job running, and a time taken then is the job's),
+leaves out the warm-up, and runs `fresh-start.test.mjs` as the process's first
+six sessions. A suite named with it runs afterwards. **A restart runs the
+source the container was built with**, so the form that tests a diff is
+`--all --fresh`; `--changed` says so when `global.R` or `entrypoint.sh` is in
+the diff. The wait is 15 minutes at most (`CEDAR_BUILD_AHEAD_TIMEOUT`, in
+seconds).
+
+The suite holds two things for each of the first two sessions:
+
+- **An input set the moment `connect()` returns is still set once the page is
+  idle** (I85).
+- **The server begins as soon after the connection as it does for the four
+  sessions after**, give or take a second. R compiles a function before
+  running it, so a session that meets the server function uncompiled waits
+  for the compiler in exactly this stretch.
+
+Measured 2026-11-25 in the development container (emulated), seconds:
+
+| | Session 1 | Session 2 | Sessions 3 to 6 |
+|---|---|---|---|
+| Connection to the server beginning, before | 0.4 | 2.8 | 0.1 to 0.2 |
+| Connection to the server beginning, after | 0.2 to 0.3 | 0.2 | 0.1 to 0.2 |
+| Whole start, before | 6.1 to 7.6 | 6.7 to 8.1 | 4.2 to 6.2 |
+| Whole start, after | 6.1 to 6.5 | 4.5 | 4.2 to 5.7 |
+
+"After" is with the server function compiled at start: `global.R` compiles the
+function it read (`cedar_compile_server()`, 2 of the 6.3 seconds the start now
+spends compiling) and `server.R`'s last line hands it to Shiny
+(`cedar_server_to_run()`), because Shiny reads `server.R` itself for the
+first session and runs what that read returns. An edited `server.R` is run as
+edited.
+
+The whole start is printed and not held. Sessions after the second differ by
+a second and a half among themselves, about one in four taking that much
+longer, which is as much as the first session still adds (ISSUES M75);
+compiling every function at start cost 33 seconds and changed neither. Run it
+alone: a second heavy job on the machine moves every number.
 
 ## E2E rules — the four that cause every flake
 
@@ -124,7 +189,19 @@ reaches zero. Only **visible** ones count.
 well before the landing tab's first reactive flush. Inputs set inside that window
 are overwritten by the app's own initialisation — the symptom is a selectize
 still reading "Type to search..." after `setInput`, a page stuck on its empty
-state, and a toast claiming the analysis ran. `connect()` now waits for idle.
+state, and a toast claiming the analysis ran. `connect()` waits for the
+session's first busy-to-idle cycle, and then for idle.
+
+*A quiet page is not a started session.* Waiting for idle alone was not
+enough on a process just started: R compiles the server function as its second
+session starts, and the page shows no busy state until that is done. Measured
+2026-11-25 on the session straight after the warm-up: connected at 0.5 s, busy
+at 3.7 s, the course picker's choices at 5.7 s. "Connected, then quiet for 600
+ms" passed at 3.6 s, the test set a course, and the picker's set-up then
+emptied it (ISSUES I85: four of four such sessions; none of three with the
+wait). A page that looks empty right after a restart: read
+`Shiny.shinyapp.$inputValues` for the input the test set before reading the
+page.
 
 **3. `offsetParent !== null` is not a visibility test.** It also returns null
 inside `position: fixed`/`sticky` ancestors, which in bslib includes the sub-tab

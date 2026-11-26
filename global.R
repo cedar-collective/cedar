@@ -583,18 +583,26 @@ cedar_preload_shared_results(c(
 
 message("[global.R] Loading ui.R and server.R...")
 source("ui.R")
+# server.R's last line reads this: nothing is compiled yet at this read.
+cedar_compiled_server <- NULL
 source("server.R")
 
-# ── Compile the module servers now ──────────────────────────────────────────
-# R compiles a function the first time it is called. Left to that, the first
-# person to open CEDAR after a restart waits while every module's server is
-# compiled (4.5 seconds here, more on production; ISSUES I81). Compiled at
-# start, that wait is part of the start, which the restart's own warm-up
-# request sits through instead. The server function itself cannot be compiled
-# here: Shiny reads server.R again for the first session and calls that copy.
+# ── Compile the servers now ─────────────────────────────────────────────────
+# R compiles a function as it is first used. Left to that, the first person to
+# open CEDAR after a restart waits while every module's server is compiled
+# (4.5 seconds here, more on production; ISSUES I81), and the second while the
+# server function is (3 more). Compiled at start, that wait is part of the
+# start, which the restart's own warm-up request sits through instead. Shiny
+# reads server.R again for the first session and runs what that read returns,
+# so the file's last line hands back the function compiled here
+# (cedar_server_to_run()).
+.compile_started <- Sys.time()
 for (.module_server in ls(globalenv(), pattern = "Server$")) {
   if (is.function(get(.module_server, envir = globalenv()))) {
     assign(.module_server, compiler::cmpfun(get(.module_server, envir = globalenv())), envir = globalenv())
   }
 }
-rm(.module_server)
+cedar_compiled_server <- cedar_compile_server(server, "server.R")
+message(sprintf("[global.R] Server functions compiled in %.1fs",
+                as.numeric(difftime(Sys.time(), .compile_started, units = "secs"))))
+rm(.module_server, .compile_started)
