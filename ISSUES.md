@@ -4801,10 +4801,15 @@ mrgather removes that lock when it starts, because a fetch stopped part-way
 leaves one behind. So a refresh started by hand while the scheduled one is
 fetching (or twice by hand) puts two browsers in one profile and writes two
 sets of exports to one folder. Found 2026-11-23 reading mrgather's code; not
-seen to happen. *Done when:* the fetch step fails with "another fetch is
-running" when a `cedar-mrgather-fetch-*` container is already up, checked
-through `docker ps` so that a fetch that died leaves nothing to clear, and
-`test-data-update-pipeline.R` covers it.
+seen to happen. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): before it starts a fetch the script
+asks `docker ps` for a `cedar-mrgather-fetch-*` container, and with one up the
+step fails as "another fetch is running (<its name>)" without starting
+mrgather. Nothing is parsed from that run, a file from today included, since
+the other fetch may still be writing it. A fetch that died leaves no
+container, so there is nothing to clear; and a run that finds every file
+already from today needs no fetch and does not ask. `test-data-update-pipeline.R`
+covers the three.
 
 ### Architecture rules (`AGENTS.md`)
 
@@ -5123,8 +5128,11 @@ With an empty `students` table, `max(as.integer(students$exit_term))`
 app's log for a scope with no far-along leaver, such as a small level on one
 campus. Found 2026-11-22 while testing the Graduation preload. *Reproduce:*
 `build_graduation_dashboard()` on XC01 with `attempts` and `boards`, given
-`parts` whose `exit$students` has no rows. *Done when:* the cone returns its
-empty result before it reads the last term, and a test covers the empty scope.
+`parts` whose `exit$students` has no rows. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): with no student the cone reads no
+last term and no course is readable; the result is the same empty one, without
+the warning. `test-exit-requirements.R` runs XC01 with no student who left and
+expects no warning.
 
 **M65 — The list of MyReports reports is kept in three places.** Until
 2026-11-22 a report's code, file signature or stage was typed in about a
