@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M76 | Improvement | See [Improvements](#improvements) |
+| M1–M77 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -5250,6 +5250,27 @@ of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
 
+**M77 — Nothing says a change touches projection model source until the
+deploy takes an hour.** Open. `enrollment_projection_model_source_files()`
+(`R/features/enrollment-projections.R`) lists 22 files, and an edit to any of
+them, a comment included, makes the next deploy rebuild both projection
+bundles, about 20 minutes each, inside a deploy step that is stopped at 60
+(I6 is what a rebuild stopped there leaves behind). `R/trunk/utils.R` is on
+the list, and it is also where a general helper goes by habit. On 2026-11-25,
+#405 added `cedar_compile_server()` and `cedar_server_to_run()` there. No
+projection reads either, nothing in the pull request or its checks said what
+the file was, and the deploy of #404 to #407 spent 45 minutes in "Deploy
+over SSH", 43 of them rebuilding the two bundles ("model source changed:
+R/trunk/utils.R"), where a deploy that rebuilds nothing takes about six. M62 had met the
+same thing on 2026-11-22 and put `fmt_count()` in `display-format.R` for that
+reason: the lesson was written in that entry and stood in nobody's way.
+Moving the two functions out now would be one more edit to the file and one
+more rebuild, so they stay. *Done when:* `./run-tests.sh --changed` and the
+pull-request check say when a diff touches a file on the list and what the
+deploy will then do, reading the list from the function itself; and what
+projections read of `utils.R` is a file of its own, or the list is of
+functions and not of files, so that a helper beside them costs nothing.
+
 **M76 — A page's student scope (level that term, home campus) is written out
 in five more places.** `scope_student_terms()` (`R/branches/student-terms.R`,
 added 2026-11-25 for M67) is the enrolled student-terms of a level and a home
@@ -5338,8 +5359,22 @@ garbage collection either: with `gcinfo(TRUE)` on, no full collection fell
 inside any of seven sessions' starts (the first at 6.7 seconds, the fourth at
 5.7), and each start saw one level-1 collection at most. Production's morning restart
 is followed by a request that fetches the page and opens no session, so the
-first reader of the day is this first session. *Done when:* the cause is
-named, and either the start does that work or the entry says why it stays.
+first reader of the day is this first session. **Traced 2026-11-25**, by the
+profile this entry asked for
+([a session's start](docs/developers/performance-monitoring.md#a-sessions-start)):
+three sessions in turn on a new process of the development container, the
+build-ahead finished. Inside the server function the first sampled 4.3
+seconds and the next two 2.0 and 2.1. The lines the first has and the others
+have not: `headcount.R:132` and `:95`, 1.3 seconds, the Headcount module's
+set-up reading its filter choices through `cedar_shared_result()`, which the
+first session of a process builds (`ui-helpers.R:1639`) and every later one
+reads; `headcount.R:195`, 0.7, the first render of its download control;
+`population.R:1297` to `1323`, 0.4, program labels; and 0.3 in Gen Ed's
+set-up (`gen-ed.R:1177`, `:1211`). So most of it is a result shared by every
+session that the first one still builds. One run, emulated. *Done when:*
+Headcount's filter choices are a job of the build-ahead
+(`cedar_preload_shared_results()`), the same profile shows what is left, and
+either the start does that too or the entry says why it stays.
 
 **M74 — The projection lock test fails when the machine is busy.**
 Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
