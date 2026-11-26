@@ -12,7 +12,7 @@ nav_order: 4.5
 
 ---
 
-Open **Registration > Projections** for the saved course-demand projections
+Open **Courses > Projections** for the saved course-demand projections
 for the pooled Albuquerque and online course market: the Gen Ed courses that
 passed the pressure screen plus the always-monitored first-year and gateway
 list. Branch campuses are not included.

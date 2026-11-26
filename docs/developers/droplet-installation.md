@@ -94,7 +94,7 @@ curl -fsS -o /dev/null http://localhost:3838/ && echo up
 ```
 
 The first build on a small droplet takes several times longer than on a
-laptop. Registration > Projections needs a published bundle in `output/`;
+laptop. Courses > Projections needs a published bundle in `output/`;
 `restart-cedar.sh --update` builds one when it is missing
 ([Release Runbook: projection artifact](release-runbook.html#projection-artifact)).
 

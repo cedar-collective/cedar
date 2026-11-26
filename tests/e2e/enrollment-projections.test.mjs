@@ -1,4 +1,4 @@
-// Saved-artifact regression checks for Registration > Projections.
+// Saved-artifact regression checks for Courses > Projections.
 //
 //   node tests/e2e/enrollment-projections.test.mjs
 import {

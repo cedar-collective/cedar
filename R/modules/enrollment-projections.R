@@ -1,4 +1,4 @@
-# Shiny module for the read-only Registration > Projections workspace.
+# Shiny module for the read-only Courses > Projections workspace.
 #
 # The module consumes one validated saved bundle at a time, chosen by target
 # term: CEDAR publishes one bundle per season, and neither supersedes the other.

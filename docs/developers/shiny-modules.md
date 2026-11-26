@@ -503,10 +503,10 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 |------|-------------------|------------|
 | `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways > Student Pathways |
 | `headcount.R` | `headcountUI/Server` | Bird's Eye > Headcount |
-| `seatfinder.R` | `seatfinderUI/Server` | Registration > Open Seats |
-| `cancellations.R` | `cancellationsUI/Server` | Bird's Eye > Cancellations |
+| `seatfinder.R` | `seatfinderUI/Server` | Courses > Open Seats |
+| `cancellations.R` | `cancellationsUI/Server` | Courses > Cancellations |
 | `dfw-rates.R` | `dfwRatesUI(id, campuses)`, `dfwRatesServer(id, attempts, dims, edges, active)` | Bird's Eye > DFW Rates: lower-division DFW one term type at a time (Term type and Campus, deep-linkable, no run button); builds only while the tab is open, once per term type and campus a session asks for; every number from `build_dfw_dashboard()` through `features/dfw-dashboard-view.R` |
-| `waitlist.R` | `waitlistUI/Server` | Registration > Waitlists |
+| `waitlist.R` | `waitlistUI/Server` | Courses > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |

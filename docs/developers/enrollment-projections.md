@@ -1158,7 +1158,7 @@ builds the schedule/upstream/DFW narrative and presentation table; the module
 only renders that payload. Correlation is descriptive: schedule changes can be
 a response to demand, so the UI never labels it a causal capacity effect.
 
-Registration > Projections lists saved bundles with
+Courses > Projections lists saved bundles with
 `find_enrollment_projection_bundles()`, loads the reader's chosen target term
 with `load_enrollment_projection_bundle()`, and filters it through
 `build_enrollment_projection_view()`. It never runs a candidate method, aftcast,

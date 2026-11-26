@@ -55,7 +55,7 @@ the count, even when stale Waitlists filters existed before the jump. Override
 the configured term or display floor with `CEDAR_RECON_TERM` and
 `CEDAR_RECON_MIN_WAIT` when needed.
 
-`enrollment-projections.test.mjs` opens the read-only Registration > Projections page,
+`enrollment-projections.test.mjs` opens the read-only Courses > Projections page,
 verifies the saved-artifact filters and audit columns, and checks the row-level
 history and six candidate methods. Run it alone with
 `./run-tests.sh --e2e enrollment-projections`.

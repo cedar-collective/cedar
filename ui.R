@@ -265,38 +265,16 @@ cedar_home_ui <- function() {
 
     tags$section(
       class = "cedar-home-section",
-      tags$h2("Analysis Workspaces"),
+      tags$h2("Courses"),
       div(
-        class = "cedar-home-grid cedar-home-grid--dept",
-        cedar_home_card(
-          "Student Pathways",
-          "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
-          "?tab=pathways",
-          "route",
-          "Best for curriculum and student-progress questions."
-        ),
-        cedar_home_card(
-          "Degree Explorer",
-          "A degree's catalog plan, semester by semester, with each course's prerequisites and enrollment history.",
-          "?tab=degree-explorer",
-          "graduation-cap",
-          "Best for seeing the route a degree lays out."
-        ),
+        class = "cedar-home-grid cedar-home-grid--top",
         cedar_home_card(
           "Course Dynamics",
           "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
           "?tab=course-dynamics",
           "chart-line",
           "Best for course-level questions."
-        )
-      )
-    ),
-
-    tags$section(
-      class = "cedar-home-section",
-      tags$h2("Registration Tools"),
-      div(
-        class = "cedar-home-grid cedar-home-grid--top",
+        ),
         cedar_home_card(
           "Regstats",
           "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
@@ -315,6 +293,40 @@ cedar_home_ui <- function() {
           "Course waitlist demand by term, campus, level, department, and part of term.",
           "?tab=waitlists",
           "clipboard-list"
+        ),
+        cedar_home_card(
+          "Projections",
+          "Sections to plan for each course next term, the registrations they are sized for, and how close past forecasts came.",
+          "?tab=projections",
+          "bullseye"
+        ),
+        cedar_home_card(
+          "Cancellations",
+          "Review canceled courses by term, campus, department, and course level.",
+          "?tab=cancellations",
+          "ban"
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Pathways"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--dept",
+        cedar_home_card(
+          "Student Pathways",
+          "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
+          "?tab=pathways",
+          "route",
+          "Best for curriculum and student-progress questions."
+        ),
+        cedar_home_card(
+          "Degree Explorer",
+          "A degree's catalog plan, semester by semester, with each course's prerequisites and enrollment history.",
+          "?tab=degree-explorer",
+          "graduation-cap",
+          "Best for seeing the route a degree lays out."
         )
       )
     ),
@@ -366,12 +378,6 @@ cedar_home_ui <- function() {
           "The end of the road: who leaves without a degree and how far along they were, the courses they never passed, and who finishes in the summer.",
           "?tab=graduation",
           "graduation-cap"
-        ),
-        cedar_home_card(
-          "Cancellations",
-          "Review canceled courses by term, campus, department, and course level.",
-          "?tab=cancellations",
-          "ban"
         )
       )
     ),
@@ -950,37 +956,14 @@ nav_panel(
   deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
 
-# Pathways menu — how students move through courses and programs: the routes
-# they took (Student Pathways, population-aware) and the routes a degree lays
-# out (Degree Explorer, the catalog's semester plan).
+
+# Courses menu — everything looked up by course or section: one course's
+# history (Course Dynamics), the term being registered for (Regstats, Open
+# Seats, Waitlists, Projections) and the sections that were cancelled.
 nav_menu(
-  title = "Pathways",
-  icon  = icon("route"),
+  title = "Courses",
+  icon  = icon("book-open"),
 
-nav_panel(
-  title = "Student Pathways",
-  icon  = icon("users-line"),
-  pathwaysUI(
-    "pathways",
-    campus_choices = sort(unique(cedar_programs$student_campus[
-      !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
-    ])),
-    program_choices = cedar_pathways_choices$program_choices,
-    dept_choices = cedar_pathways_choices$dept_choices,
-    course_campus_choices = cedar_campus_choices(cedar_registrations)
-  )
-), # end Student Pathways nav_panel
-
-nav_panel(
-  title = "Degree Explorer",
-  icon = icon("graduation-cap"),
-  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status,
-    CEDAR_DEGREE_BOARDS$colleges)
-)
-
-), # end Pathways nav_menu
-
-# Course Dynamics tab — promoted from Explore
 nav_panel(
   title = "Course Dynamics",
   icon = icon("file-lines"),
@@ -1146,7 +1129,7 @@ nav_panel(
         subtab_header(
           "Section Plan",
           "How many sections to schedule for this course in each projected term, and the registrations they are sized for. ",
-          "It is the course's row of Registration > Projections, read from the same saved projection.",
+          "It is the course's row of Courses > Projections, read from the same saved projection.",
           method = tags$p("Each plan opens to the steps that built the number and how close past forecasts came. A course outside the monitored groups, or screened out of a term, says so.")
         ),
         # The model pools ABQ and EA as one market (enrollment-projections.md,
@@ -1356,11 +1339,6 @@ nav_panel(
   ) # end Course Dynamics loading overlay
 ), # end course dynamics nav_panel
 
-# Registration dropdown menu
-nav_menu(
-  title = "Registration",
-  icon = icon("clipboard-list"),
-
   nav_panel(
     title = "Regstats",
     icon = icon("tachometer-alt"),
@@ -1383,8 +1361,44 @@ nav_menu(
     title = "Projections",
     icon = icon("bullseye"),
     enrollmentProjectionsUI("enrollment_projections")
-  ) # end projections nav_panel
-), # end Registration nav_menu
+  ), # end projections nav_panel
+
+  nav_panel(
+    title = "Cancellations",
+    icon = icon("ban"),
+    cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ) # end cancellations nav_panel
+), # end Courses nav_menu
+
+# Pathways menu — how students move through courses and programs: the routes
+# they took (Student Pathways, population-aware) and the routes a degree lays
+# out (Degree Explorer, the catalog's semester plan).
+nav_menu(
+  title = "Pathways",
+  icon  = icon("route"),
+
+nav_panel(
+  title = "Student Pathways",
+  icon  = icon("users-line"),
+  pathwaysUI(
+    "pathways",
+    campus_choices = sort(unique(cedar_programs$student_campus[
+      !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
+    ])),
+    program_choices = cedar_pathways_choices$program_choices,
+    dept_choices = cedar_pathways_choices$dept_choices,
+    course_campus_choices = cedar_campus_choices(cedar_registrations)
+  )
+), # end Student Pathways nav_panel
+
+nav_panel(
+  title = "Degree Explorer",
+  icon = icon("graduation-cap"),
+  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status,
+    CEDAR_DEGREE_BOARDS$colleges)
+)
+
+), # end Pathways nav_menu
 
 # Explore dropdown menu
 nav_menu(
@@ -1826,14 +1840,7 @@ nav_panel(
       title = "Graduation",
       icon = icon("graduation-cap"),
       graduationUI("graduation", cedar_home_campuses)
-    ), # end Graduation nav_panel
-
-    nav_panel(
-      title = "Cancellations",
-      icon = icon("ban"),
-      cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
-    ) # end cancellations nav_panel (was under Admin)
-
+    ) # end Graduation nav_panel
 
   ), # end Bird's Eye nav_menu
 

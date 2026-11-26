@@ -12,7 +12,7 @@ nav_order: 12
 
 ---
 
-Waitlists inspects students on course waitlists by course, declared program, and student classification. It lives under **Registration → Waitlists** and can also be opened from Regstats waitlist links.
+Waitlists inspects students on course waitlists by course, declared program, and student classification. It lives under **Courses → Waitlists** and can also be opened from Regstats waitlist links.
 
 The tab is best for checking where demand is visible in Banner waitlist records. It should not be read as total unmet demand: students who wanted a course but never joined or remained on a waitlist are not visible here.
 

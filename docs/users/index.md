@@ -74,11 +74,30 @@ Registration statistics dashboard. Shows courses where registration patterns dif
 
 Saved Spring course-demand projections with aftcast accuracy, confidence,
 capacity interpretation, population-fit evidence, and section guidance. Open
-the page from **Registration > Projections**.
+the page from **Courses > Projections**.
 
 **Best for:** chairs and college analysts reviewing future section needs.
 
 [Enrollment Projections guide →](enrollment-projections)
+
+---
+
+### Courses menu
+
+The **Courses** dropdown holds everything looked up by course or section: one
+course's history, the term being registered for, and the sections that were
+cancelled.
+
+| Tab | What it answers |
+|-----|----------------|
+| **Course Dynamics** | One course: its enrollment trends, student flows, grade distributions, DFW by instructor type, retention and sequence comparisons. [Guide →](course-reports) |
+| **Regstats** | Which registration patterns differ from recent history? [Guide →](regstats) |
+| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
+| **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
+| **Projections** | What course demand and section need does the saved model estimate for the next Spring or Fall? [Guide →](enrollment-projections) |
+| **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
+
+For one course's retention, use Course Dynamics → Downstream → Coming Back.
 
 ---
 
@@ -96,20 +115,6 @@ routes a degree lays out.
 
 ---
 
-### Registration menu
-
-The **Registration** dropdown groups tools used during schedule planning and
-active registration review:
-
-| Tab | What it answers |
-|-----|----------------|
-| **Regstats** | Which registration patterns differ from recent history? [Guide →](regstats) |
-| **Projections** | What course demand and section need does the saved model estimate for the next Spring or Fall? [Guide →](enrollment-projections) |
-| **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
-| **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
-
----
-
 ### Bird's Eye menu
 
 The **Bird's Eye** dropdown holds the broad views across the institution, each
@@ -124,13 +129,8 @@ narrowed by campus, college, department or level:
 | **First Year** | How much of each entering class is still here after its first semesters, by how the students entered? [Guide →](first-year) |
 | **Retention** | After the first year: are students coming back each semester and keeping pace, which warning signs go with not returning, and in which courses does a DFW cost the most? [Guide →](retention) |
 | **Graduation** | Who leaves without a degree and how far along were they, which required courses did they never pass, and who finishes in the summer? [Guide →](graduation) |
-| **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
 
-**Course Dynamics** — the one-course view of enrollment trends, student flows,
-grade distributions, DFW by instructor type, retention, and sequence
-comparisons — is on the top-level navbar. [Guide →](course-reports)
-
-For one course's retention, use Course Dynamics → Downstream → Coming Back.
+For one course's history, see **Courses → Course Dynamics**.
 
 ---
 
