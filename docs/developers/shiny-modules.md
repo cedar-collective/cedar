@@ -441,7 +441,10 @@ the scope. It is not where a page explains itself.
   reads as a section of the page.** Reach for `section_heading()` only for a
   minor label inside an already-described block.
 - **Never use a bare `h3()`–`h6()`.** An unclassed heading renders at browser
-  default and will not match anything around it.
+  default and will not match anything around it. `test-architecture.R` holds
+  each file's count of them, of `style =` given a fixed string and of hex
+  colours written in R (M18, M17, M58): a count may only go down
+  ([ratchets](testing.md#a-backlog-held-by-a-ratchet)).
 - **`description` is not optional in spirit.** If a section genuinely needs no
   sentence, that is a signal the section may not need to exist.
 

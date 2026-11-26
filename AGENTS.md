@@ -167,6 +167,7 @@ The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `cla
 
 - **Current enrollment is never hidden** from descriptive charts; it is labelled. SCH is attempted hours at census (`filter_sch_rows()`).
 - A term counts as settled by pull date against its start, never by comparing row counts to prior years. An edge that cannot be determined is `NULL` and fails closed; startup stops without the settled and graded edges. Say which edge you used (`cedar_edge_note()`).
+- **A student's or a group's own latest term is not an edge:** mark the line `MAX-TERM-OK:` with the reason. `test-architecture.R` counts every `max(term)` and `slice_max(term)` without one (M3).
 - **Longitudinal follow-up** (retention, persistence, flows, sequences) stops at `last_enrolled_complete`, or `cedar_longitudinal_edge(edges, grade_dependent = TRUE)` when it reads a grade. Never let a partial term into a cohort, denominator or cache key.
 - **A row with no posted grade is unknown, never a failure.** Filter to `last_graded` before classifying; no catch-all `TRUE ~ "failed"`.
 - **An A→B analysis needs an opportunity edge:** drop A rows whose follow-up term is past `last_enrolled_complete`, report how many, and keep that separate from B's outcome edge.
@@ -275,6 +276,8 @@ if (!"dept_code" %in% names(df)) stop("dept_code column required")    # right
 - **Report duplication the search turns up** beyond the request as an `M` entry in `ISSUES.md`, and mention it; don't fold it into the change unasked.
 
 There is one canonical way to count each thing: census `add_census_enrl()`; DFW counts and rates `summarize_attempt_outcomes()` over `attempt_outcome_flags()` (`get_course_outcome_rates()` for a course page), with `classify_enrollment_outcomes()` only where no `cedar_attempts` exists (M53); term type `add_term_type_col()`; enrollment history `summarize_term_enrl_series()` / `format_term_history()`; a rate's trend across terms `compute_rate_trend()`. Shared visuals (sparklines, fill bars, badges) live in `R/modules/ui-helpers.R`. Duplicated logic is consolidated up a layer, never copied sideways.
+
+**A backlog is held by a ratchet.** Where the code does not yet meet a rule everywhere (inline styles, bare headings, hex colours in R, an unmarked `max(term)`, a DFW count divided by hand, a student scope written by hand, a reader classifying the class list, silent fallbacks), `test-architecture.R` holds each file's count, which may only go down. Write the new one the way the rule says; lower the number when you remove one; never raise it ([ratchets](docs/developers/testing.md#a-backlog-held-by-a-ratchet)).
 
 **Numbers.** Round for display only, once, in the display adapter. Counts whole, percentages one decimal, GPA and means two, SMDs three; more when the default would collapse a reported difference. Missing values show as an em dash. Identifiers (terms, CRNs, IDs, course numbers) get no separators or decimals. Don't apply one formatter to different kinds of column.
 
