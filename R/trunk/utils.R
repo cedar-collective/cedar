@@ -1133,3 +1133,4 @@ cedar_server_to_run <- function(read_now, compiled, path) {
   if (!identical(file.mtime(path), compiled$file_time)) return(read_now)
   compiled$fn
 }
+# A line no projection reads, on a branch that is never merged (see #414).
