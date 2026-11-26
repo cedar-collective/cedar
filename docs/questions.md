@@ -33,9 +33,9 @@ Not sure where to start? The [User Guide](users/) has a quick reference by role.
 **Short answer:** Look at sections below your enrollment thresholds, and at
 courses running well below their own history.
 
-**In CEDAR:** **Explore → Enrollment → Low Enrollment** lists active sections
-under configurable thresholds by course level; for a future term, its concerns
-mode uses prior patterns to flag courses likely to struggle. The **Dept
+**In CEDAR:** **Courses → Low Enrollment** lists active sections at or near
+the threshold for their course level; for a future term nobody has registered
+for, its schedule check compares each scheduled course with its own history. The **Dept
 Dashboard** (pick campus, department, and term, then **Gather Data**) shows
 courses running above and below their historical averages for the same kind of
 term.
@@ -44,7 +44,7 @@ term.
 count — it is labelled *in progress*. Compare it with earlier terms at the same
 point in registration, not with their final numbers.
 
-**More:** [Enrollment](users/enrollment-tab#low-enrollment) ·
+**More:** [Low Enrollment](users/low-enrollment) ·
 [Dept Dashboard](users/dept-dashboard)
 
 ### Is a course turning students away?

@@ -13,37 +13,7 @@ cancellationsUI <- function(id, sections, default_term, dept_choices) {
       "Cancellations",
       "Cancelled sections matching your filters, with timing shown relative to course start.",
       fluidRow(class = "explore-filter-row",
-        column(2,
-          selectizeInput(ns("cn_campus"), "Campus", multiple = TRUE,
-                         choices = sort(unique(sections$campus)),
-                         selected = cedar_campus_default(sections))
-        ),
-        column(1,
-          selectizeInput(ns("cn_college"), "College", multiple = TRUE,
-                         choices = sort(unique(sections$college)))
-        ),
-        column(2,
-          selectizeInput(ns("cn_term"), "Term", multiple = TRUE,
-                         choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = default_term)
-        ),
-        column(1,
-          selectInput(ns("cn_pt"), "PoT", multiple = TRUE,
-                      choices = sort(unique(sections$part_term)))
-        ),
-        column(2,
-          selectizeInput(ns("cn_dept"), "Department", multiple = TRUE,
-                         choices = as.list(dept_choices))
-        ),
-        column(1,
-          selectInput(ns("cn_im"), "Method", multiple = TRUE,
-                      choices = sort(unique(sections$delivery_method)))
-        ),
-        column(1,
-          selectInput(ns("cn_level"), "Level", multiple = TRUE,
-                      choices = sort(unique(sections$level)),
-                      selected = "lower")
-        ),
+        cedar_section_scope_inputs(ns, "cn", sections, dept_choices, default_term),
         column(2,
           filter_actions(
             cedar_requires(actionButton(ns("cn_button"), label = "Find Cancellations",

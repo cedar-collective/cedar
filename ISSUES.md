@@ -61,6 +61,10 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
+| [I89](#i89--low-enrollment-ignored-the-enrollment-bars-subject) | Defect | Low Enrollment ran under the Enrollment bar but built its own scope without Subject: a Subject choice narrowed the Courses table and not the Low Enrollment list beside it. Found 2026-11-26; the page now has its own bar |
+| [I88](#i88--low-enrollments-cards-and-colours-judged-a-crosslisted-section-on-its-own-students-and-its-list-on-the-combined-class) | Defect | Low Enrollment kept or dropped a crosslisted section by its combined class but counted its cards and coloured its cells by the section's own students, so one section could be listed as over its threshold and counted as under it. Found 2026-11-26; one band a row now |
+| [I87](#i87--low-enrollment-showed-a-list-missing-rows-after-a-threshold-was-raised) | Defect | Raising a Low Enrollment threshold after a run re-filtered the rows already fetched: at 20 the page showed the classes of up to 15 a run at 12 had fetched and none of those of 16 to 25. Found 2026-11-26; the thresholds are part of a run now |
 | [I86](#i86--retentions-course-list-stopped-with-an-error-when-its-students-held-no-graded-course) | Defect | Retention's "Courses Where a DFW Costs the Most" stopped with `object 'pop_p_value' not found` when the students of the chosen level and home campus held no graded course in the terms it reads: an error notice where an empty list belongs. Not seen on a page; found on the fixtures 2026-11-25 |
 | [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the session straight after the warm-up of a just-started process, four of four times on 2026-11-25. It was the browser-test driver: `connect()` took a quiet page for a started session, the test set the course, and the picker's one-time set-up then emptied it. A reader cannot do that. `connect()` now waits for the session's first busy-to-idle cycle (three of three fresh starts pass) |
 | [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
@@ -117,6 +121,156 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I90 — Low Enrollment read as not yet run when nothing was low, and dropped history from a long list without saying
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** low. No number was wrong; the page gave a reader the wrong
+account of what it had done.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+- `build_low_enrollment_alerts()` returns `NULL` when no section is at or near
+  its threshold. The page took `NULL` to mean it had not run, so a run that
+  found nothing showed "Click Gather Enrollments above to load data, then open
+  this tab", and its "No Courses Found" message could not be reached.
+- History lines are added only to a list of 500 rows or fewer
+  (`history_limit`). A longer list showed a dash in every Prior History cell,
+  the same as a section with no history, and nothing said the lookup had been
+  skipped.
+
+### Reproduce (before the fix)
+
+On the fixtures: `build_low_enrollment_alerts(test_sections, list(term =
+"202010", level = "lower"))` is `NULL`; and
+`build_low_enrollment_alerts(test_sections, list(term = "202010"),
+history_limit = 2L)$history_text` is `NA` for all four sections.
+
+### Fix
+
+`build_low_enrollment_page()` returns a payload for every run: a run that
+lists nothing says "Nothing to review" with what was looked for, and one too
+long for history says so above the list (`history_skipped`).
+`test-low-enrollment-page.R` holds both ("a scope with nothing small lists
+nothing…", "a list too long for history lines says so…").
+
+---
+
+## I89 — Low Enrollment ignored the Enrollment bar's Subject
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. With a Subject chosen, the list held sections the bar
+above it said were out of scope.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+Low Enrollment was a sub-tab under the Enrollment bar and ran on its Gather
+Enrollments button, but built its own options from the bar's inputs. It read
+campus, college, department, term, part of term, course, instructor, level
+and the exclude-list box, and left out Subject. It also read `enrl_im` and
+`enrl_gen_ed`, two inputs the page no longer has. A reader who chose one
+Subject of a department saw that subject in the Courses table and every
+subject of the department under Low Enrollment.
+
+### Reproduce (before the fix)
+
+`git show 60df9ad:server.R`: the `opt` list in `low_enrl_data` has no `subj`,
+while the Courses table's has (`opt[["subj"]] <- input$enrl_subj`). On the
+page: a department with two subjects, one of them chosen in Subject, Gather
+Enrollments, then the Low Enrollment sub-tab.
+
+### Fix
+
+Low Enrollment is its own page (Courses > Low Enrollment,
+`R/modules/low-enrollment.R`) with its own bar, the seven scope inputs every
+section page shares (`cedar_section_scope_inputs()`), and its run reads every
+one of them.
+
+---
+
+## I88 — Low Enrollment's cards and colours judged a crosslisted section on its own students, and its list on the combined class
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. The rows listed were right; a card count and a cell
+colour were wrong for crosslisted sections.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix. The Dept Dashboard's Low Enrollment Review was not affected:
+it reads the stored band.
+
+### What was wrong
+
+Since adc3de4 (2026-07-27) a section is kept or dropped on its combined class
+(`.alert_enrl`, the crosslist total where there is one), and
+`build_low_enrollment_alerts()` stores its band from that number
+(`severity`). The page's summary cards recomputed the band from `enrolled`,
+the section's own students, and coloured the Enrolled column the same way,
+while "How to read this table" said Course Total was the column coloured. So
+a crosslisted section could be listed as just over its threshold and counted
+on a card as under it. The cell colour also turned green at exactly the
+threshold, where the cards called the same class a watch.
+
+### Reproduce (before the fix)
+
+On the fixtures, Spring 2020: HIST 484-001 has 8 students of its own in a
+combined class of 11, against a split-level threshold of 10.
+`build_low_enrollment_alerts(test_sections, list(term = "202010"))` gives it
+`severity == "buffer"`; `low_enrollment_severity(8, 10)`, which is what the
+cards counted, is `"watch"`.
+
+### Fix
+
+One band a row. The page reads the stored band
+(`R/features/low-enrollment.R`), its cards count it, and its table colours XL
+Total, the number judged, by it. `test-low-enrollment-page.R` holds it ("a
+section's band is its class against its own threshold…").
+
+---
+
+## I87 — Low Enrollment showed a list missing rows after a threshold was raised
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. A reader who raised a threshold saw a shorter list than
+the threshold describes, with nothing to say so.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+A run fetched its sections once, under the thresholds at the click: a section
+is kept when its class is within a quarter above its level's threshold. The
+threshold inputs then re-filtered that fetch as they changed. Lowering one
+narrowed the list correctly. Raising one could only keep what had been
+fetched: a run at the standard 12 holds classes of up to 15, so raising the
+threshold to 20 showed those classes judged against 20, and none of the
+classes of 16 to 25 that a threshold of 20 lists.
+
+### Reproduce (before the fix)
+
+On the fixtures: `build_low_enrollment_alerts(test_sections, list(term =
+"202010"))` returns 4 sections. `collect_low_enrollment_threshold_rows()` of
+those rows at thresholds of 20, which is what the page showed after the
+inputs were raised, still returns 4. A run at 20 returns 15.
+
+### Fix
+
+The thresholds are part of a run, like its terms: they sit folded under
+"Adjust thresholds" in the page's filter bar, are read at the click, and the
+scope bar states the ones the list on screen was run with.
+`test-low-enrollment-page.R` holds it ("the thresholds are the run's…").
+
+---
 
 ## I86 — Retention's course list stopped with an error when its students held no graded course
 
@@ -5003,8 +5157,10 @@ inline tabs are modules (templates: `R/modules/headcount.R`,
 `R/modules/dept-trends.R`), with logic in branches/cones/features. On
 2026-11-26: 6,049 lines and 19 module servers mounted. The pages still
 written in it, by their outputs: Course Dynamics (`cr_`, 59), the Dept
-Dashboard (`dashboard_`, 18), Low Enrollment (`low_`, 8), Enrollment
-(`enrl_`, 7) and Admin's mappings (`mapping_`, 7).
+Dashboard (`dashboard_`, 18), Enrollment (`enrl_`, 7) and Admin's mappings
+(`mapping_`, 7). Low Enrollment left it the same day
+(`R/modules/low-enrollment.R`, with `R/features/low-enrollment.R`): 5,445
+lines and 20 module servers.
 
 **M15 — `ggplot` charts.** Six remain. *Done when:* each is native `plot_ly()`.
 On 2026-11-26 three remain: `R/cones/pathway.R`, `R/cones/population-trend.R`
@@ -5033,7 +5189,8 @@ and `R/modules/enrollment-projections.R` 1,999.
 (133 lines on 2026-11-14, 91 of them in `server.R`). *Done when:* replaced by shared helpers and CSS classes
 (`R/modules/ui-helpers.R`), one tab per PR. On 2026-11-26: 101 in the modules,
 `server.R` and `ui.R`; 61 of them in `server.R`, most under the Dept
-Dashboard's outputs, then Low Enrollment's. *Held since 2026-11-26* by
+Dashboard's outputs, then Low Enrollment's (54 in `server.R` and none in
+`ui.R` once Low Enrollment became a module). *Held since 2026-11-26* by
 `tests/testthat/test-architecture.R` ("inline styles given a fixed string do
 not grow"): 102 `style =` given a fixed string, in 10 files, each file's
 count an allowance that may only go down. A style built from a value (24
@@ -5042,7 +5199,8 @@ count an allowance that may only go down. A style built from a value (24
 **M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
 `subtab_header()`, `dashboard_section()`, `dashboard_subsection()`, or
 `section_heading()` with its one-sentence description. On 2026-11-26: 38; 22
-of them in `server.R`, 16 of those Low Enrollment's. *Held since 2026-11-26*
+of them in `server.R`, 16 of those Low Enrollment's (8 in `server.R` once
+Low Enrollment became a module). *Held since 2026-11-26*
 by `tests/testthat/test-architecture.R` ("bare headings do not grow"): 37 in
 7 files, each file's count an allowance that may only go down
 (`R/modules/ui-helpers.R` is left out: the section helpers write their own
@@ -5141,7 +5299,14 @@ campus "Albuquerque/Main" where the rest say ABQ; the Waitlists campus box
 wraps to one chip per line; empty states say "Select X, then click Y" except
 Pathways', which says what each subtab will show. *Done when:* labels, campus
 values and empty states follow one pattern (Pathways' start card for the
-empty state).
+empty state). *2026-11-26:* the scope inputs of Regstats, Open Seats,
+Waitlists, Low Enrollment, Cancellations and Enrollment come from one builder
+(`cedar_section_scope_inputs()`, `R/modules/ui-helpers.R`): one label, order,
+width and default for each, and a page states only where it differs.
+Headcount's labels, Pathways' campus names and the empty states remain. So
+does a narrow window: at 1,024 pixels wide the section pages' bar does not
+wrap, its link menu ends past the right edge (24 pixels on Cancellations, 39
+on Low Enrollment, measured in the app) and the page scrolls sideways.
 
 **M48 — Dept Dashboard lists run unbounded.** "Missing vs. two years ago" listed
 32 HIST courses with no cap or collapse, and the Low Enrollment table clips

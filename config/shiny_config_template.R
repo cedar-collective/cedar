@@ -19,7 +19,7 @@ cedar_output_dir <- file.path(cedar_base_dir, "output")
 # Spring schedule in October, say) is selectable as soon as it is loaded.
 
 # The term the institution is in now. A later term with sections but no
-# enrollments is treated as upcoming: Enrollment's low-enrollment view compares
+# enrollments is treated as upcoming: Courses > Low Enrollment compares
 # its scheduled courses with past offerings of the same season instead of
 # flagging every empty section. Enrollment's trend charts also stop here.
 cedar_current_term <- 202680

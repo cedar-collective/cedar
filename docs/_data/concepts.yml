@@ -105,3 +105,19 @@ concepts:
     they took, and which majors they were in. A major whose summer finishers
     mostly carried a full load is a program built to end in summer. Finishers
     who took one course, or none, were completing a last requirement.
+  low-enrollment.sections: >-
+    Each row is a section meeting this term with few students in it, set
+    against the size your college expects of a class at its level. A
+    crosslisted section is judged by the whole class that meets together, not
+    by its own share of it. The colours say how far under the line a class is;
+    the green rows are over it, but close enough to slip under if a few
+    students drop. Read it as a list to look into, not a verdict: a small class
+    may be a required course, a capstone or a section added on purpose, and
+    none of that shows here.
+  low-enrollment.schedule-check: >-
+    Nobody has registered for this term yet, so there are no students to
+    count. Each course on the schedule is set instead against how it filled in
+    the same season before: a course that has run small is likely to run small
+    again unless something has changed. A course never offered in that season
+    is listed too, because there is nothing to judge it by. This cannot see why
+    a course ran small, or a change in when, where or by whom it is taught.

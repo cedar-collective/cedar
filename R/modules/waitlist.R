@@ -149,32 +149,10 @@ waitlistUI <- function(id, sections, default_term, dept_choices) {
       # Bootstrap columns summing to 12 so the bar wraps/stacks on small screens
       # instead of clipping. Do NOT reintroduce per-column fixed widths here.
       fluidRow(class = "explore-filter-row",
-        column(1,
-          selectizeInput(ns("wl_campus"), "Campus", multiple = TRUE,
-                         choices = sort(unique(sections$campus)),
-                         selected = cedar_campus_default(sections))
-        ),
-        column(1,
-          selectizeInput(ns("wl_college"), "College", multiple = TRUE,
-                         choices = sort(unique(sections$college)))
-        ),
-        column(2,
-          selectizeInput(ns("wl_term"), "Term", multiple = TRUE,
-                         choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = default_term)
-        ),
-        column(1,
-          selectInput(ns("wl_pt"), "PoT", multiple = TRUE,
-                      choices = sort(unique(sections$part_term)))
-        ),
-        column(2,
-          selectizeInput(ns("wl_dept"), "Department", multiple = TRUE,
-                         choices = dept_choices)
-        ),
-        column(1,
-          selectizeInput(ns("wl_level"), "Level", multiple = TRUE,
-                         choices = sort(unique(sections$level)))
-        ),
+        cedar_section_scope_inputs(
+          ns, "wl", sections, dept_choices, default_term,
+          fields = c("campus", "college", "term", "pt", "dept", "level"),
+          widths = c(campus = 1), level_selected = NULL),
         column(2,
           selectizeInput(ns("wl_course"), "Course", multiple = TRUE, choices = NULL)
         ),

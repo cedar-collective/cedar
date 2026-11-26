@@ -301,6 +301,12 @@ cedar_home_ui <- function() {
           "bullseye"
         ),
         cedar_home_card(
+          "Low Enrollment",
+          "Sections running under the enrollment expected for their level, and scheduled courses that have run small.",
+          "?tab=low-enrollment",
+          "exclamation-triangle"
+        ),
+        cedar_home_card(
           "Cancellations",
           "Review canceled courses by term, campus, department, and course level.",
           "?tab=cancellations",
@@ -338,7 +344,7 @@ cedar_home_ui <- function() {
         class = "cedar-home-grid cedar-home-grid--explore",
         cedar_home_card(
           "Enrollment",
-          "Section and course enrollment views with low-enrollment review.",
+          "Seats and enrollment for the sections you choose, and which courses are growing or shrinking.",
           "?tab=enrollment",
           "table",
           "Best for schedule review and section-level questions."
@@ -1364,6 +1370,12 @@ nav_panel(
   ), # end projections nav_panel
 
   nav_panel(
+    title = "Low Enrollment",
+    icon = icon("exclamation-triangle"),
+    lowEnrollmentUI("low_enrollment", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ), # end low enrollment nav_panel
+
+  nav_panel(
     title = "Cancellations",
     icon = icon("ban"),
     cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
@@ -1417,43 +1429,9 @@ nav_panel(
       "Enrollment",
       "Seats and enrollment for the sections you choose, from the first day of classes to the end of the term.",
     fluidRow(
-      column(2,
-             selectizeInput(
-               inputId = "enrl_campus",
-               label = "Campus",
-               multiple = TRUE,
-               choices  = sort(unique(cedar_sections$campus)),
-               selected = cedar_campus_default(cedar_sections)),
-      ),
-      column(1,
-             selectizeInput(
-               inputId = "enrl_college",
-               label = "College", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$college))),
-      ),
-      column(2,
-             selectInput(
-               inputId = "enrl_term",
-               label = "Term",
-               multiple = TRUE,
-               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)), decreasing = TRUE),
-               selected = as.character(cedar_default_term)),
-      ),
-      column(1,
-             selectInput(
-               inputId = "enrl_pt",
-               label = "PoT",
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$part_term))),
-      ),
-      column(3,
-             selectizeInput(
-               inputId = "enrl_dept",
-               label = "Department",
-               multiple = TRUE,
-               choices = .dept_choices),
-      ),
+      cedar_section_scope_inputs(
+        identity, "enrl", cedar_sections, .dept_choices, cedar_default_term,
+        fields = c("campus", "college", "term", "pt", "dept"), widths = c(dept = 3)),
       column(1,
              selectizeInput(
                inputId = "enrl_subj",
@@ -1656,105 +1634,6 @@ nav_panel(
           )
         ),
         reactable::reactableOutput("enrl_summary")
-      ),
-
-      # Low enrollment — mode banner, summary cards, thresholds, then level sub-tabs
-      nav_panel(
-        title = "Low Enrollment",
-        value = "low_enrl",
-        icon = icon("exclamation-triangle"),
-
-        subtab_header(
-          "Low Enrollment",
-          "Sections running under the review thresholds, split by course level ",
-          "because the bar differs for each. Set the thresholds below to match your ",
-          "own review rule. For current and past terms this reports what enrollment ",
-          "actually was. A future term nobody has registered for gets a schedule ",
-          "check instead: each scheduled course against its own history, flagging ",
-          "what looks at risk. Once registration opens, it reports the registrations ",
-          "so far and says when they were pulled \u2014 the banner tells you which you are seeing."
-        ),
-
-        # Mode banner — shown when a future term triggers concerns mode
-        uiOutput("enrl_mode_banner"),
-
-        # Summary stat cards — shown above sub-tabs once data is gathered
-        uiOutput("low_enrl_summary"),
-
-        # Threshold controls and calculate button
-        div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
-          span("Thresholds:", style = "font-weight: 600; color: var(--text-secondary); padding-bottom: 6px; white-space: nowrap;"),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_lower", "Lower div", value = 12, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_upper", "Upper div", value = 12, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
-          ),
-          conditionalPanel(
-            condition = "output.low_enrl_schedule_check !== 'true'",
-            div(style = "width: 100px;",
-              numericInput("low_enrl_min_enrl", "Min enrolled", value = 1, min = 0, max = 1000, step = 1)
-            )
-          ),
-          div(style = "padding-bottom: 6px;",
-            uiOutput("low_enrl_download_ui"))
-        ),
-
-        info_panel("How to read this table",
-          tags$p(tags$strong("Current / past terms (alerts mode):"), class = "mb-1"),
-          tags$ul(
-            tags$li(tags$strong("Sects"), " — number of active home sections of this course in the selected term."),
-            tags$li(tags$strong("Enrolled"), " — this section's own registered student count."),
-            tags$li(tags$strong("XL Total"), " — for crosslisted sections, the combined count across all partner sections; equals Enrolled for non-crosslisted courses."),
-            tags$li(tags$strong("Course Total"), " — sum of XL Total across all home sections of this course. Color-coded against the threshold.")
-          ),
-          tags$p(tags$strong("Schedule check (a future term with no registrations yet):"), class = "mt-2 mb-1"),
-          tags$ul(
-            tags$li(tags$strong("Sects"), " — number of scheduled home sections."),
-            tags$li(tags$strong("Hist Avg"), " — average combined enrollment over the course's last 4 same-season terms on the same campus. Color-coded against the threshold; a dash when there are none."),
-            tags$li(tags$strong("Trend"), " — ↑ up / ↓ down / ↔ stable based on linear regression slope across prior terms."),
-            tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average."),
-            tags$li(tags$strong("Prior History"), " — those terms' enrollment. A course with none lists its latest offerings in other seasons, on other campuses or as other topics; they never set the average.")
-          ),
-          tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", class = "mt-2"),
-          cedar_docs_link("users/enrollment-tab")
-        ),
-
-        navset_tab(
-          id = "low_enrl_tabs",
-          nav_panel(
-            title = "Lower",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_lower")
-          ),
-          nav_panel(
-            title = "Upper",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_upper")
-          ),
-          nav_panel(
-            title = "Split",
-            icon = icon("exclamation-triangle"),
-            br(),
-            p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section ≤499 and one ≥500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
-              class = "cedar-body"),
-            reactable::reactableOutput("low_enrl_table_split")
-          ),
-          nav_panel(
-            title = "Graduate",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_grad")
-          )
-        ) # end low_enrl navset_tab
       ),
 
       # Filter-driven course trend explorer — single dept only

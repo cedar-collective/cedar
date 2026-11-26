@@ -193,6 +193,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/admin.R")
   source_file("features/course-report.R")
   source_file("features/enrollment.R")
+  source_file("features/low-enrollment.R")
   source_file("features/dept-dashboard.R")
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")
@@ -230,6 +231,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/headcount.R")
     source_file("modules/seatfinder.R")
     source_file("modules/cancellations.R")
+    source_file("modules/low-enrollment.R")  # Courses > Low Enrollment
     source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
     source_file("modules/retention-dashboard.R")  # Bird's Eye > Retention
     source_file("modules/first-year.R")  # Bird's Eye > First Year (after Retention: it reads RETENTION_TERM_TYPES)

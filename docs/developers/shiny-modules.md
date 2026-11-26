@@ -436,6 +436,27 @@ the scope. It is not where a page explains itself.
 - **No page-level paragraph** restating the time scope above the tabs: the
   charts mark in-progress terms (`mark_plotly_terms()`) and the bar names them.
 
+### A section page's filter bar
+
+Regstats, Open Seats, Waitlists, Low Enrollment, Cancellations and Enrollment
+ask the same questions of `cedar_sections`: campus, college, term, part of
+term, department, method, level.
+
+- **The inputs come from `cedar_section_scope_inputs(ns, prefix, sections,
+  dept_choices, default_term)`** (`ui-helpers.R`): one label, order, width and
+  default for each, with ids `<prefix>_<field>` matching the page's
+  `CEDAR_SHARE_SPECS` fields. A page states only where it differs (`fields`,
+  `widths`, `labels`, `level_selected`) and writes its own extra inputs beside
+  them. Never hand-write one of the seven.
+- **Thresholds a reader may adjust are folded** under one line
+  (`cedar_threshold_fold()`), which the server fills with
+  `cedar_threshold_state()`: "standard values", or each value changed. They
+  are read at Run, carried by the page's link, and stated in the scope bar.
+  Regstats and Low Enrollment are the two users.
+- Low Enrollment (`R/modules/low-enrollment.R`) is the shortest whole example:
+  bar, run button that waits for a term, overlay, scope bar of facts, one
+  section with its method, link copy and restore.
+
 ### Headings
 
 - **A subtab opens with `subtab_header()`, never with a section bar.** The
@@ -505,6 +526,7 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 | `headcount.R` | `headcountUI/Server` | Bird's Eye > Headcount |
 | `seatfinder.R` | `seatfinderUI/Server` | Courses > Open Seats |
 | `cancellations.R` | `cancellationsUI/Server` | Courses > Cancellations |
+| `low-enrollment.R` | `lowEnrollmentUI(id, sections, default_term, dept_choices)`, `lowEnrollmentServer(id, sections, current_term, min_days_after_start, error_handler)` | Courses > Low Enrollment: the seven shared scope inputs, thresholds folded under "Adjust thresholds" (`cedar_threshold_fold()`) and read at Run, then `build_low_enrollment_page()`'s payload drawn as notes, cards and one table a level. Deep-linkable (`?tab=low-enrollment`) |
 | `dfw-rates.R` | `dfwRatesUI(id, campuses)`, `dfwRatesServer(id, attempts, dims, edges, active)` | Bird's Eye > DFW Rates: lower-division DFW one term type at a time (Term type and Campus, deep-linkable, no run button); builds only while the tab is open, once per term type and campus a session asks for; every number from `build_dfw_dashboard()` through `features/dfw-dashboard-view.R` |
 | `waitlist.R` | `waitlistUI/Server` | Courses > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
