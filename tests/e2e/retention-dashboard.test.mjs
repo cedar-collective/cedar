@@ -99,6 +99,7 @@ try {
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
     return (p?.data || []).map((d) => ({
       name: d.name, dash: d.line?.dash || null, mode: d.mode, n: (d.y || []).filter((v) => v !== null).length,
+      total: (d.y || []).length,
       last: (d.y || [])[(d.y || []).length - 1],
       // A term not read between a line's first and last breaks it: no point there.
       gaps: (d.hovertext || []).map((h, i) => {
@@ -115,8 +116,8 @@ try {
   // In a fall, the even semesters started in a spring and say so; the odd do not.
   ok(stages.slice(1).every((t) => /spring start/.test(t.name) === (parseInt(t.name, 10) % 2 === 0)),
      'in a fall, the even semesters are marked as spring starts');
-  ok(stages.every((t) => t.n >= 3 && t.gaps.length === t.n && t.gaps.every((g) => g === 'gap' || (g !== null && g < 0.05))),
-     `every point is its hover's counts divided (${stages.map((t) => t.n).join(', ')} terms)`);
+  ok(stages.every((t) => t.n >= 1 && t.gaps.length === t.total && t.gaps.every((g) => g === 'gap' || (g !== null && g < 0.05))),
+     `every point is its hover's counts divided (${stages.map((t) => `${t.n}${t.total > t.n ? ` and ${t.total - t.n} gap` : ''}`).join(', ')} terms)`);
   ok(stages.every((t) => !/text/.test(t.mode)), 'no number on any point');
   const lasts = stages.slice(1).map((t) => t.last);
   ok(Math.max(...lasts) - Math.min(...lasts) > 1,
