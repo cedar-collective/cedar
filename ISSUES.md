@@ -5618,7 +5618,14 @@ second attempt, same commit, passed in 8m29s. The step's screenshot
 (`/tmp/cedar-smoke-regstats-runs.png`) is not among the files the workflow
 uploads (`.github/workflows/pr-checks.yml` keeps the compose log and
 `/tmp/cedar-synthetic-demo.png`), so whether the sub-tab never opened or
-opened empty is not known. *Reproduce:* not on demand; one failure seen.
+opened empty is not known. **A second failure, on another step (2026-11-26, run 45884238534,
+attempt 1).** #422 changed `ISSUES.md` and `ROADMAP.md`. The R suite passed
+(9,351) and so did eight browser steps, then "Pathways Roadblocks reads the
+attempt table" timed out waiting for the attempt outcomes, 90 seconds after
+"Pathways population builds" passed. The re-run of the same commit passed in
+7m52s. So it is not one step: two steps that each open a sub-tab and wait for
+its output, on runs that change no code. *Reproduce:* not on demand; two
+failures seen.
 *Done when:* the workflow uploads every `/tmp/cedar-smoke-*.png` a failed
 step saves, and either the cause is found from one or `clickSubTabIn()`
 waits for the tab it clicked to be the active one before the step reads it.
