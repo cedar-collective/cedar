@@ -223,6 +223,16 @@ DFW Rates is built ahead too, after Graduation (`dfw_rates_payload_job()`,
 Its one timed build on production took 12 seconds; on a development machine
 it takes 7 to 16.
 
+Headcount's program choices with nothing picked are the first job of all
+(`headcount_choices_job()`, `headcount_preload_jobs()`,
+`R/modules/headcount.R`), and for another reason. No page opens on them:
+every session asks for them as it starts, on whatever page it opened, because
+the module's set-up fills its Major, Minor and Concentration pickers. They
+were shared already, so the first session of a process counted them for the
+rest, inside its own start (ISSUES M75). **A result every session reads as it
+starts is built ahead however small**: what it costs is paid once either way,
+and the build-ahead pays it where nobody is waiting.
+
 ### Downstream, for the courses analysed most
 
 Course Dynamics > Downstream is opened for a course the reader picks, so no
