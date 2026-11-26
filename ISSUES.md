@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Retention's By Classification table, Pathways Course Timing and Regstats' fall sophomores read across it unmarked |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -122,6 +123,85 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I92 — Classification changed meaning from Summer 2025: a student now sits a step lower, and every reading by classification crosses the change unmarked
+
+**Status:** open. The change is in the data; what CEDAR lacks is the record
+of it and a mark on the readings that cross it.
+**Found:** 2026-11-26, drawing the Retention page's return rate at each
+classification (branch `retention/stage-headline`, held for it).
+**Affects:** every comparison by `student_classification` across Summer 2025:
+Retention's By Classification table (on production now), Pathways Course
+Timing (classification is its default axis), Regstats' fall sophomore
+courses (`classification = "Sophomore, 2nd Yr"`), the entering-class reading
+by classification, the course demographics by classification, and the
+projections' cohort composition. About two dozen files read the column.
+
+### What was seen
+
+`cedar_student_terms` takes classification from academic studies where it
+has a row and from the class list otherwise (`.prefer_programs()`,
+`R/branches/student-terms.R`). For every undergraduate student-term present
+in both, the two agree on 99.3% to 100% of rows in every term from Fall 2019
+to Fall 2026, except two:
+
+| Term | Agree | Academic studies a step lower |
+|---|---|---|
+| Spring 2025 | 100.0% | 0.0% |
+| Summer 2025 | 90.3% | 9.7% |
+| Fall 2025 | 76.0% | 23.9% |
+| Spring 2026 | 100.0% | 0.0% |
+| Fall 2026 | 99.6% | 0.0% |
+
+Enrolled undergraduates each fall, as stored against the class list's own
+value: through Fall 2024 the two counts of each classification agree within
+1%. In Fall 2025 the stored first-semester freshmen are 1.7 times the class
+list's, the second-semester freshmen 42% fewer and the seniors 18% fewer. In
+Fall 2026 the two agree again, and both look like Fall 2025 as stored: about
+as many first-semester freshmen, and as few seniors.
+
+### What it most likely is
+
+A change in how a student is classified, in effect by late May 2025, that
+places a student a step lower; and a class list that carries the
+classification a student had when they registered. Fall 2025's registrations
+were made in Spring 2025, under the earlier rule; academic studies' Fall 2025
+rows (pulled 2025-11-06) carry the new one; by Spring 2026 both are under the
+new rule. Earned credits fit it: in Fall 2024 the middle second-semester
+freshman had earned about 6 credits; in Fall 2025, as stored, about 21. One
+reading is that the earlier rule counted hours in progress and the new one
+counts earned hours only. **Not confirmed with the registrar.**
+
+What it does to a reading: on Retention, first-semester freshmen came back
+next term at 77.8% in Fall 2024 and 87.6% in Fall 2025, and second-semester
+freshmen at 90.1% and 85.6%. Most or all of both moves is who the
+classification holds, not whether students came back. A trend fitted across
+the change reads it as one.
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+cl <- qs2::qs_read(file.path(cedar_data_dir, "cedar_registrations.qs"))
+ugc <- c("Freshman, 1st Yr, 1st Sem", "Freshman, 1st Yr, 2nd Sem", "Sophomore, 2nd Yr",
+         "Junior, 3rd Yr", "Senior, 4th Yr")
+a <- dplyr::distinct(cedar_programs, student_id, term, as_cls = student_classification)
+b <- dplyr::distinct(cl, student_id, term, cl_cls = student_classification)
+dplyr::inner_join(a, b, by = c("student_id", "term")) |>
+  dplyr::filter(as_cls %in% ugc, cl_cls %in% ugc) |>
+  dplyr::mutate(d = match(as_cls, ugc) - match(cl_cls, ugc)) |>
+  dplyr::group_by(term) |>
+  dplyr::summarize(agree = mean(d == 0), as_lower = mean(d < 0))
+```
+
+### Done when
+
+The change is confirmed (its first term and what it counts) and recorded as
+an entry in `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`), annotated,
+never recoded; and every reading that follows classification across terms
+either marks the break on its chart and fits no trend across it, or reads a
+measure the change does not touch (credits earned, semesters here). The
+Retention stages wait on the second.
 
 ## I91 — The running credit total counts attempted credits, and read as earned it disagrees with classification
 
