@@ -226,11 +226,12 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     })
 
     bands <- reactive({
-      req(isTRUE(active()), input$term_type, input$band_by)
+      req(isTRUE(active()), input$term_type, input$level, input$band_by)
       if (identical(input$band_by, "hs") && is.null(applicants)) return(NULL)
-      cedar_shared_result(list("retention_bands", input$term_type, input$campus, input$band_by), function() tryCatch(
+      cedar_shared_result(list("retention_bands", input$term_type, input$level, input$campus, input$band_by), function() tryCatch(
         retention_dashboard_band_courses(attempts, student_terms, applicants, list(
-          term_type = input$term_type, campus = if (length(input$campus) > 0) input$campus else NULL,
+          term_type = input$term_type, student_level = input$level,
+          campus = if (length(input$campus) > 0) input$campus else NULL,
           data_edges = edges, band_by = input$band_by)),
         error = function(e) {
           showNotification(paste("Courses by GPA:", conditionMessage(e)), type = "error", duration = 10)
@@ -249,8 +250,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       m <- b$meta
       tags$ul(
         tags$li(paste0("Graded attempts in ", paste(vapply(m$terms, fmt_term, character(1)), collapse = ", "),
-                       ", by the campus that taught the course (the campus chosen above). Every student in the course ",
-                       "is read, whatever their level: the Student level chosen above does not narrow this section. The GPA band is ",
+                       " by students at the chosen level and home campus that term, transfer students included. ",
+                       "Each course is read by the campus that taught it, and a student's other courses count ",
+                       "wherever they were taught. The GPA band is ",
                        if (m$band_by == "entering") "the GPA a continuing student brought into the term, counted from their own earlier terms here; first-term students have none"
                        else "the high-school GPA on file for a student in their first graded term here",
                        ". A student is read once for each term: ", fmt_count(m$n_banded), " in all. ",

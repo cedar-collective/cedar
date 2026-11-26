@@ -8,8 +8,8 @@
 // labelled with its slope and verdict (no cards), the warning-sign table (a late withdrawal and a DFW grade, each with
 // and without), the classification and college tables with a trend line and
 // no word, the course table, every method slot filled; a re-read when the
-// term type or the student level changes; and the home card's
-// link.
+// term type or the student level changes, the courses-by-GPA section with
+// the rest of the page (ISSUES M67); and the home card's link.
 //
 //   node tests/e2e/retention-dashboard.test.mjs
 
@@ -190,6 +190,10 @@ try {
   ok((await outputsInError(page, NS)).length === 0, `no output in error on spring terms (${(await outputsInError(page, NS)).join('; ')})`);
 
   const undergrad = await page.evaluate(plotX);
+  // The courses-by-GPA sentence for undergraduates, to set beside the next level's.
+  const bandText = () => document.getElementById('retention_dashboard-bands_finding')?.innerText.trim() || '';
+  await waitFor(page, bandText, { timeout: 240000 });
+  const undergradBands = await page.evaluate(bandText);
   // The second level in student_levels.csv (graduate at UNM). A home campus
   // changes little at the undergraduate level: nearly all are ABQ students.
   const second = await page.$eval(`#${NS}level`, (el) => Object.values(el.selectize?.options || {})
@@ -209,6 +213,12 @@ try {
   const [counted] = await readScope();
   ok(/^Counted, Spring \d{4}$/.test(counted?.key || '') && counted.val !== scope[0]?.val,
      `the scope bar re-reads with the level and term type (${counted?.key}: ${counted?.val})`);
+  // The section reads the page's students: another level is another reading.
+  const bandsReread = await waitFor(page, (before) => {
+    const now = document.getElementById('retention_dashboard-bands_finding')?.innerText.trim() || '';
+    return !!now && now !== before;
+  }, { timeout: 240000, args: [undergradBands] });
+  ok(bandsReread, `the courses-by-GPA section re-reads with the student level (was: ${undergradBands.slice(0, 40)})`);
 
   await connect(page, { tab: 'home' });
   const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=retention'));

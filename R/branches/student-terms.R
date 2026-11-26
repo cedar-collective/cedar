@@ -749,3 +749,25 @@ thin_class_list <- function(students) {
   for (a in keep_attrs) attr(thin, a) <- attr(students, a)
   thin
 }
+
+#' The enrolled student-terms of a student level and a home campus
+#'
+#' The scope a page about students applies: who was enrolled in a term at
+#' this level (their level that term) with this home campus. A student-term
+#' with no level or no home campus on record is in no named scope.
+#'
+#' @param student_terms `cedar_student_terms`, or rows of it.
+#' @param student_level Level codes to keep; NULL keeps every level.
+#' @param student_campus Home campuses to keep; NULL keeps every home campus.
+#' @return The `enrolled` rows of `student_terms` in that scope.
+scope_student_terms <- function(student_terms, student_level = NULL, student_campus = NULL) {
+  missing <- setdiff(c("student_id", "term", "enrolled", "student_level", "student_campus"), names(student_terms))
+  if (length(missing) > 0L) {
+    stop("[student-terms.R] scope_student_terms(): student_terms lacks ", paste(missing, collapse = ", "),
+         call. = FALSE)
+  }
+  rows <- student_terms %>% filter(enrolled)
+  if (!is.null(student_level)) rows <- rows %>% filter(.data$student_level %in% .env$student_level)
+  if (!is.null(student_campus)) rows <- rows %>% filter(.data$student_campus %in% .env$student_campus)
+  rows
+}

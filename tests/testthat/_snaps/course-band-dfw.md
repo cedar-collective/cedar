@@ -1,4 +1,4 @@
-# BD01: the page's lists, their count by chance and the sentence
+# BD02: the page's lists, their count by chance and the sentence
 
     Code
       cat(retention_band_sentence(r), retention_band_sentence(two),

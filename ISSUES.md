@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M75 | Improvement | See [Improvements](#improvements) |
+| M1–M76 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -60,6 +60,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I86](#i86--retentions-course-list-stopped-with-an-error-when-its-students-held-no-graded-course) | Defect | Retention's "Courses Where a DFW Costs the Most" stopped with `object 'pop_p_value' not found` when the students of the chosen level and home campus held no graded course in the terms it reads: an error notice where an empty list belongs. Not seen on a page; found on the fixtures 2026-11-25 |
 | [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the session straight after the warm-up of a just-started process, four of four times on 2026-11-25. It was the browser-test driver: `connect()` took a quiet page for a started session, the test set the course, and the picker's one-time set-up then emptied it. A reader cannot do that. `connect()` now waits for the session's first busy-to-idle cycle (three of three fresh starts pass) |
 | [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
 | [I83](#i83--a-deep-links-loading-notice-gave-no-estimate-and-no-running-count) | Defect | A link that runs a report on arrival (`autorun=true`) showed a bare "Loading…" until the report arrived: no estimate and no running count, because the overlay it opens before Shiny connects never went through the code that writes them (resolved 2026-11-25) |
@@ -114,6 +115,40 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I86 — Retention's course list stopped with an error when its students held no graded course
+
+**Status:** resolved 2026-11-25 (branch `retention/band-courses-page-scope`).
+**Found:** 2026-11-25, writing a test that the section reads the students'
+home campus (M67).
+**Severity:** low. No number was wrong: an error notice where an empty list
+belongs, in a scope not seen on a page.
+**Affects:** `retention_dashboard_course_list()`
+(`R/features/retention-dashboard.R`), the Retention page's "Courses Where a
+DFW Costs the Most".
+
+### What was wrong
+
+`get_stopout()` returns a table with no columns when the students it is given
+hold no graded attempt in the terms. `retention_dashboard_course_list()` took
+only `NULL` as nothing to list and filtered that table on `pop_p_value`, so
+the page showed "Courses: object 'pop_p_value' not found". It takes a level
+and home campus whose students have a settled next term and no graded course
+in the latest three graded terms of the page's term type; none is known in
+the data.
+
+### Reproduce (before the fix)
+
+On the fixtures, where RR01's EA-home students take no course:
+`retention_dashboard_course_list(rr01$student_terms, rr01$attempts, NULL,
+rr01$dashboard$series, list(student_level = "UG", campus = "EA", data_edges =
+rr01_edges, course_min_n = 10L, course_min_dfw_n = 5L))`.
+
+### Fix
+
+A table with no rows is nothing to list, and the section shows no table, as
+it does when no term is graded. `test-return-rates.R` ("RR01: the courses
+read the latest graded falls' students") holds it.
 
 ## I85 — At a Glance was left with no step in one session, and nothing in the log said why
 
@@ -5183,11 +5218,55 @@ it read the same control as the student's home campus. The section's method
 note has said the second since it shipped and says the first since
 2026-11-23; neither is a wrong number, but one control means two things on
 one page. Found 2026-11-23 writing down who each Retention section counts
-(read from the code; how many attempts it moves was not measured). *Done
-when:* the section reads the students of the page's level (their level that
-term, from `cedar_student_terms`), or the choice to read everyone is recorded
-here as deliberate; and the campus control means one thing on the page, or
-the section has its own.
+(read from the code). Resolved 2026-11-25 (branch
+`retention/band-courses-page-scope`): the section reads the students enrolled
+that term at the page's level and home campus, a student's whole term in or
+out (`get_course_band_dfw()`'s `opt$student_level` and `opt$student_campus`,
+through `scope_student_terms()`), and each of their courses on the campus
+that taught it, as "Courses Where a DFW Costs the Most" does. Both controls
+now mean one thing on the page. Measured on the development machine's own
+copy of the tables (older than the app's), Fall 2021 to Fall 2025,
+undergraduates of the main campus:
+
+- 24.3% of the student-terms the old reading held were not undergraduates
+  (16.6% of its graded attempts); 0.1% had another home campus.
+- 31.1% of these students' graded attempts were taught on another campus
+  (online, mostly), and the old reading held none of them.
+- Courses read went from 103 to 168, 65 of them taught on another campus;
+  harder from 7 to 10 and easier from 10 to 13. Every course on a list before
+  is still on it. (The app's copy reads 168 too, 9 of them harder, and each
+  list holds two courses taught on another campus.)
+- Every level the page offers builds, by either GPA, in 0.4 to 4.8 seconds;
+  graduate students have no course with 30 attempts in the lowest band.
+
+Fixed with it: the cone took the lowest high-school GPA band from the
+students present, so with nobody in the lowest band the next one up was
+called the lowest (read from the code), and with nobody banded it stopped
+("subscript out of bounds"), which a level choice makes reachable (graduate
+students by high-school GPA). The lowest band is now the scale's, whoever is
+in it, and a scope with no student reads as "No course had 30 graded
+attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
+of another home campus, and one student whose level changes between terms,
+in one course); 14 deliberate breaks of the change each failed a test. I86
+and M76 came out of the same work.
+
+**M76 — A page's student scope (level that term, home campus) is written out
+in five more places.** `scope_student_terms()` (`R/branches/student-terms.R`,
+added 2026-11-25 for M67) is the enrolled student-terms of a level and a home
+campus, and the Retention page's two course sections read through it. The
+same filters are still written inline, each with its own handling of
+`enrolled`, of a missing level and of the order they apply in:
+`get_credit_ceiling_crossings()` (`R/cones/credit-ceiling.R`),
+`get_course_cohort_effect()` (`R/cones/course-cohort-effect.R`, home campus
+with a classification), `course_cohort_gen_ed_candidates()` and
+`course_cohort_context_defaults()` (`R/features/course-cohort-context.R`),
+`entering_students()` (`R/branches/retention-context.R`, the level on the
+enrolled rows and the campus on the entering term) and
+`retention_scope_facts()` (`R/features/retention-dashboard.R`, which also
+counts the rows at another level). M67 was one such copy missing. Found
+2026-11-25 looking for a helper before writing one; none was changed. *Done
+when:* each reads through `scope_student_terms()`, or its header says why its
+scope differs.
 
 **M68 — Against Non-Takers took one to two minutes for a large course, and
 runs when Downstream opens.** Resolved 2026-11-25 (branch

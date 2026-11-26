@@ -231,7 +231,9 @@ retention_who_note <- function(who) {
 #'   gap ahead of a small one with a wide gap.
 retention_dashboard_course_list <- function(student_terms, attempts, degrees, series, opt = list()) {
   courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
-  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
+  # Nothing to list when no term is graded (NULL) or the scope's students hold
+  # no graded attempt in the terms (get_stopout()'s table with no columns).
+  courses$listed <- if (NROW(courses$by_course) == 0L) NULL else courses$by_course %>%
     filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
     mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
     arrange(desc(excess_not_back)) %>%
@@ -264,9 +266,7 @@ retention_dashboard_courses <- function(student_terms, attempts, degrees, series
   graded_edge <- opt$data_edges[["last_graded"]]
   terms <- utils::tail(sort(series$term[series$term <= graded_edge]), as.integer(opt$course_terms %||% 3L))
   if (length(terms) == 0L) return(list(terms = integer(0), by_course = NULL, observation_info = NULL))
-  members <- student_terms %>% filter(enrolled, term %in% terms)
-  if (!is.null(opt$student_level)) members <- members %>% filter(student_level %in% opt$student_level)
-  if (!is.null(opt$campus)) members <- members %>% filter(student_campus %in% opt$campus)
+  members <- scope_student_terms(student_terms, opt$student_level, opt$campus) %>% filter(term %in% terms)
   population <- members %>% distinct(student_id) %>% mutate(population_label = "Population")
   # The population's own outcome rows in those terms (its membership window).
   window <- attempts %>% semi_join(members %>% select(student_id, term), by = c("student_id", "term"))
@@ -534,13 +534,15 @@ RETENTION_BAND_WORDS <- c(
 #' The courses harder, and easier, on the lowest-GPA students than the rest of their term
 #'
 #' get_course_band_dfw() over the latest `band_terms` graded terms of the
-#' page's term type, with the two lists the page shows and how many courses
-#' chance alone would put on each.
+#' page's term type, for the page's students, with the two lists the page
+#' shows and how many courses chance alone would put on each.
 #'
-#' @param opt `term_type` (required), `campus` (the campuses that taught the
-#'   courses; NULL reads every campus, each apart), `data_edges` (required),
-#'   `band_by` (`"entering"` or `"hs"`), `band_terms` (terms pooled; default
-#'   5), `min_n`, `z_min`.
+#' @param opt The dashboard's scope: `term_type` (required), `student_level`
+#'   and `campus` (the students' level and home campus that term, as every
+#'   section of the page reads them; NULL reads everyone), `data_edges`
+#'   (required). Each course is read on every campus that taught it to those
+#'   students, each apart. Also `band_by` (`"entering"` or `"hs"`),
+#'   `band_terms` (terms pooled; default 5), `min_n`, `z_min`.
 #' @return get_course_band_dfw()'s list with `harder` and `easier` (the
 #'   courses of each verdict, by the attempts the gap stands for, 15 at most)
 #'   and `meta$n_courses`, `meta$n_by_chance` (the courses read times the
@@ -555,9 +557,11 @@ retention_dashboard_band_courses <- function(attempts, student_terms, applicants
   terms <- terms[terms <= as.integer(edge) & get_term_type(terms) %in% opt$term_type]
   terms <- utils::tail(terms, as.integer(opt$band_terms %||% 5L))
   if (length(terms) == 0L) stop("[retention-dashboard.R] no graded ", opt$term_type, " term to read.", call. = FALSE)
+  # The page's campus is the student's home campus (opt$campus), never the
+  # campus that taught the course: the cone is given it as the student scope.
   r <- get_course_band_dfw(attempts, student_terms,
-                           c(opt[intersect(names(opt), c("campus", "data_edges", "band_by", "min_n", "z_min"))],
-                             list(term = terms)), applicants)
+                           c(opt[intersect(names(opt), c("student_level", "data_edges", "band_by", "min_n", "z_min"))],
+                             list(term = terms, student_campus = opt$campus)), applicants)
   listed <- function(which) r$courses %>%
     filter(verdict == which) %>%
     mutate(excess_dfw = low_attempts * gap_pts / 100) %>%

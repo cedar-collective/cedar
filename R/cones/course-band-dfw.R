@@ -31,7 +31,15 @@
 # two rates of one band as unrelated; it is a floor. Each course is read on
 # the campus that taught it; a student's other courses count wherever taught.
 #
-# Depends on: build_gpa_timeline() (branches/gpa-timeline.R)
+# Whose attempts (`opt$student_level`, `opt$student_campus`): the students
+# enrolled that term at that level and home campus (scope_student_terms()).
+# A student-term is in or out whole, so "their other courses" stays every
+# course of the term, and "the course's other students" are the others in the
+# same scope. This is not `opt$campus`, which is the campus that taught the
+# course.
+#
+# Depends on: scope_student_terms() (branches/student-terms.R)
+#             build_gpa_timeline() (branches/gpa-timeline.R)
 #             entering_gpa_band(), hs_gpa_band(), applicant_hs_gpa()
 #               (branches/comparison.R)
 
@@ -39,10 +47,13 @@
 #'
 #' @param attempts `cedar_attempts`: `student_id`, `term`, `campus`,
 #'   `subject_course`, `outcome`.
-#' @param student_terms `cedar_student_terms`, for build_gpa_timeline().
+#' @param student_terms `cedar_student_terms`, for build_gpa_timeline() and
+#'   for the student scope.
 #' @param opt `data_edges` (required; its `last_graded`), `term` (terms to
 #'   read; NULL reads every graded term), `campus` (delivery campuses; NULL
-#'   reads every campus, each apart), `band_by` (`"entering"`, the default,
+#'   reads every campus, each apart), `student_level` and `student_campus`
+#'   (the students to read, by their level and home campus that term; NULL
+#'   reads everyone), `band_by` (`"entering"`, the default,
 #'   or `"hs"`), `min_n` (attempts a course needs in the lowest band and in
 #'   the others; default 30), `z_min` (how far beyond chance; default 2).
 #' @param applicants `cedar_applicants`, for `band_by = "hs"`.
@@ -53,8 +64,11 @@
 #'   rates and excess (`low_*`, `rest_*`), `gap_pts` (low excess less rest
 #'   excess), `gap_se`, `z` and `verdict` (`"harder"`, `"easier"` or
 #'   `"no_difference"`), widest gap first. `meta`: `edge`, `terms`,
-#'   `band_by`, `low_band`, `min_n`, `z_min`, and the student-terms read and
-#'   left out (`n_banded`, `n_no_band`, `n_invalid`, `n_courses_small`).
+#'   `band_by`, `low_band` (the first band of the scale, whether or not it
+#'   has a student), `min_n`, `z_min`, the scope read (`campus`,
+#'   `student_level`, `student_campus`), and the student-terms read and left
+#'   out (`n_banded`, `n_no_band`, `n_invalid`, `n_out_of_scope`,
+#'   `n_courses_small`). A scope with no student is an empty result.
 get_course_band_dfw <- function(attempts, student_terms, opt = list(), applicants = NULL) {
   needed <- c("student_id", "term", "campus", "subject_course", "outcome")
   missing <- setdiff(needed, names(attempts))
@@ -77,6 +91,17 @@ get_course_band_dfw <- function(attempts, student_terms, opt = list(), applicant
   graded <- attempts %>% filter(term <= edge, !is.na(outcome)) %>% mutate(term = as.integer(term))
   if (!is.null(opt$term)) graded <- graded %>% filter(term %in% as.integer(opt$term))
   if (nrow(graded) == 0L) stop("[course-band-dfw.R] no graded attempt in the terms asked for.", call. = FALSE)
+  terms <- sort(unique(graded$term))
+
+  # ── Whose attempts: the students of the level and home campus asked for ───
+  n_out_of_scope <- 0L
+  if (!is.null(opt$student_level) || !is.null(opt$student_campus)) {
+    in_scope <- scope_student_terms(student_terms, opt$student_level, opt$student_campus) %>%
+      transmute(student_id, term = as.integer(term))
+    n_all <- nrow(distinct(graded, student_id, term))
+    graded <- graded %>% semi_join(in_scope, by = c("student_id", "term"))
+    n_out_of_scope <- n_all - nrow(distinct(graded, student_id, term))
+  }
 
   # ── Each student-term's band ──────────────────────────────────────────────
   takers <- graded %>% distinct(student_id, term)
@@ -92,12 +117,16 @@ get_course_band_dfw <- function(attempts, student_terms, opt = list(), applicant
   } else {
     first_term <- valid %>% filter(is.na(gpa_entering)) %>%
       left_join(applicant_hs_gpa(applicants), by = "student_id")
+    # The scale's own bands, whoever is in them: with nobody in the lowest
+    # band it is still the lowest, and has no course to read.
     banded <- first_term %>% filter(!is.na(high_school_cum_gpa)) %>%
-      transmute(student_id, term, band = droplevels(hs_gpa_band(high_school_cum_gpa), exclude = "not on file"))
+      transmute(student_id, term, band = hs_gpa_band(high_school_cum_gpa)) %>%
+      mutate(band = factor(band, levels = setdiff(levels(band), "not on file")))
     n_no_band <- sum(is.na(first_term$high_school_cum_gpa))
   }
   low_band <- levels(banded$band)[[1]]
-  cedar_debug("[course-band-dfw.R] ", nrow(banded), " banded student-terms by ", band_by, " to ", edge)
+  cedar_debug("[course-band-dfw.R] ", nrow(banded), " banded student-terms by ", band_by, " to ", edge,
+              "; ", n_out_of_scope, " outside the student scope")
 
   # ── A band's rate in the course and in the rest of the same students' term ─
   totals <- graded %>%
@@ -144,8 +173,10 @@ get_course_band_dfw <- function(attempts, student_terms, opt = list(), applicant
     arrange(desc(gap_pts), subject_course, campus)
 
   list(courses = courses, bands = bands,
-       meta = list(edge = edge, terms = sort(unique(graded$term)), band_by = band_by, low_band = low_band,
+       meta = list(edge = edge, terms = terms, band_by = band_by, low_band = low_band,
                    min_n = min_n, z_min = z_min, campus = opt$campus,
+                   student_level = opt$student_level, student_campus = opt$student_campus,
                    n_banded = nrow(banded), n_no_band = n_no_band, n_invalid = n_invalid,
+                   n_out_of_scope = n_out_of_scope,
                    n_courses_small = nrow(both) - nrow(read)))
 }

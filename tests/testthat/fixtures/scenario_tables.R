@@ -580,6 +580,64 @@ bd01 <- local({
        edges = list(last_graded = 202280L, last_enrolled_complete = 202280L))
 })
 
+# BD02: BD01 as a page about students reads it. Every BD01 seat is an
+# undergraduate whose home campus is ABQ (EA1 too: its GATE 101 is the one
+# taught on EA), and twenty more seats take GATE 101 and OTHR 200 on ABQ in
+# the same three falls:
+#   G01-G10, graduate students, home campus ABQ, entering GPA 2.0: all pass
+#     GATE 101, all DFW OTHR 200.
+#   T01-T10, undergraduates whose home campus is EA, entering GPA 3.2: all
+#     DFW GATE 101, all pass OTHR 200.
+# and S1, the one student with two terms (home campus ABQ in both): an
+#   undergraduate in 202080, in a first term (no entering GPA, so in no
+#   band), who passes OTHR 200; a graduate student in 202180 (entering GPA
+#   3.0), who passes SEMR 600, a course nobody else takes. A level is the
+#   term's: the undergraduates' reading never holds SEMR 600.
+# Undergraduates of home campus ABQ are BD01's seats: GATE 101 on ABQ is +30
+#   points, harder, and EA's GATE 101 is read (EA1's home campus is ABQ). 61
+#   student-terms are outside that scope: the 60 above and S1's 202180.
+# Every level, home campus ABQ: GATE 101's low band is 60 attempts at 30%
+#   against 60% in their other course (excess -30) and its other students'
+#   excess is 10: gap -40, easier.
+# Undergraduates of every home campus: GATE 101's other students are 60
+#   attempts at 60% against 5% (excess 55): gap -15, inside chance
+#   (se = 100 * sqrt(.6*.4/30 + .2*.8/30 + .6*.4/60 + .05*.95/60) = 13.5).
+# No seat is a law student, and no graduate student-term is a first term.
+bd02 <- local({
+  more <- tidyr::crossing(
+    term = c(202080L, 202180L, 202280L),
+    tibble::tibble(
+      seat = c(sprintf("G%02d", 1:10), sprintf("T%02d", 1:10)),
+      gpa = rep(c(2.0, 3.2), each = 10),
+      student_level = rep(c("GR", "UG"), each = 10),
+      student_campus = rep(c("ABQ", "EA"), each = 10),
+      gate_dfw = rep(c(FALSE, TRUE), each = 10),
+      othr_dfw = rep(c(TRUE, FALSE), each = 10)
+    )
+  ) %>%
+    dplyr::mutate(student_id = paste0("BD02-", seat, "-", term))
+  attempts <- dplyr::bind_rows(
+    bd01$attempts,
+    tibble::tibble(student_id = more$student_id, term = more$term, campus = "ABQ", subject_course = "GATE 101",
+                   outcome = ifelse(more$gate_dfw, "dfw", "pass")),
+    tibble::tibble(student_id = more$student_id, term = more$term, campus = "ABQ", subject_course = "OTHR 200",
+                   outcome = ifelse(more$othr_dfw, "dfw", "pass")),
+    tibble::tibble(student_id = "BD02-S1", term = c(202080L, 202180L), campus = "ABQ",
+                   subject_course = c("OTHR 200", "SEMR 600"), outcome = "pass")
+  )
+  student_terms <- dplyr::bind_rows(
+    bd01$student_terms %>% dplyr::mutate(enrolled = TRUE, student_level = "UG", student_campus = "ABQ"),
+    tibble::tibble(student_id = more$student_id, term = more$term, quality_points = 36, graded_hours = 12,
+                   cumulative_quality_points = 36 + 30 * more$gpa, cumulative_graded_hours = 42,
+                   timeline_valid = TRUE, enrolled = TRUE,
+                   student_level = more$student_level, student_campus = more$student_campus),
+    tibble::tibble(student_id = "BD02-S1", term = c(202080L, 202180L), quality_points = 36, graded_hours = 12,
+                   cumulative_quality_points = c(36, 72), cumulative_graded_hours = c(12, 24),
+                   timeline_valid = TRUE, enrolled = TRUE, student_level = c("UG", "GR"), student_campus = "ABQ")
+  )
+  list(attempts = attempts, student_terms = student_terms, applicants = bd01$applicants, edges = bd01$edges)
+})
+
 # ── test-course-planning-history.R ──────────────────────────────────────────────
 
 course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)
@@ -2451,6 +2509,8 @@ cc01 <- local({
 #     latest fall.
 #   Two ABQ seniors awarded a degree that term (left out, counted).
 #   Five ABQ graduate students, all back (out of an undergraduate scope).
+#     Each takes MATH 101 too and gets a DFW: 15 attempts over the three
+#     graded falls that an undergraduate reading of the course never holds.
 # Fall 2024: ten ABQ freshmen whose return cannot be observed yet.
 rr01 <- local({
   falls <- c(202080L, 202180L, 202280L, 202380L)
@@ -2487,10 +2547,11 @@ rr01 <- local({
                      returned_next_regular_term = dplyr::if_else(return_observable, returned, NA),
                      return_observable, degree_awarded)
   # MATH 101 attempts, stamped as test_attempts is (one of its rows, restated).
-  takers <- dplyr::filter(rows, grepl("-A", id), i != 38L)
+  takers <- dplyr::filter(rows, (grepl("-A", id) & i != 38L) | grepl("-G", id))
   attempts <- test_attempts[rep(1L, nrow(takers)), ] %>%
     dplyr::mutate(student_id = takers$student_id, term = takers$term, campus = "ABQ",
-                  subject_course = "MATH 101", outcome = ifelse(takers$dfw_grades > 0L, "dfw", "pass"))
+                  subject_course = "MATH 101",
+                  outcome = ifelse(takers$dfw_grades > 0L | grepl("-G", takers$id), "dfw", "pass"))
   dashboard <- build_retention_dashboard(student_terms, attempts, NULL, list(
     term_type = "fall", student_level = "UG", data_edges = rr01_edges,
     min_n = 5L, course_min_n = 10L, course_min_dfw_n = 5L))
