@@ -484,6 +484,11 @@ rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds
   wrong); from inside it is the way to load the fixtures.
 - Don't `source("global.R")`: it starts the interactive setup wizard.
 - Don't hand-source `R/modules/*.R`; use `load_funcs(..., modules = TRUE)`.
+- Don't wait a fixed time in a test. A test held to three seconds failed on a
+  busy machine (ISSUES M74). Wait for the state itself: look, wait, look again,
+  and give up after a stated number of tries, as `set_file_time_back()` does
+  (`helper-projection-refresh.R`). `test-architecture.R` holds the number of
+  `Sys.sleep()` calls in each test file, and it may only go down.
 
 ---
 

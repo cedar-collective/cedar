@@ -209,6 +209,11 @@ students analyzed" for a run that produced 401.
 `recalculating` forever, so counting every `.recalculating` in the DOM never
 reaches zero. Only **visible** ones count.
 
+`test-architecture.R` counts the `sleep()` calls in every script here but
+`lib.mjs`, whose job waiting is. The count may only go down: two are left, a
+poll with a timeout in `nav.test.mjs` and a beat before a screenshot in
+`shot.mjs`.
+
 **2. `connect()` must settle before you touch inputs.** `isConnected()` goes true
 well before the landing tab's first reactive flush. Inputs set inside that window
 are overwritten by the app's own initialisation — the symptom is a selectize
