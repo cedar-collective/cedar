@@ -210,7 +210,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
   source_file("features/retention-dashboard.R")  # Bird's Eye > Retention payload
-  source_file("features/summer-sections.R")     # the summer question on First Year and Retention
+  source_file("features/summer-sections.R")     # Retention's two summer questions
   source_file("features/graduation-dashboard.R")  # Bird's Eye > Graduation payload
   source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
@@ -234,7 +234,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/low-enrollment.R")  # Courses > Low Enrollment
     source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
     source_file("modules/retention-dashboard.R")  # Bird's Eye > Retention
-    source_file("modules/first-year.R")  # Bird's Eye > First Year (after Retention: it reads RETENTION_TERM_TYPES)
+    source_file("modules/retention-entering-classes.R")  # Retention's entering-class sections (was the First Year page)
     source_file("modules/graduation.R")  # Bird's Eye > Graduation
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")

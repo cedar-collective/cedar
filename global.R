@@ -526,7 +526,7 @@ message("[global.R] Initializing logging system...")
 init_logging()
 
 # ── Preload ─────────────────────────────────────────────────────────────────
-# The home campuses the student pages offer (First Year, Retention, Graduation).
+# The home campuses the student pages offer (Retention, Graduation).
 cedar_home_campuses <- sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus)))
 # What the DFW Rates page offers: the teaching campuses and the graded terms.
 # ui.R and the preload below both read them here.

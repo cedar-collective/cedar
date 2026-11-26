@@ -17,6 +17,18 @@ test_that("Course Dynamics share spec targets the standard analyze button", {
   expect_equal(spec$types$course, "select_server")
 })
 
+test_that("every link slug opens a page the app mounts, a retired page's link included", {
+  # The browser clicks the navbar item whose title a slug maps to; a slug that
+  # names a page ui.R no longer mounts opens Home with no word of why.
+  ui_source <- paste(readLines(file.path(cedar_base_dir, "ui.R"), warn = FALSE), collapse = "\n")
+  mounted <- unique(regmatches(ui_source, gregexpr('(?<=title = ")[^"]+', ui_source, perl = TRUE))[[1]])
+  unmounted <- setdiff(unname(CEDAR_TAB_SLUGS), mounted)
+  expect_identical(unmounted, character(0))
+  # First Year was folded into Retention (2026-11): its link still opens a page.
+  expect_identical(cedar_tab_from_slug("first-year"), "Retention")
+  expect_false("First Year" %in% mounted)
+})
+
 test_that("every runnable deep-link spec declares its early loading overlay", {
   runnable <- Filter(function(spec) !is.null(spec$run), CEDAR_SHARE_SPECS)
   expect_true(all(vapply(runnable, function(spec) {

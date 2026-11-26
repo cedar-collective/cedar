@@ -10,14 +10,14 @@
 # notes beneath it). Keys are <page>.<section>.
 schema_version: 1
 concepts:
-  first-year.entering-classes: >-
+  retention.entering-classes: >-
     Take everyone who started in the same term and follow them as one class.
     Each line asks the same question a semester later: how much of the class is
     still here? A student who has graduated counts as still here, because
     finishing is not leaving. The space between two lines is the part of the
     class lost between those two semesters, so a widening gap shows when
     students are going.
-  first-year.first-spring-summer: >-
+  retention.first-spring-summer: >-
     Some students take a course in the summer after their first spring, and
     most do not. This compares how often each group is enrolled again in the
     fall. Expect the summer students to return more often: a student who signs
