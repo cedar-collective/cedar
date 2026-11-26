@@ -1,60 +1,45 @@
-# Bird's Eye > First Year
+# Bird's Eye > Retention: the entering-class sections
 #
-# The first of the three pages (First Year, Retention, Graduation): how much
-# of each entering class is still enrolled in its first semesters, by how the
-# students entered. Retention reads continuing students term by term;
-# Graduation reads students at the end.
+# Two sections of the Retention page (modules/retention-dashboard.R), as a
+# module of their own inside it: how much of each entering class is still
+# enrolled in its first semesters, by how the students entered, and the summer
+# after a class's first spring. They were the First Year page until 2026-11;
+# ?tab=first-year opens Retention.
 #
-# The module holds no analysis: it collects the term type, level, home
-# campuses and who a class holds, calls retention_dashboard_milestones()
-# (features/retention-dashboard.R) and lays out its rows. It builds only while
-# the tab is open, once per scope a session asks for.
+# The module holds no analysis: it reads the page's term type, level and home
+# campuses (`scope`) and who a class holds, calls
+# retention_dashboard_milestones() (features/retention-dashboard.R) and
+# build_first_year_summer() (features/summer-sections.R) and lays out their
+# rows. Each is read once per scope a process is asked for.
 #
 # Exported functions:
-#   firstYearUI(id, campuses)
-#   firstYearServer(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, active)
+#   retentionEnteringClassesUI(id)   list(`classes`, `summer`): the two sections, for the page to place
+#   retentionEnteringClassesServer(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, scope)
 
-# campuses  the home campuses to offer; it opens on the main campus
-#           (CEDAR_CAMPUS_MAIN), and none selected reads every campus.
-firstYearUI <- function(id, campuses) {
+# The two sections. The page places each where it belongs: the classes before
+# its year-by-year pace section, the summer beside its other summer section.
+retentionEnteringClassesUI <- function(id) {
   ns <- NS(id)
-  # The page opens on student_levels.csv's first level.
-  levels <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
-  tagList(
-    filter_bar(
-      "First Year",
-      "How much of each entering class is still here after its first semesters?",
-      fluidRow(
-        column(3, radioButtons(ns("term_type"), "Entering term", choices = RETENTION_TERM_TYPES,
-                               selected = "fall", inline = TRUE)),
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
-        column(4, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
-                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
-                                 options = list(placeholder = "Every home campus")))
-      )
-    ),
-    # Opened by the server while it reads (cedar_with_loading()).
-    cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f331", loading_label = "Reading the entering classes…",
-    dashboard_section(
+  list(
+    classes = dashboard_section(
       "Each Entering Class, Semester by Semester",
       "How much of each entering class is still enrolled in its 2nd, 3rd, 4th and 5th semesters?",
-      method = uiOutput(ns("method_milestones")), concept = "first-year.entering-classes",
+      method = uiOutput(ns("method_milestones")), concept = "retention.entering-classes",
       radioButtons(ns("entry"), "Entering students", choices = RETENTION_ENTRY_CHOICES,
                    selected = "first_time", inline = TRUE),
       uiOutput(ns("milestones_finding")),
       plotly::plotlyOutput(ns("milestones_plot"), height = "380px")
     ),
-    dashboard_section(
+    summer = dashboard_section(
       "The Summer After the First Spring",
       "Do students who take a course the summer after their first spring come back in the fall more often?",
-      method = uiOutput(ns("method_summer")), concept = "first-year.first-spring-summer",
+      method = uiOutput(ns("method_summer")), concept = "retention.first-spring-summer",
       uiOutput(ns("summer_finding")),
       plotly::plotlyOutput(ns("summer_plot"), height = "340px"),
       dashboard_subsection(
         "Their Summer Courses",
         "The courses these students took most that summer.",
         reactable::reactableOutput(ns("summer_courses")))
-    )
     )
   )
 }
@@ -89,17 +74,17 @@ RETENTION_ENTRY_OPTIONS <- list(
 
 # student_terms, degrees, programs, attempts, edges   the loaded tables and edges.
 # courses, course_codes   the course dimension, for titles.
-# active   reactive: TRUE while the tab is open.
-firstYearServer <- function(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, active) {
+# scope   reactive: the page's list(`term_type`, `level`, `campus` (NULL for
+#         every home campus)); it waits (req()) while the page is not open.
+retentionEnteringClassesServer <- function(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, scope) {
   moduleServer(id, function(input, output, session) {
-    # Each class in the summer after its first spring: read after the chart above.
+    # Each class in the summer after its first spring.
     summer <- reactive({
-      req(isTRUE(active()), input$term_type, input$level, input$entry)
+      sc <- scope(); req(sc, input$entry)
       entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
-      cedar_shared_result(list("first_year_summer", input$term_type, input$level, input$campus, input$entry), function() tryCatch(
+      cedar_shared_result(list("first_year_summer", sc$term_type, sc$level, sc$campus, input$entry), function() tryCatch(
         build_first_year_summer(student_terms, attempts, degrees, programs, list(
-          term_type = input$term_type, student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+          term_type = sc$term_type, student_level = sc$level, campus = sc$campus, data_edges = edges,
           entry = entry$entry, entry_time_status = entry$time_status)),
         error = function(e) {
           showNotification(paste("Summer:", conditionMessage(e)), type = "error", duration = 10)
@@ -146,21 +131,21 @@ firstYearServer <- function(id, student_terms, degrees, programs, attempts, cour
     # The entering classes are read on their own, so choosing who a class
     # holds rebuilds this chart and nothing else.
     milestones <- reactive({
-      req(isTRUE(active()), input$term_type, input$level, input$entry)
+      sc <- scope(); req(sc, input$entry)
       entry <- RETENTION_ENTRY_OPTIONS[[input$entry]]
-      cedar_shared_result(list("retention_milestones", input$term_type, input$level, input$campus, input$entry), function() cedar_with_loading(session, session$ns("load"), report_type = "first_year", tryCatch(
+      cedar_shared_result(list("retention_milestones", sc$term_type, sc$level, sc$campus, input$entry), function() tryCatch(
         retention_dashboard_milestones(student_terms, degrees, list(
-          term_type = input$term_type, student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+          term_type = sc$term_type, student_level = sc$level, campus = sc$campus, data_edges = edges,
           entry = entry$entry, entry_time_status = entry$time_status), programs),
         error = function(e) {
           showNotification(paste("Entering classes:", conditionMessage(e)), type = "error", duration = 10)
           NULL
-        })))
+        }))
     })
 
     output$milestones_finding <- renderUI({
-      ms <- milestones(); req(ms)
+      ms <- milestones()
+      if (is.null(ms)) return(empty_state("The entering classes could not be read; the notification says why."))
       sentence <- retention_milestone_sentence(list(milestones = ms))
       if (length(sentence) == 0L) return(empty_state("No entering class in this scope has a settled later term to read."))
       lead_text(sentence)
@@ -172,7 +157,7 @@ firstYearServer <- function(id, student_terms, degrees, programs, attempts, cour
     output$method_milestones <- renderUI({
       ms <- milestones(); req(ms)
       tags$ul(
-        tags$li(.retention_entry_note(attr(ms, "entry"), tolower(names(RETENTION_TERM_TYPES)[RETENTION_TERM_TYPES == input$term_type]), attr(ms, "n_summer_starts"))),
+        tags$li(.retention_entry_note(attr(ms, "entry"), tolower(names(RETENTION_TERM_TYPES)[RETENTION_TERM_TYPES == scope()$term_type]), attr(ms, "n_summer_starts"))),
         tags$li("Still enrolled means enrolled in that later term on any campus, or awarded a degree by then. A student away one term and back the next is missing from the first and counted in the second."),
         tags$li(paste0("Each line is one semester of the class's time here: the entering term is the 1st, so a year on is ",
                        "the 3rd, the one retention is usually quoted at. A semester is a fall or a spring; summer is not ",

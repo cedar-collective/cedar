@@ -162,7 +162,6 @@ CEDAR_TAB_SLUGS <- c(
   "low-enrollment"     = "Low Enrollment",  # its own page since 2026-11; was a sub-tab of Enrollment
   "cancellations"      = "Cancellations",
   "dfw-rates"          = "DFW Rates",
-  "first-year"         = "First Year",
   "retention"          = "Retention",
   "graduation"         = "Graduation",
   "data-usage"         = "Data & Usage",
@@ -172,7 +171,8 @@ CEDAR_TAB_SLUGS <- c(
   "cedar"              = "Home",            # original landing slug
   "dashboard"          = "Dept Dashboard",
   "data"               = "Data & Usage",
-  "department-profile" = "Dept Trends"      # pre-2026-07 name for Dept Trends
+  "department-profile" = "Dept Trends",     # pre-2026-07 name for Dept Trends
+  "first-year"         = "Retention"        # its own page for four days in 2026-11; its sections are on Retention
 )
 
 # Slug a tab's own copy-URL button should emit. Derived from CEDAR_SHARE_SPECS

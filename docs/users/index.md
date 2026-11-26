@@ -126,8 +126,7 @@ narrowed by campus, college, department or level:
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **DFW Rates** | Is the lower-division DFW rate going up or down, which courses hold the DFW grades, and where do sections disagree? [Guide →](dfw-rates) |
-| **First Year** | How much of each entering class is still here after its first semesters, by how the students entered? [Guide →](first-year) |
-| **Retention** | After the first year: are students coming back each semester and keeping pace, which warning signs go with not returning, and in which courses does a DFW cost the most? [Guide →](retention) |
+| **Retention** | Are students coming back each semester and keeping pace, how much of each entering class is still here from its first semesters on, which warning signs go with not returning, and in which courses does a DFW cost the most? [Guide →](retention) |
 | **Graduation** | Who leaves without a degree and how far along were they, which required courses did they never pass, and who finishes in the summer? [Guide →](graduation) |
 
 For one course's history, see **Courses → Course Dynamics**.

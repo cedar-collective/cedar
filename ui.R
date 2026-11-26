@@ -368,14 +368,8 @@ cedar_home_ui <- function() {
           "percent"
         ),
         cedar_home_card(
-          "First Year",
-          "How much of each entering class is still here after its first semesters, by how the students entered.",
-          "?tab=first-year",
-          "seedling"
-        ),
-        cedar_home_card(
           "Retention",
-          "After the first year: whether students come back each semester and keep pace, which warning signs go with not returning, and where a DFW costs the most.",
+          "Whether students come back each semester and keep pace, each entering class from its first semesters on, which warning signs go with not returning, and where a DFW costs the most.",
           "?tab=retention",
           "user-check"
         ),
@@ -1702,12 +1696,6 @@ nav_panel(
       icon = icon("percent"),
       dfwRatesUI("dfw_rates", cedar_dfw_rates_offers$campuses, terms = cedar_dfw_rates_offers$terms)
     ), # end DFW Rates nav_panel
-
-    nav_panel(
-      title = "First Year",
-      icon = icon("seedling"),
-      firstYearUI("first_year", cedar_home_campuses)
-    ), # end First Year nav_panel
 
     nav_panel(
       title = "Retention",

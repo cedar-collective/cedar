@@ -53,7 +53,7 @@ fix each needs, and which of them are one piece of work, are under
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M78 | Improvement | See [Improvements](#improvements) |
+| M1–M80 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -4792,7 +4792,7 @@ this table says which entries are one piece of work, and of what kind.
 | A person, a source owner or a production step: no code | M9, M10, M21, M32, M50 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
 | mrgather on production | M65 (and defects I32, I33, I43) | Production's mrgather becomes a checkout of its repository (`ROADMAP.md`, Platform). What is left of the four closes with it. |
 | One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. Ratchets hold M3, M53, M54 and M76 since 2026-11-26; the helpers are still to write. |
-| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
+| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58, M80 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
 | How the app loads and starts | M59, M70, M75, M77 | One function that loads the tables as the app holds them, for `global.R`, the cache-warming scripts and the REPL (M59). M77's second half edits model source and goes with the projections below. |
 | The fixture and production disagree | M38, M40, M57 | One migration: each changes the counts pinned in the fixture's header. |
 | Tests, one at a time | M7, M8, M20, M42, M79 | Discrete. |
@@ -5500,6 +5500,26 @@ attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
 of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
+
+**M80 — Retention follows an entering class in two sections that each choose
+their own students.** Open; found 2026-11-26 folding the First Year page into
+Retention (branch `retention/fold-first-year`). "Each Entering Class, Semester
+by Semester" (`R/modules/retention-entering-classes.R`) and "Still Here, and
+Moving Forward?" (`R/modules/retention-dashboard.R`) both read
+`get_entering_class_retention()`, and now sit one after the other. The first
+has **Entering students** (first-time; first-time, full-time; new transfer;
+everyone new), reads fall or spring classes by the page's term type, and
+follows four semesters. The second has **Students who started as**
+(first-time; transfer by credits brought), reads fall classes only, and
+follows eight. For a first-time fall class the 3rd and 5th semesters of the
+first are the start of the second and third years of the second: the same
+share, drawn twice (the browser suite holds that the two agree). *Not merged
+in the fold* because one control cannot serve both as they stand: the pace
+split has no meaning for "everyone new", needs the credits a transfer student
+brought, and is built for fall classes. *Done when:* one choice of who a class
+holds drives both, with the pace section saying plainly which choices it
+cannot split by pace, or the first section's lines become the totals of the
+second's bars in one figure.
 
 **M79 — The pull-request check failed once on a change to `ISSUES.md`
 alone, and what the page showed was not kept.** Open. #416 changed one

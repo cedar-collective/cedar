@@ -1,7 +1,8 @@
-# Summer on the three student pages
+# Summer on the student pages
 #
-# First Year and Retention each ask one summer question of their own students,
-# through get_summer_after_spring(); Graduation's is get_summer_finishers().
+# Retention asks two summer questions, each of its own students (an entering
+# class after its first spring; continuing students behind on credits), through
+# get_summer_after_spring(); Graduation's is get_summer_finishers().
 # The builders here name the students (entering_students()) and shape the
 # cone's rows for the page.
 #

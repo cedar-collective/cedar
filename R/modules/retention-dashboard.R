@@ -1,19 +1,21 @@
 # Bird's Eye > Retention
 #
-# The middle of the three pages (First Year, Retention, Graduation): are
-# continuing students coming back? One term type at a time: how often enrolled
-# students came back the next regular term and whether that is rising or
-# falling; who is not coming back, by the warning signs known by the end of
-# the term; each classification and college; each fall's classes year by
-# year, and whether they are keeping pace; and the courses where a DFW grade
-# goes with not coming back the most. Entering classes' first semesters are
-# on First Year (modules/first-year.R); finishing in the summer is on
-# Graduation.
+# The first of the two student pages (Retention, then Graduation): are
+# students coming back? One term type at a time: how often enrolled students
+# came back the next regular term and whether that is rising or falling; who
+# is not coming back, by the warning signs known by the end of the term; each
+# classification and college; each entering class semester by semester, then
+# year by year with its pace; the two summer questions; and the courses where
+# a DFW grade goes with not coming back the most. Finishing in the summer is
+# on Graduation.
 #
 # The module holds no analysis: it collects the term type, level and home
 # campuses, calls build_retention_dashboard() (features/retention-dashboard.R)
 # and lays out its payload. It builds only while the tab is open, once per
-# scope a session asks for.
+# scope a session asks for. The two entering-class sections, the First Year
+# page until 2026-11, are a module inside this one
+# (modules/retention-entering-classes.R), placed here and read under this
+# page's controls.
 #
 # Who is counted is said twice, each where its kind belongs: as facts in the
 # data scope bar under the controls (the level's students in the latest term,
@@ -32,10 +34,11 @@ retentionDashboardUI <- function(id, campuses) {
   ns <- NS(id)
   # The page opens on student_levels.csv's first level.
   levels <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
+  entering <- retentionEnteringClassesUI(ns("classes"))
   tagList(
     filter_bar(
       "Retention",
-      "After the first year: are students coming back each semester, are they keeping pace, and who is not?",
+      "From the first semester on: are students coming back, are they keeping pace, and who is not?",
       fluidRow(
         column(3, radioButtons(ns("term_type"), "Term type", choices = RETENTION_TERM_TYPES,
                                selected = "fall", inline = TRUE)),
@@ -73,9 +76,10 @@ retentionDashboardUI <- function(id, campuses) {
                                        reactable::reactableOutput(ns("college_table"))))
       )
     ),
+    entering$classes,
     dashboard_section(
       "Still Here, and Moving Forward?",
-      "Of each fall's new students, how many are still enrolled as each year begins, and are they earning credits fast enough to finish?",
+      "As each year begins, are the students still enrolled from each fall's class earning credits fast enough to finish?",
       method = uiOutput(ns("method_pace")), concept = "retention.class-pace",
       fluidRow(
         column(7, radioButtons(ns("pace_started"), "Students who started as",
@@ -93,6 +97,7 @@ retentionDashboardUI <- function(id, campuses) {
         "How many credits has the middle enrolled student of each class earned here before each term?",
         plotly::plotlyOutput(ns("accumulation_plot"), height = "400px"))
     ),
+    entering$summer,
     dashboard_section(
       "Summer and Staying on Pace",
       "Of the students behind on credits after each spring, how many take summer courses, and does it bring them back onto pace?",
@@ -187,6 +192,14 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                                      course_dim, course_codes) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
+    # The entering-class sections read this page's controls.
+    retentionEnteringClassesServer(
+      "classes", student_terms, degrees, programs, attempts, course_dim, course_codes, edges,
+      scope = reactive({
+        req(isTRUE(active()), input$term_type, input$level)
+        list(term_type = input$term_type, level = input$level,
+             campus = if (length(input$campus) > 0) input$campus else NULL)
+      }))
     payload <- reactive({
       req(isTRUE(active()), input$term_type, input$level)
       cedar_shared_result(list("retention_dashboard", input$term_type, input$level, input$campus), function() cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
