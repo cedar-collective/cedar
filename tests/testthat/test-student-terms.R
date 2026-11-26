@@ -452,3 +452,20 @@ test_that("the student-term table builds the same from the thin class list and i
   # The roster's majors read the same off the description table as off the rows.
   expect_equal(summarize_class_list_majors(descriptions), summarize_class_list_majors(cedar_registrations_st))
 })
+
+# RS01 (fixtures/scenario_tables.R): the Retention page's Fall 2022 students.
+test_that("RS01: a scope is the enrolled student-terms of a level and a home campus", {
+  page <- scope_student_terms(rs01$student_terms, "UG", "ABQ")
+  # Fall 2022: W-A to W-G. Not the graduate students (W-H, W-I), the student
+  # with no level (W-J), the EA student (W-K) or the unenrolled row (W-L).
+  expect_setequal(page$student_id[page$term == 202280L], paste0("W-", LETTERS[1:7]))
+  # Every term: those seven's twelve rows and W-M's Fall 2021.
+  expect_equal(nrow(page), 12L)
+  # An axis left open keeps every value of it, a missing one included.
+  expect_equal(nrow(scope_student_terms(rs01$student_terms, "UG")), 13L)
+  expect_equal(nrow(scope_student_terms(rs01$student_terms, student_campus = "ABQ")), 15L)
+  expect_equal(nrow(scope_student_terms(rs01$student_terms)), 16L)
+  expect_false("W-L" %in% scope_student_terms(rs01$student_terms)$student_id)
+  expect_error(scope_student_terms(rs01$student_terms[c("student_id", "term", "enrolled")], "UG"),
+               "student_terms lacks student_level, student_campus")
+})

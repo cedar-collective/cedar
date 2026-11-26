@@ -168,10 +168,17 @@ test_that("RR01: the courses read the latest graded falls' students", {
   expect_equal(courses$terms, c(202080L, 202180L, 202280L))
   expect_equal(courses$listed$subject_course, "MATH 101")
   expect_equal(courses$listed$campus, "ABQ")
+  # The page's students only: the five graduate students a fall who got a
+  # DFW in MATH 101 are not among the 21.
   expect_equal(c(courses$listed$pop_n_dfw, courses$listed$pop_n_pass), c(21L, 96L))
   expect_equal(courses$listed$pop_dfw_stopout_rate, 19 / 21)
   # 21 DFW students, 19 not back, against the passers' 8 of 96 not back.
   expect_equal(courses$listed$excess_not_back, 21 * (19 / 21 - 8 / 96))
+  # The page's campus is the students' home campus: MATH 101 is taught on ABQ,
+  # and no student whose home campus is EA took it.
+  ea <- retention_dashboard_course_list(rr01$student_terms, rr01$attempts, NULL, rr01$dashboard$series, list(
+    student_level = "UG", campus = "EA", data_edges = rr01_edges, course_min_n = 10L, course_min_dfw_n = 5L))
+  expect_equal(NROW(ea$listed), 0L)
 })
 
 test_that("RR01: the trend carries its fitted line's ends, the least-squares line through the terms", {
