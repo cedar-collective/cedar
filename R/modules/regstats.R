@@ -6,33 +6,11 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
       "Registration Statistics",
       cedar_definition_summary("regstats"),
       fluidRow(
-        column(2,
-          selectInput(ns("rs_campus"), "Campus", multiple = TRUE,
-            choices  = sort(unique(sections$campus)),
-            selected = cedar_campus_default(sections))
-        ),
-        column(2,
-          selectInput(ns("rs_college"), "College", multiple = TRUE,
-            choices = sort(unique(sections$college)))
-        ),
-        column(2,
-          selectInput(ns("rs_term"), "Term", multiple = TRUE,
-            choices  = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-            selected = if (!is.null(default_term)) as.character(default_term) else NULL)
-        ),
-        column(2,
-          selectInput(ns("rs_pt"), "Part of Term", multiple = TRUE,
-            choices = sort(unique(sections$part_term)))
-        ),
-        column(2,
-          selectizeInput(ns("rs_dept"), "Department", multiple = TRUE,
-            choices = dept_choices)
-        ),
-        column(2,
-          selectInput(ns("rs_level"), "Level", multiple = TRUE,
-            choices  = sort(unique(sections$level)),
-            selected = "lower")
-        ),
+        cedar_section_scope_inputs(
+          ns, "rs", sections, dept_choices, default_term,
+          fields = c("campus", "college", "term", "pt", "dept", "level"),
+          widths = c(college = 2, pt = 2, level = 2),
+          labels = c(pt = "Part of Term"))
       ),
       # The flagging thresholds are a reader's adjustment, not a filter: they
       # stay folded under one line that says whether the standard values are

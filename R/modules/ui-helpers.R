@@ -643,6 +643,84 @@ filter_actions <- function(..., class = NULL) {
   div(class = classes, ...)
 }
 
+# ── The scope inputs of a page that lists sections ───────────────────────────
+# Campus, College, Term, Part of term, Department, Method and Level are the
+# same seven questions on Regstats, Open Seats, Waitlists, Low Enrollment,
+# Cancellations and Enrollment, asked of the same table with the same choices.
+# They are written once, here. A page names the fields it shows, in its own
+# order, and adds its own inputs and its run button beside them:
+#
+#   fluidRow(class = "explore-filter-row",
+#     cedar_section_scope_inputs(ns, "cn", sections, dept_choices, default_term),
+#     column(2, filter_actions(...)))
+#
+# An input's id is `<prefix>_<field>` under `ns`, which is what
+# CEDAR_SHARE_SPECS (R/trunk/url-state.R) restores a link into.
+#
+#   ns              the module's NS(id); `identity` on a page that is not a module.
+#   sections        cedar_sections: the choices are its values.
+#   dept_choices    the Department choices (codes, named or grouped by college).
+#   default_term    the term selected on open; NULL for none.
+#   fields          which inputs, in order (any of CEDAR_SECTION_SCOPE_FIELDS).
+#   widths, labels  named by field, to depart from the standard column width
+#                   (of 12) or label; leave a field out to keep the standard.
+#   level_selected  the levels selected on open; NULL for none (every level).
+# Returns a list of column() tags, one per field.
+CEDAR_SECTION_SCOPE_FIELDS <- c("campus", "college", "term", "pt", "dept", "im", "level")
+CEDAR_SECTION_SCOPE_WIDTHS <- c(campus = 2, college = 1, term = 2, pt = 1, dept = 2, im = 1, level = 1)
+CEDAR_SECTION_SCOPE_LABELS <- c(campus = "Campus", college = "College", term = "Term", pt = "PoT",
+                                dept = "Department", im = "Method", level = "Level")
+
+cedar_section_scope_inputs <- function(ns, prefix, sections, dept_choices,
+                                       default_term = NULL,
+                                       fields = CEDAR_SECTION_SCOPE_FIELDS,
+                                       widths = NULL, labels = NULL,
+                                       level_selected = "lower") {
+  unknown <- setdiff(fields, CEDAR_SECTION_SCOPE_FIELDS)
+  if (length(unknown) > 0 || anyDuplicated(fields) > 0) {
+    stop("cedar_section_scope_inputs(): fields are distinct names from ",
+         paste(CEDAR_SECTION_SCOPE_FIELDS, collapse = ", "), "; got ",
+         paste(fields, collapse = ", "), ".")
+  }
+  for (given in list(widths, labels)) {
+    stray <- setdiff(names(given), fields)
+    if (length(given) > 0 && (is.null(names(given)) || length(stray) > 0)) {
+      stop("cedar_section_scope_inputs(): widths and labels are named by a field being shown (",
+           paste(fields, collapse = ", "), ").")
+    }
+  }
+  source_cols <- c(campus = "campus", college = "college", term = "term", pt = "part_term",
+                   im = "delivery_method", level = "level")
+  needed <- unique(c(source_cols[intersect(fields, names(source_cols))],
+                     if ("term" %in% fields) "term_type"))
+  missing_cols <- setdiff(needed, names(sections))
+  if (length(missing_cols) > 0) {
+    stop("cedar_section_scope_inputs() needs sections column(s): ",
+         paste(missing_cols, collapse = ", "))
+  }
+  pick <- function(given, standard, field) {
+    if (field %in% names(given)) given[[field]] else standard[[field]]
+  }
+  col_width <- function(field) pick(widths, CEDAR_SECTION_SCOPE_WIDTHS, field)
+  col_label <- function(field) pick(labels, CEDAR_SECTION_SCOPE_LABELS, field)
+  values_of <- function(field) sort(unique(sections[[source_cols[[field]]]]))
+
+  input_for <- function(field) {
+    id <- ns(paste0(prefix, "_", field))
+    choices <- switch(field,
+      term = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
+      dept = dept_choices,
+      values_of(field))
+    selected <- switch(field,
+      campus = cedar_campus_default(sections),
+      term   = if (!is.null(default_term)) as.character(default_term),
+      level  = level_selected,
+      NULL)
+    selectizeInput(id, col_label(field), multiple = TRUE, choices = choices, selected = selected)
+  }
+  lapply(fields, function(field) column(col_width(field), input_for(field)))
+}
+
 # Light green scope strip shown at the bottom of a filter bar.
 filter_scope_stripe <- function(...) {
   div(class = "filter-scope-strip", ...)

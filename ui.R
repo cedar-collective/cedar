@@ -1417,43 +1417,9 @@ nav_panel(
       "Enrollment",
       "Seats and enrollment for the sections you choose, from the first day of classes to the end of the term.",
     fluidRow(
-      column(2,
-             selectizeInput(
-               inputId = "enrl_campus",
-               label = "Campus",
-               multiple = TRUE,
-               choices  = sort(unique(cedar_sections$campus)),
-               selected = cedar_campus_default(cedar_sections)),
-      ),
-      column(1,
-             selectizeInput(
-               inputId = "enrl_college",
-               label = "College", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$college))),
-      ),
-      column(2,
-             selectInput(
-               inputId = "enrl_term",
-               label = "Term",
-               multiple = TRUE,
-               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)), decreasing = TRUE),
-               selected = as.character(cedar_default_term)),
-      ),
-      column(1,
-             selectInput(
-               inputId = "enrl_pt",
-               label = "PoT",
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$part_term))),
-      ),
-      column(3,
-             selectizeInput(
-               inputId = "enrl_dept",
-               label = "Department",
-               multiple = TRUE,
-               choices = .dept_choices),
-      ),
+      cedar_section_scope_inputs(
+        identity, "enrl", cedar_sections, .dept_choices, cedar_default_term,
+        fields = c("campus", "college", "term", "pt", "dept"), widths = c(dept = 3)),
       column(1,
              selectizeInput(
                inputId = "enrl_subj",
