@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I91](#i91--a-students-running-credit-total-and-their-classification-disagree-for-a-quarter-of-juniors) | Suspected defect | `build_credit_timeline()`'s `total_credits_entering` puts 28% of Fall 2025 juniors at 90 credits or more and 6% of seniors under 90. One of the two is off for those students, or they count different credit; which is not yet known. Found 2026-11-26 weighing a credit line between the Retention and Graduation pages |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -121,6 +122,65 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I91 — A student's running credit total and their classification disagree for a quarter of juniors
+
+**Status:** open; suspected (two paths that may disagree, cause not established).
+**Found:** 2026-11-26, checking whether a credit line (75 or 90 credits) could
+divide the Retention page from the Graduation page.
+**Severity:** moderate for any reader that bands *enrolled* students by
+credits; none for the pages as they stand, which band students who have left
+by their stamped total (`get_exit_credits()`) or read classification.
+**Affects:** `build_credit_timeline()` (`total_credits_entering`,
+`total_credits_after`); its readers `get_entering_class_retention(opt$arrival_credits)`
+and `get_credit_ceiling_crossings()`.
+
+### What is seen
+
+Undergraduates enrolled in Fall 2025, home campus ABQ, with a readable total
+(`timeline_valid` and `transfer_credits_known`: 92% of them, 86% of seniors).
+By the registrar's rule a junior has 60 to 89 earned hours and a senior 90 or
+more. On the running total:
+
+| Classification | under 60 | 60–89 | 90 or more |
+|---|---|---|---|
+| Junior | 3% | 70% | 28% |
+| Senior | 3% | 3% | 95% |
+| Sophomore | 84% | 15% | 1% |
+
+The total runs ahead of the classification far more often than behind it.
+
+### What could explain it (not established)
+
+- **Credit brought from elsewhere is one block for the whole record**
+  (`overall_credits_attempted - inst_credits_attempted`, I74). Credit a
+  student brings in mid-career, a summer at another college, is then counted
+  from their first term, and every earlier term's total is too high.
+- The block is of *attempted* credit and classification is on *earned* hours.
+- Classification may be set at a point in the term that lags the credits
+  entering it.
+
+Until one is shown, a credit band for an enrolled student is an estimate, and
+"90 credits" and "senior" are different groups of students.
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+st <- cedar_read("cedar_student_terms"); pr <- cedar_read("cedar_programs")
+pop <- st %>% filter(term == 202580, enrolled, student_level == "UG", student_campus == "ABQ")
+tl <- build_credit_timeline(st, pr, list(student_ids = unique(pop$student_id)))
+pop %>%
+  inner_join(tl %>% filter(timeline_valid, transfer_credits_known), by = c("student_id", "term")) %>%
+  count(student_classification, band = cut(total_credits_entering, c(-Inf, 60, 90, Inf), right = FALSE))
+```
+
+### How to check
+
+For students with several pulls, compare the transfer block between an early
+pull and a late one: if it grows for the juniors who read 90 or more, the block
+is being back-dated. Then compare the block as attempted with the block as
+earned for the same students.
 
 ## I90 — Low Enrollment read as not yet run when nothing was low, and dropped history from a long list without saying
 
