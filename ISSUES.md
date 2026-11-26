@@ -38,7 +38,6 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I91](#i91--a-students-running-credit-total-and-their-classification-disagree-for-a-quarter-of-juniors) | Suspected defect | `build_credit_timeline()`'s `total_credits_entering` puts 28% of Fall 2025 juniors at 90 credits or more and 6% of seniors under 90. One of the two is off for those students, or they count different credit; which is not yet known. Found 2026-11-26 weighing a credit line between the Retention and Graduation pages |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -62,6 +61,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
 | [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
 | [I89](#i89--low-enrollment-ignored-the-enrollment-bars-subject) | Defect | Low Enrollment ran under the Enrollment bar but built its own scope without Subject: a Subject choice narrowed the Courses table and not the Low Enrollment list beside it. Found 2026-11-26; the page now has its own bar |
 | [I88](#i88--low-enrollments-cards-and-colours-judged-a-crosslisted-section-on-its-own-students-and-its-list-on-the-combined-class) | Defect | Low Enrollment kept or dropped a crosslisted section by its combined class but counted its cards and coloured its cells by the section's own students, so one section could be listed as over its threshold and counted as under it. Found 2026-11-26; one band a row now |
@@ -123,45 +123,64 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
-## I91 — A student's running credit total and their classification disagree for a quarter of juniors
+## I91 — The running credit total counts attempted credits, and read as earned it disagrees with classification
 
-**Status:** open; suspected (two paths that may disagree, cause not established).
+**Status:** resolved 2026-11-26 as not a defect: explained, no code changed
+(branch `issues/credit-total-vs-classification`). Kept so it is not diagnosed
+again.
 **Found:** 2026-11-26, checking whether a credit line (75 or 90 credits) could
 divide the Retention page from the Graduation page.
-**Severity:** moderate for any reader that bands *enrolled* students by
-credits; none for the pages as they stand, which band students who have left
-by their stamped total (`get_exit_credits()`) or read classification.
-**Affects:** `build_credit_timeline()` (`total_credits_entering`,
-`total_credits_after`); its readers `get_entering_class_retention(opt$arrival_credits)`
-and `get_credit_ceiling_crossings()`.
+**Affects:** nothing shown. Anyone who reads `build_credit_timeline()`'s
+`total_credits_entering` / `total_credits_after` as credits *earned*.
 
-### What is seen
+### What was seen
 
 Undergraduates enrolled in Fall 2025, home campus ABQ, with a readable total
-(`timeline_valid` and `transfer_credits_known`: 92% of them, 86% of seniors).
-By the registrar's rule a junior has 60 to 89 earned hours and a senior 90 or
-more. On the running total:
+(`timeline_valid` and `transfer_credits_known`: 92% of them). By the
+registrar's rule a junior has 60 to 89 earned hours and a senior 90 or more.
+Banded on `total_credits_entering`:
 
 | Classification | under 60 | 60–89 | 90 or more |
 |---|---|---|---|
-| Junior | 3% | 70% | 28% |
-| Senior | 3% | 3% | 95% |
-| Sophomore | 84% | 15% | 1% |
+| Junior | 3% | 70% | 27% |
+| Senior | 3% | 3% | 94% |
+| Sophomore | 85% | 15% | 1% |
 
-The total runs ahead of the classification far more often than behind it.
+### Cause
 
-### What could explain it (not established)
+The timeline is on the **attempted** basis throughout, and says so in its
+code: attempted credits here before the term (`unm_credits_entering`) plus the
+attempted block brought from elsewhere (`overall_credits_attempted -
+inst_credits_attempted`). Classification is set on **earned** hours. A student
+who has attempted 93 credits and earned 84 is a junior, correctly, and at "90
+or more" on the timeline, correctly.
 
-- **Credit brought from elsewhere is one block for the whole record**
-  (`overall_credits_attempted - inst_credits_attempted`, I74). Credit a
-  student brings in mid-career, a summer at another college, is then counted
-  from their first term, and every earlier term's total is too high.
-- The block is of *attempted* credit and classification is on *earned* hours.
-- Classification may be set at a point in the term that lags the credits
-  entering it.
+The same students on earned credits (`cumulative_completed_unm_credits` less
+the term's own, plus `overall_credits_earned - inst_credits_earned`, the
+earned block by the same difference of two stamped columns):
 
-Until one is shown, a credit band for an enrolled student is an estimate, and
-"90 credits" and "senior" are different groups of students.
+| Classification | under 60 | 60–89 | 90 or more |
+|---|---|---|---|
+| Junior | 9% | 84% | 7% |
+| Senior | 3% | 5% | 92% |
+| Sophomore | 98% | 2% | 0% |
+
+What is left (a junior under 60, a senior under 90) is one student in ten or
+fewer, and is not explained here: when in a term classification is set, and
+credit brought in mid-career and counted from the first term, are the two
+places to look.
+
+### What to take from it
+
+- **`total_credits_entering` is attempted credits.** It is the right figure
+  for the 160-credit ceiling (`get_credit_ceiling_crossings()`), which is set
+  on attempted credits. It is the wrong figure to set against a degree's 120
+  credits or against classification: on it 51% of Fall 2025 seniors are at
+  120 or more, on earned credits 34%.
+- **No function gives an earned position yet.** The one above was worked out
+  in a scratch script. A page that bands *enrolled* students by credits
+  earned needs it built beside the attempted one (`ROADMAP.md`), with the
+  same two guards (`timeline_valid`, a recorded pair of totals).
 
 ### Reproduce
 
@@ -170,17 +189,19 @@ source("scripts/cedar-repl.R")
 st <- cedar_read("cedar_student_terms"); pr <- cedar_read("cedar_programs")
 pop <- st %>% filter(term == 202580, enrolled, student_level == "UG", student_campus == "ABQ")
 tl <- build_credit_timeline(st, pr, list(student_ids = unique(pop$student_id)))
+earned_block <- pr %>%
+  filter(!is.na(inst_credits_earned), !is.na(overall_credits_earned)) %>%
+  distinct(student_id, inst_credits_earned, overall_credits_earned) %>%
+  group_by(student_id) %>%
+  summarize(brought = max(median(overall_credits_earned - inst_credits_earned), 0))
 pop %>%
   inner_join(tl %>% filter(timeline_valid, transfer_credits_known), by = c("student_id", "term")) %>%
-  count(student_classification, band = cut(total_credits_entering, c(-Inf, 60, 90, Inf), right = FALSE))
+  inner_join(earned_block, by = "student_id") %>%
+  mutate(earned = cumulative_completed_unm_credits - coalesce(completed_unm_credits, 0) + brought) %>%
+  count(student_classification,
+        attempted = cut(total_credits_entering, c(-Inf, 60, 90, Inf), right = FALSE),
+        earned = cut(earned, c(-Inf, 60, 90, Inf), right = FALSE))
 ```
-
-### How to check
-
-For students with several pulls, compare the transfer block between an early
-pull and a late one: if it grows for the juniors who read 90 or more, the block
-is being back-dated. Then compare the block as attempted with the block as
-earned for the same students.
 
 ## I90 — Low Enrollment read as not yet run when nothing was low, and dropped history from a long list without saying
 
