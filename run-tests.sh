@@ -8,6 +8,8 @@
 #   ./run-tests.sh --e2e reports # full institutional report tour, without rebuild
 #   ./run-tests.sh --all        # rebuild, then all institutional browser suites
 #   ./run-tests.sh --all smoke  # rebuild, then only the short smoke check
+#   ./run-tests.sh --e2e --fresh  # restart the app, then time its first sessions
+#   ./run-tests.sh --all --fresh  # the same on a rebuilt container (tests the diff)
 #   ./run-tests.sh --test-image cedar:ci --e2e demo  # R in Docker; browser on host
 #   ./run-tests.sh --project-library  # same suite, prepared native dependencies
 #
@@ -46,13 +48,14 @@ export LC_ALL="$_cedar_utf8_locale"
 unset _cedar_utf8_locale _charmap
 echo "locale: LC_ALL=$LC_ALL"
 
-E2E=0; REBUILD=0; ONLY=""; TEST_IMAGE=""; PROJECT_LIBRARY=0; CHANGED=0; SKIP_R=0
+E2E=0; REBUILD=0; ONLY=""; TEST_IMAGE=""; PROJECT_LIBRARY=0; CHANGED=0; SKIP_R=0; FRESH=0
 SELECTED=()   # populated by --changed; empty means "use ONLY / the default"
 while [ "$#" -gt 0 ]; do
   arg="$1"
   case "$arg" in
     --e2e)  E2E=1 ;;
     --all)  E2E=1; REBUILD=1 ;;
+    --fresh) E2E=1; FRESH=1 ;;
     --changed) CHANGED=1 ;;
     --project-library) PROJECT_LIBRARY=1 ;;
     --test-image)
@@ -74,7 +77,7 @@ fi
 export CEDAR_TEST_PROJECT_LIBRARY="$PROJECT_LIBRARY"
 
 # Validate selection before spending time on R or starting an app.
-suites=(harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-deeplink gen-ed-grads credit-timeline course-impact-covariates course-cohort later-course downstream-glance course-topics concurrent-by-major dfw-rates first-year retention-dashboard graduation theme start-page run-buttons degree-explorer demo)
+suites=(fresh-start harness admin reports-smoke nav enrollment-projections course-dynamics-deeplink waitlist-deeplink waitlist-reconciliation gen-ed-deeplink gen-ed-grads credit-timeline course-impact-covariates course-cohort later-course downstream-glance course-topics concurrent-by-major dfw-rates first-year retention-dashboard graduation theme start-page run-buttons degree-explorer demo)
 REPORT_SCOPE=smoke
 
 # ── --changed: pick the smallest defensible set of checks for this diff ───────
@@ -106,7 +109,7 @@ plan_from_changes() {
     return
   fi
 
-  local need_r=0 need_browser=0 need_deps=0 only_docs=1
+  local need_r=0 need_browser=0 need_deps=0 need_fresh=0 only_docs=1
   local -a browser_suites=()
   local reason
   while IFS= read -r f; do
@@ -130,8 +133,12 @@ plan_from_changes() {
       # The synthetic institution is exercised by the demo browser suite.
       dev/*)
         need_r=1; need_browser=1; browser_suites+=(demo); only_docs=0; reason="synthetic data -> R + demo" ;;
+      # What the app does as it starts, and so what its first readers wait for.
+      # Only a process just started shows it, and only a rebuilt one has the diff.
+      global.R|entrypoint.sh)
+        need_r=1; need_fresh=1; only_docs=0; reason="how the app starts -> R suite + first sessions" ;;
       # Everything else under R/ plus the fixtures is pure computation.
-      R/*|tests/testthat/*|config/*|global.R|app.R|setup.R)
+      R/*|tests/testthat/*|config/*|app.R|setup.R)
         need_r=1; only_docs=0; reason="computation -> R suite" ;;
       docs/*|*.md)
         reason="docs only" ;;
@@ -147,6 +154,11 @@ plan_from_changes() {
     return
   fi
   [ "$need_deps" -eq 1 ] && echo "  => also verify pinned dependencies (scripts/r-environment.R check)"
+  if [ "$need_fresh" -eq 1 ]; then
+    echo "  => the app's start changed. This run does not cover it; afterwards:"
+    echo "       ./run-tests.sh --all --fresh                          # rebuild, then its first sessions"
+    echo "       bash scripts/dev.sh up && ./run-tests.sh --e2e demo   # the synthetic app still starts"
+  fi
   if [ "$need_browser" -eq 1 ]; then
     E2E=1
     if [ "${#browser_suites[@]}" -gt 0 ]; then
@@ -187,6 +199,15 @@ if [ "$E2E" -eq 0 ] && [ -n "$ONLY" ]; then
   echo "a suite name requires --e2e or --all" >&2; exit 2
 fi
 if [ "$E2E" -eq 1 ]; then
+  # --fresh alone is the first-sessions check and nothing after it.
+  if [ "$FRESH" -eq 1 ] && [ -z "$ONLY" ]; then ONLY=fresh-start; fi
+  if [ "$FRESH" -eq 0 ] && [ "$ONLY" = fresh-start ]; then
+    echo "fresh-start times a process's first sessions: run it with --fresh, which restarts the app first" >&2
+    exit 2
+  fi
+  if [ "$FRESH" -eq 1 ] && [ -n "$TEST_IMAGE" ]; then
+    echo "--fresh restarts the running app's container; do not combine it with --test-image" >&2; exit 2
+  fi
   if [ -z "$ONLY" ]; then
     if [ "$REBUILD" -eq 1 ]; then REPORT_SCOPE=all; else ONLY=smoke; fi
   fi
@@ -286,11 +307,75 @@ fi
 
 # ── 3. Browser suites ────────────────────────────────────────────────────────
 if [ "$E2E" -eq 1 ]; then
+  # Log lines older than this belong to the process a --fresh run replaces.
+  FRESH_SINCE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   if [ "$REBUILD" -eq 1 ]; then
     run_stage "rebuild container" ./rebuild-and-test.sh
   fi
 
   APP_URL="${CEDAR_URL:-http://localhost:3838/}"
+
+  # A process just started is a different thing to test from one in use. R
+  # compiles a function as it is first used, and a session's set-up arrives on
+  # its own schedule, so a change to how the app or a session starts shows in a
+  # new process's first sessions and nowhere else (ISSUES I81, I85). Every
+  # other browser run reuses a process already in use; only a deploy met a new
+  # one. --fresh restarts whichever container answers on the app's port, which
+  # serves the institutional stack, the synthetic one and a one-off test
+  # container alike. After --all the rebuilt container is already new.
+  app_port() {
+    local port="${APP_URL#*://}"; port="${port%%/*}"
+    case "$port" in *:*) echo "${port##*:}" ;; *) echo 80 ;; esac
+  }
+  app_container() {
+    docker ps --filter "publish=$(app_port)" --format '{{.Names}}' 2>/dev/null | sed -n 1p
+  }
+  restart_app() {
+    local name; name="$(app_container)"
+    if [ -z "$name" ]; then
+      echo "no running container publishes port $(app_port): --fresh restarts the app's container" >&2
+      return 1
+    fi
+    echo "restarting ${name}"
+    # From here on: a build-ahead the old process finished a moment ago must
+    # not be read as the new one's.
+    FRESH_SINCE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    docker restart "$name" >/dev/null
+  }
+  # The app builds some pages ahead once it has started
+  # (cedar_preload_shared_results()), one job at a time on its one R process,
+  # and logs "[preload] 3 of 15: ...: built (2.8s)" as each ends. A session
+  # opened meanwhile waits behind the job running, so a time taken then is the
+  # job's. Read the log on stdin; succeed once the last job is there.
+  build_ahead_done() {
+    awk '/\[preload\] [0-9]+ of [0-9]+:/ {
+           for (i = 2; i < NF; i++) if ($i == "of" && $(i - 1) + 0 == $(i + 1) + 0) last = 1
+         }
+         END { exit last ? 0 : 1 }'
+  }
+  wait_for_build_ahead() {
+    local timeout="${1:-900}" name start
+    name="$(app_container)"; start="$(date +%s)"
+    if [ -z "$name" ]; then
+      echo "no running container publishes port $(app_port): cannot read the app's log" >&2
+      return 1
+    fi
+    while true; do
+      if docker logs --since "$FRESH_SINCE" "$name" 2>&1 | build_ahead_done; then
+        echo "build-ahead finished after $(( $(date +%s) - start ))s"
+        return 0
+      fi
+      if [ $(( $(date +%s) - start )) -ge "$timeout" ]; then
+        echo "the build-ahead did not log its last job within ${timeout}s. Its last lines:" >&2
+        docker logs --since "$FRESH_SINCE" "$name" 2>&1 | awk '/\[preload\]/' | tail -3 >&2
+        return 1
+      fi
+      sleep 5
+    done
+  }
+  if [ "$FRESH" -eq 1 ] && [ "$REBUILD" -eq 0 ]; then
+    run_stage "restart app (a new process)" restart_app
+  fi
   run_stage "app responds at ${APP_URL}" wait_for_app_response "$APP_URL" 240
 
   # Which data surface is actually answering? Both stacks serve the same port,
@@ -376,17 +461,32 @@ if [ "$E2E" -eq 1 ]; then
 
   # Absorb the cold start here, where a slow stage is expected. Otherwise
   # whichever suite runs first pays for global.R inside its own step budget and
-  # fails as an ambiguous "timed out waiting for <output>".
-  run_stage "warm up app" node tests/e2e/warmup.mjs
+  # fails as an ambiguous "timed out waiting for <output>". A --fresh run has
+  # no warm-up: the process's first session is the first thing it times.
+  if [ "$FRESH" -eq 1 ]; then
+    run_stage "build-ahead finished" wait_for_build_ahead "${CEDAR_BUILD_AHEAD_TIMEOUT:-900}"
+  else
+    run_stage "warm up app" node tests/e2e/warmup.mjs
+  fi
 
-  # demo asserts fixed synthetic values; everything else reads institutional data.
+  # demo asserts fixed synthetic values; everything else reads institutional
+  # data. fresh-start reads no data at all, so it runs on either.
   WANT_MODE=institutional
   if [ "${#SELECTED[@]}" -gt 0 ]; then
     [[ " ${SELECTED[*]} " == *" demo "* ]] && WANT_MODE=synthetic
   elif [ "$ONLY" = demo ]; then
     WANT_MODE=synthetic
+  elif [ "$ONLY" = fresh-start ]; then
+    WANT_MODE=either
   fi
-  run_stage "app data surface" check_app_mode "$WANT_MODE"
+  if [ "$WANT_MODE" != either ]; then
+    run_stage "app data surface" check_app_mode "$WANT_MODE"
+  fi
+
+  # First, and only on a process nothing has opened yet.
+  if [ "$FRESH" -eq 1 ]; then
+    run_stage "e2e: fresh-start (the process's first sessions)" node tests/e2e/fresh-start.test.mjs
+  fi
 
   # Between suites, wait for the app to answer rather than sleeping a fixed 6s.
   # The blind sleep cost ~66s on a full run — 17% of the browser stage — and
@@ -395,6 +495,8 @@ if [ "$E2E" -eq 1 ]; then
   # the real readiness signal, so poll for it.
   # Report the first failure; reruns are explicit after diagnosing its cause.
   for s in "${suites[@]}"; do
+    # fresh-start ran above if it was asked for; it is no part of a tour.
+    [ "$s" = "fresh-start" ] && continue
     if [ "${#SELECTED[@]}" -gt 0 ]; then
       # --changed picked an explicit set; demo is included only if it chose it.
       [[ " ${SELECTED[*]} " == *" $s "* ]] || continue

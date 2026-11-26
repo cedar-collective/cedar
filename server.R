@@ -6042,3 +6042,8 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   })
 
 } # end server
+
+# The value of this line is the function Shiny runs: the one global.R compiled
+# at start, unless this file has changed since (cedar_server_to_run(),
+# R/trunk/utils.R; ISSUES I81, M70). Keep it last.
+cedar_server_to_run(server, cedar_compiled_server, "server.R")

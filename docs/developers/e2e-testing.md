@@ -114,6 +114,62 @@ line); production, on 8 GB, builds ten. A restart is also ready sooner.
 stale container produced a completely separate phantom — Dept Trends "rendered
 hidden charts" purely because the image predated the fix.
 
+## A process just started
+
+Every browser run but one meets a process already in use: the app was started
+some time ago and a warm-up session has been through it. What a process does
+for its first readers was therefore tested by nobody until a deploy, and two
+things lived there unseen: R compiled the server function while the second
+session waited (ISSUES I81), and the test driver itself lost an input on that
+session (I85).
+
+```bash
+./run-tests.sh --e2e --fresh     # restart the running app, then its first sessions
+./run-tests.sh --all --fresh     # the same on a rebuilt container
+```
+
+`--fresh` restarts whichever container answers on the app's port (the
+institutional stack, the synthetic one or a one-off test container), waits for
+the build-ahead's last job in its log (`[preload] 5 of 5: …`: a session opened
+before then waits behind the job running, and a time taken then is the job's),
+leaves out the warm-up, and runs `fresh-start.test.mjs` as the process's first
+six sessions. A suite named with it runs afterwards. **A restart runs the
+source the container was built with**, so the form that tests a diff is
+`--all --fresh`; `--changed` says so when `global.R` or `entrypoint.sh` is in
+the diff. The wait is 15 minutes at most (`CEDAR_BUILD_AHEAD_TIMEOUT`, in
+seconds).
+
+The suite holds two things for each of the first two sessions:
+
+- **An input set the moment `connect()` returns is still set once the page is
+  idle** (I85).
+- **The server begins as soon after the connection as it does for the four
+  sessions after**, give or take a second. R compiles a function before
+  running it, so a session that meets the server function uncompiled waits
+  for the compiler in exactly this stretch.
+
+Measured 2026-11-25 in the development container (emulated), seconds:
+
+| | Session 1 | Session 2 | Sessions 3 to 6 |
+|---|---|---|---|
+| Connection to the server beginning, before | 0.4 | 2.8 | 0.1 to 0.2 |
+| Connection to the server beginning, after | 0.2 to 0.3 | 0.2 | 0.1 to 0.2 |
+| Whole start, before | 6.1 to 7.6 | 6.7 to 8.1 | 4.2 to 6.2 |
+| Whole start, after | 6.1 to 6.5 | 4.5 | 4.2 to 5.7 |
+
+"After" is with the server function compiled at start: `global.R` compiles the
+function it read (`cedar_compile_server()`, 2 of the 6.3 seconds the start now
+spends compiling) and `server.R`'s last line hands it to Shiny
+(`cedar_server_to_run()`), because Shiny reads `server.R` itself for the
+first session and runs what that read returns. An edited `server.R` is run as
+edited.
+
+The whole start is printed and not held. Sessions after the second differ by
+a second and a half among themselves, about one in four taking that much
+longer, which is as much as the first session still adds (ISSUES M75);
+compiling every function at start cost 33 seconds and changed neither. Run it
+alone: a second heavy job on the machine moves every number.
+
 ## E2E rules — the four that cause every flake
 
 Written after a session lost hours to all four. `tests/e2e/lib.mjs` now solves
