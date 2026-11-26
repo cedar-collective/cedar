@@ -663,8 +663,8 @@ plot_return_series <- function(payload) {
     x = labels, y = s$return_pct, type = "scatter", mode = "lines+markers+text",
     text = sprintf("%.1f%%", s$return_pct), textposition = "top center",
     line = list(color = CEDAR_PALETTE[[2]], width = 3), marker = list(color = CEDAR_PALETTE[[2]], size = 8),
-    hovertext = paste0(labels, "<br>", format(s$n_returned, big.mark = ","), " of ",
-                       format(s$n_observable, big.mark = ","), " came back"),
+    hovertext = paste0(labels, "<br>", format(s$n_returned, big.mark = ",", trim = TRUE), " of ",
+                       format(s$n_observable, big.mark = ",", trim = TRUE), " came back"),
     hoverinfo = "text", showlegend = FALSE, name = "Came back")
   # The fitted trend, drawn from compute_rate_trend()'s own line, labelled at
   # its end with its slope and verdict (the colour says which way, when it is
@@ -710,8 +710,8 @@ plot_return_stages <- function(payload, entry) {
   colours <- stats::setNames(CEDAR_PALETTE[seq_len(payload$stages$last)], seq_len(payload$stages$last))
   hover <- function(name, rows) paste0(name, "<br>", vapply(rows$term, fmt_term, character(1)), ": ",
                                        sprintf("%.1f%%", rows$return_pct), "<br>",
-                                       format(rows$n_returned, big.mark = ","), " of ",
-                                       format(rows$n_observable, big.mark = ","), " came back")
+                                       format(rows$n_returned, big.mark = ",", trim = TRUE), " of ",
+                                       format(rows$n_observable, big.mark = ",", trim = TRUE), " came back")
   p <- plotly::plot_ly(
     x = vapply(overall$term, fmt_term, character(1)), y = overall$return_pct, type = "scatter", mode = "lines",
     line = list(color = CEDAR_SEMANTIC_COLORS[["reference"]], width = 2, dash = "dot"),
@@ -765,7 +765,7 @@ plot_entering_class_milestones <- function(payload) {
       name = names_by_step[[i]], line = list(color = colours[[i]], width = 3), marker = list(color = colours[[i]], size = 8),
       hovertext = paste0("Entered ", vapply(rows$term, fmt_term, character(1)), "<br>", names_by_step[[i]], ", in ",
                          vapply(rows$target_term, fmt_term, character(1)), ": ",
-                         format(rows$n_here, big.mark = ","), " of ", format(rows$n_entering, big.mark = ","),
+                         format(rows$n_here, big.mark = ",", trim = TRUE), " of ", format(rows$n_entering, big.mark = ",", trim = TRUE),
                          sprintf(" (%.1f%%)", rows$here_pct)),
       hoverinfo = "text")
   }

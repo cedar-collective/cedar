@@ -210,6 +210,13 @@ test_that("RT01: the chart draws a semester a line, breaking it at a term not re
   expect_equal(x[!is.na(x)], c("Fall 2020", "Fall 2022", "Fall 2023"))
   expect_equal(is.na(y), c(FALSE, TRUE, FALSE, FALSE))
   expect_false(isTRUE(third$connectgaps))
+  # A count narrower than the others in its line is not padded on hover.
+  p$stages$series$n_returned[p$stages$series$stage == 1L & p$stages$series$term == 202080L] <- 9L
+  first <- plotly::plotly_build(plot_return_stages(p, "first_time"))$x$data[[2]]
+  expect_false(any(grepl("  ", unlist(first$hovertext))))
+  p$series$n_returned[[1]] <- 9L
+  overall <- plotly::plotly_build(plot_return_series(p))$x$data[[1]]
+  expect_false(any(grepl("  ", unlist(overall$hovertext))))
   # Transfer students' chart is their own semesters.
   transfer <- plotly::plotly_build(plot_return_stages(rt01$dashboard, "transfer"))$x$data
   expect_equal(vapply(transfer, function(t) t$name, character(1)), c("Every student together", "1st semester"))
