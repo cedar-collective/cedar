@@ -10,7 +10,7 @@ test_that("PR checks are read-only, secret-free, and independent of deployment",
   expect_null(workflow$on$pull_request[["paths-ignore"]])
   expect_identical(workflow$permissions, list(contents = "read"))
   expect_false(grepl("secrets\\.|pull_request_target|self-hosted|ssh-action|docker-compose.yml", text))
-  expect_setequal(names(workflow$jobs), "synthetic-checks")
+  expect_setequal(names(workflow$jobs), c("synthetic-checks", "model-source", "deploy-cost"))
 
   job <- workflow$jobs[["synthetic-checks"]]
   expect_identical(job$name, "Synthetic checks")
@@ -45,6 +45,102 @@ test_that("PR checks run the full standard gate against an isolated synthetic ap
   upload <- Filter(function(step) identical(step$uses, "actions/upload-artifact@v4"), steps)[[1]]
   expect_identical(upload[["if"]], "always()")
   expect_equal(upload$with[["retention-days"]], 7)
+})
+
+# ISSUES M77: an edit to a file the projection model is hashed from makes the
+# next deploy rebuild both bundles, and nothing said so before the merge. Three
+# places now do, from one reading of the list: this script, the runner's
+# change analysis, and a pull-request check that carries the answer in its name.
+test_that("a shell reads the projection model-source list the deploy hashes", {
+  script <- file.path(cedar_base_dir, "scripts", "projection-model-source.sh")
+  expect_identical(system2("bash", shQuote(script), stdout = TRUE),
+                   enrollment_projection_model_source_files())
+
+  touched <- function(paths) {
+    system2("bash", c(shQuote(script), "--touched"), input = paths, stdout = TRUE)
+  }
+  expect_identical(
+    touched(c("R/trunk/utils.R", "R/trunk/display-format.R", "docs/developers/testing.md",
+              "scripts/build-enrollment-projections.R")),
+    c("R/trunk/utils.R", "scripts/build-enrollment-projections.R"))
+  # A path that only begins or ends like a listed one is not on the list.
+  expect_length(touched(c("R/trunk/display-format.R", "ISSUES.md", "tests/R/trunk/utils.R",
+                          "R/trunk/utils.R.orig")), 0)
+  expect_equal(system2("bash", c(shQuote(script), "--nope"), stdout = FALSE, stderr = FALSE), 2)
+})
+
+test_that("the change analysis says when a diff touches projection model source", {
+  testthat::local_edition(3)
+  # The real runner; git answers with diffs of our choosing, and the stages it
+  # then selects are stand-ins. HEAD left origin/main at 1111111 and the local
+  # main at 0000000, and which of the two is the later is the case's to say.
+  bin <- withr::local_tempdir()
+  stub <- c("#!/bin/bash",
+            'case "${0##*/} $*" in',
+            '  "git merge-base HEAD origin/main") echo 1111111 ;;',
+            '  "git merge-base HEAD main") echo 0000000 ;;',
+            '  "git merge-base --is-ancestor 1111111 0000000") [ "$CEDAR_FAKE_LATER" = main ] || exit 1 ;;',
+            '  "git diff --name-only 1111111 HEAD") printf "%s\\n" $CEDAR_FAKE_SINCE_ORIGIN ;;',
+            '  "git diff --name-only 0000000 HEAD") printf "%s\\n" $CEDAR_FAKE_SINCE_MAIN ;;',
+            "esac",
+            "exit 0")
+  for (command in c("git", "node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep)))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  analysis <- function(since_origin, since_main = since_origin, later = "origin") {
+    withr::local_envvar(c(CEDAR_FAKE_SINCE_ORIGIN = paste(since_origin, collapse = " "),
+                          CEDAR_FAKE_SINCE_MAIN = paste(since_main, collapse = " "),
+                          CEDAR_FAKE_LATER = later))
+    said <- system2("bash", c(shQuote(runner), "--changed"), stdout = TRUE, stderr = FALSE)
+    expect_null(attr(said, "status"))
+    from <- match("change analysis:", said)
+    said[from:(from + match("", said[-seq_len(from)]) - 1L)]
+  }
+  helper <- "R/trunk/display-format.R"
+  with_model_source <- c(helper, "R/trunk/utils.R")
+
+  expect_snapshot(writeLines(c(
+    "== A helper beside the model's files, and one of the model's files",
+    analysis(with_model_source),
+    "", "== The helper alone",
+    analysis(helper)
+  )))
+
+  # ISSUES M78. A local main left weeks behind holds everyone's work since in
+  # its diff, the model's files among it: the branch is compared with where it
+  # left origin/main. And a local main that is the later of the two is the one
+  # compared with.
+  expect_identical(analysis(helper, since_main = with_model_source), analysis(helper))
+  expect_identical(analysis(with_model_source, since_main = helper, later = "main"), analysis(helper))
+})
+
+test_that("the pull-request checks name a merge that will rebuild the projection bundles", {
+  testthat::local_edition(3)
+  workflow <- yaml::read_yaml(file.path(cedar_base_dir, ".github", "workflows", "pr-checks.yml"))
+  detect <- workflow$jobs[["model-source"]]
+  cost <- workflow$jobs[["deploy-cost"]]
+
+  # The diff read is the proposed merge against main: the merge commit and its
+  # first parent, which a checkout of depth 2 holds.
+  checkout <- detect$steps[[1]]
+  expect_identical(checkout$uses, "actions/checkout@v4")
+  expect_identical(checkout$with[["persist-credentials"]], FALSE)
+  expect_null(checkout$with$ref)
+  expect_equal(checkout$with[["fetch-depth"]], 2)
+  commands <- vapply(detect$steps, function(step) step$run %||% "", character(1))
+  expect_length(grep("git diff --name-only HEAD^1 HEAD | bash scripts/projection-model-source.sh --touched",
+                     commands, fixed = TRUE), 1)
+  expect_identical(detect$outputs$touched, "${{ steps.diff.outputs.touched }}")
+
+  # The answer is the second job's name, where the list of checks shows it,
+  # and it is a name either way: the job itself never fails a pull request.
+  expect_identical(cost$needs, "model-source")
+  expect_false(any(grepl("exit [1-9]", vapply(cost$steps, function(step) step$run %||% "", character(1)))))
+  expect_snapshot(writeLines(cost$name))
 })
 
 test_that("the Docker R option preserves the standard runner and rejects malformed arguments", {

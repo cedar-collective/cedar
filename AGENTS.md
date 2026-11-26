@@ -326,7 +326,7 @@ The full contract and the one summary of its rules: [enrollment-projections.md](
 - **Selection is rolling and published accuracy is out of sample.** A challenger replaces the prior same-season spine only by beating it on earlier aftcasts.
 - **The pressure bump and feeder adjustment change the plan, never the forecast or its accuracy.**
 - **Shiny never fits a model:** it reads validated bundles (`load_enrollment_projection_bundle()`), one per season.
-- `model_version` changes for calculation; `schema_version` for shape. **Editing any model-source file rebuilds both bundles on deploy**; page text belongs in `R/features/enrollment-projection-view.R`.
+- `model_version` changes for calculation; `schema_version` for shape. **Editing any model-source file rebuilds both bundles on deploy** (`./run-tests.sh --changed` and the pull-request check named `Deploy: …` say when a diff does; `R/trunk/utils.R` is one, so a helper no projection reads goes in another file); page text belongs in `R/features/enrollment-projection-view.R`.
 - Named populations come from `CEDAR_POPULATION_GROUPS`; run `population_group_audit()` when adding one.
 
 ## Degree Explorer and the catalog tooling

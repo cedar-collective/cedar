@@ -1,3 +1,32 @@
+# the change analysis says when a diff touches projection model source
+
+    Code
+      writeLines(c(
+        "== A helper beside the model's files, and one of the model's files",
+        analysis(with_model_source), "", "== The helper alone", analysis(helper)))
+    Output
+      == A helper beside the model's files, and one of the model's files
+      change analysis:
+        R/trunk/display-format.R                     computation -> R suite
+        R/trunk/utils.R                              computation -> R suite; PROJECTION MODEL SOURCE
+        => projection model source is in this diff: R/trunk/utils.R
+           Merged, it makes the next deploy rebuild both projection bundles: about 45
+           minutes of a deploy step that is stopped at 60 (ISSUES M77, I6). If no
+           projection reads the change, it belongs in a file that is not on the list
+           (bash scripts/projection-model-source.sh prints it). If the model did
+           change, say so in the pull request and merge it by itself.
+      
+      == The helper alone
+      change analysis:
+        R/trunk/display-format.R                     computation -> R suite
+
+# the pull-request checks name a merge that will rebuild the projection bundles
+
+    Code
+      writeLines(cost$name)
+    Output
+      ${{ needs.model-source.outputs.touched != '' && 'Deploy: rebuilds both projection bundles (about 45 minutes)' || 'Deploy: no projection rebuild' }}
+
 # after a failed browser stage the runner says what the app's container shows
 
     Code

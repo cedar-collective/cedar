@@ -30,11 +30,12 @@
 
     Code
       writeLines(c(unlist(lapply(refused, `[[`, "said"), use.names = FALSE), already$
-        said))
+        said, unreadable$said))
     Output
       check-test-catches: break 1 (text the file does not hold): `old` is not in R/sums.R
       check-test-catches: break 1 (text the file holds twice): `old` is in R/sums.R 2 times; write enough of the line that it is there once
       check-test-catches: break 1 (a test file that is not there): no test file tests/testthat/test-products.R
       check-test-catches: test-sums.R fails as the tree stands, so a failure under a break proves nothing:
         add_one adds one
+      check-test-catches: <breaks.yml> cannot be read as YAML: Parser error: while parsing a block mapping at line 1, column 3 did not find expected key at line 5, column 5
 
