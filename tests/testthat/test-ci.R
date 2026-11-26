@@ -169,6 +169,80 @@ test_that("the runner refuses a suite aimed at the wrong data surface", {
   expect_equal(browser_calls(run(c("--e2e", "nav"))), "node tests/e2e/nav.test.mjs")
 })
 
+test_that("a fresh run restarts the app, waits for its build-ahead and times its first sessions first", {
+  # Executable doubles, as above. docker answers the two questions the runner
+  # asks of it: which container publishes the app's port, and what its log
+  # says. Every other browser run meets a process already in use, which is how
+  # a test driver that raced a new one went unseen (ISSUES I85).
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  app_log <- file.path(bin, "app.log")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            'if [ "${0##*/}" = docker ] && [ "$1" = ps ]; then echo "$CEDAR_FAKE_CONTAINER"; fi',
+            'if [ "${0##*/}" = docker ] && [ "$1" = logs ]; then cat "$CEDAR_FAKE_APP_LOG"; fi',
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                        CEDAR_RUNNER_LOG = log, CEDAR_FAKE_APP_LOG = app_log,
+                        CEDAR_FAKE_CONTAINER = "cedar-test-app",
+                        CEDAR_BUILD_AHEAD_TIMEOUT = "1"))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  run <- function(args) {
+    writeLines(character(), log)
+    status <- system2("bash", c(shQuote(runner), args), stdout = FALSE, stderr = FALSE)
+    list(status = status, calls = readLines(log))
+  }
+  browser_calls <- function(result) grep("^node .*test.mjs", result$calls, value = TRUE)
+  first_sessions <- "node tests/e2e/fresh-start.test.mjs"
+  built <- c("[global.R] Downstream built ahead for: no course",
+             "[preload] 1 of 5: graduation_dashboard, ABQ: built (15.6s)",
+             "2026-11-25T21:55:40Z [preload] 5 of 5: dfw_dashboard, ABQ, EA: built (16.2s)")
+
+  writeLines(built, app_log)
+  fresh <- run(c("--e2e", "--fresh"))
+  expect_equal(fresh$status, 0)
+  expect_equal(browser_calls(fresh), first_sessions)
+  expect_true("docker restart cedar-test-app" %in% fresh$calls)
+  expect_lt(match("docker restart cedar-test-app", fresh$calls), match(first_sessions, fresh$calls))
+  expect_false("node tests/e2e/warmup.mjs" %in% fresh$calls)
+
+  # A suite named with it runs after the first sessions, never before.
+  expect_equal(browser_calls(run(c("--e2e", "--fresh", "nav"))),
+               c(first_sessions, "node tests/e2e/nav.test.mjs"))
+
+  # A rebuilt container is already a new process: no restart on top of it.
+  rebuilt <- run(c("--all", "--fresh"))
+  expect_equal(browser_calls(rebuilt), first_sessions)
+  expect_false("docker restart cedar-test-app" %in% rebuilt$calls)
+
+  # It is no part of a tour, and means nothing on a process already in use.
+  expect_false(first_sessions %in% browser_calls(run("--all")))
+  unasked <- run(c("--e2e", "fresh-start"))
+  expect_equal(unasked$status, 2)
+  expect_length(unasked$calls, 0)
+
+  # The build-ahead has not logged its last job: a session opened now would
+  # wait behind the job running, so nothing is timed.
+  writeLines(built[1:2], app_log)
+  building <- run(c("--e2e", "--fresh"))
+  expect_equal(building$status, 1)
+  expect_length(browser_calls(building), 0)
+
+  # No container publishes the app's port: nothing to restart, and it says so
+  # before any browser starts.
+  writeLines(built, app_log)
+  withr::local_envvar(c(CEDAR_FAKE_CONTAINER = ""))
+  absent <- run(c("--e2e", "--fresh"))
+  expect_equal(absent$status, 1)
+  expect_false(any(grepl("^docker restart", absent$calls)))
+  expect_length(browser_calls(absent), 0)
+})
+
 test_that("the instructor-gate password is handed from .env to the Shiny worker", {
   # ISSUES.md I55: .env and .Renviron are kept out of the image, and
   # shiny-server starts its R worker with a clean environment. The password
@@ -200,4 +274,22 @@ test_that("the count of courses built ahead is handed from the environment to th
   expect_lt(writes, starts)
   global <- readLines(file.path(cedar_base_dir, "global.R"))
   expect_length(grep('Sys.getenv("CEDAR_PRELOAD_COURSES", "10")', global, fixed = TRUE), 1L)
+})
+
+# ISSUES I81, M70. The R suite cannot start the app, so both ends of the
+# hand-over are read: Shiny runs the value of server.R's last line.
+test_that("global.R compiles the server function and server.R's last line hands it to Shiny", {
+  server_file <- parse(file.path(cedar_base_dir, "server.R"))
+  expect_identical(deparse(server_file[[length(server_file)]]),
+                   'cedar_server_to_run(server, cedar_compiled_server, "server.R")')
+
+  global <- readLines(file.path(cedar_base_dir, "global.R"), warn = FALSE)
+  nothing_yet <- which(global == "cedar_compiled_server <- NULL")
+  read <- which(global == 'source("server.R")')
+  compiled <- which(global == 'cedar_compiled_server <- cedar_compile_server(server, "server.R")')
+  expect_length(nothing_yet, 1L)
+  expect_length(read, 1L)
+  expect_length(compiled, 1L)
+  expect_lt(nothing_yet, read)
+  expect_lt(read, compiled)
 })

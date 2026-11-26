@@ -31,10 +31,10 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 ## Architecture Layers
 
 ```
-app.R          — 3 lines: loads ui/server, calls shinyApp()
-global.R       — data loading, library loading, load_funcs()
+global.R       — runs once at start: data loading, library loading, load_funcs()
 ui.R           — page_navbar() structure; mounts module UIs
-server.R       — module wiring + legacy inline handlers
+server.R       — module wiring + legacy inline handlers; its last line hands
+                 Shiny the function global.R compiled (Shiny never reads app.R)
 R/lists/       — static constants and the readers of the institution files
 R/trunk/       — pure infrastructure (filter, utils, cache, logging, data I/O)
 R/branches/    — reusable CEDAR domain computations
@@ -299,6 +299,7 @@ All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** th
 | Calculation or data contract | focused R tests while editing; `./run-tests.sh` when finished |
 | UI, routing, module wiring | the R gate plus `./run-tests.sh --e2e <suite>` for the changed behavior; look at layout changes |
 | `global.R`, or a validator that can stop startup | also `bash scripts/dev.sh up && ./run-tests.sh --e2e demo` |
+| What the app or a session does as it starts (`global.R`, `entrypoint.sh`, the last line of `server.R`, `connect()`) | also `./run-tests.sh --all --fresh`: every other browser run meets a process already in use |
 | A grouping grain or join key | also a real-data check (`scripts/cedar-repl.R`): fixtures are often single-valued on the axis you changed |
 | Release candidate or major pipeline change | `./run-tests.sh --all` |
 | Documentation or presentation only | check links or appearance |

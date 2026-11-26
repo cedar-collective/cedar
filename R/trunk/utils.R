@@ -1101,3 +1101,35 @@ cedar_plotly_palette <- function(labels, palette = CEDAR_PALETTE, label_order = 
   }
   stats::setNames(cedar_brewer_palette(length(labels), palette), labels)
 }
+
+
+# ── The server function Shiny runs ───────────────────────────────────────────
+# With a server.R in the directory, Shiny reads that file itself for a
+# process's first session, in an environment of its own, and runs the value of
+# its last line: never the `server` global.R made by reading the same file at
+# start (ISSUES M70). So nothing global.R does to its copy reaches a session,
+# and R compiled the function Shiny holds as sessions ran it: about 3 seconds
+# of the second session's start (I81). These two hand global.R's copy, compiled
+# at start, back to Shiny through server.R's last line.
+
+# global.R: compile the function it read, and note the file it came from.
+cedar_compile_server <- function(server, path) {
+  if (!is.function(server)) stop("[utils.R] cedar_compile_server(): `server` is not a function")
+  if (!file.exists(path)) stop("[utils.R] cedar_compile_server(): no file at ", path)
+  list(fn = compiler::cmpfun(server), file_time = file.mtime(path))
+}
+
+# server.R's last line: the function to run. `read_now` is the one this read of
+# the file just made. `compiled` is NULL at global.R's own read (nothing is
+# compiled yet, and the value is not used). A file changed since it was
+# compiled is run as it now reads: Shiny reads server.R again when it changes,
+# and an edit must not be answered with the function from before it.
+cedar_server_to_run <- function(read_now, compiled, path) {
+  if (!is.function(read_now)) stop("[utils.R] cedar_server_to_run(): `read_now` is not a function")
+  if (is.null(compiled)) return(read_now)
+  if (!is.function(compiled$fn) || !inherits(compiled$file_time, "POSIXct")) {
+    stop("[utils.R] cedar_server_to_run(): `compiled` is not what cedar_compile_server() returns")
+  }
+  if (!identical(file.mtime(path), compiled$file_time)) return(read_now)
+  compiled$fn
+}

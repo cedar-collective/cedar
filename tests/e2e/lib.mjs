@@ -141,12 +141,27 @@ export async function connect(page, opts = {}) {
     startWatched.add(page);
     await page.evaluateOnNewDocument(() => {
       window.__cedarStartCycles = 0;
+      // Milliseconds from the navigation: the websocket open, the server's
+      // first sign of work, and the end of the first cycle.
+      window.__cedarStart = { connected: null, busy: null, started: null };
+      const connecting = setInterval(() => {
+        const app = window.Shiny && window.Shiny.shinyapp;
+        if (app && app.isConnected && app.isConnected()) {
+          window.__cedarStart.connected = performance.now();
+          clearInterval(connecting);
+        }
+      }, 10);
       const watch = () => {
         const root = document.documentElement;
         let busy = root.classList.contains('shiny-busy');
         new MutationObserver(() => {
           const now = root.classList.contains('shiny-busy');
-          if (busy && !now) window.__cedarStartCycles += 1;
+          const at = window.__cedarStart;
+          if (!busy && now && at.busy === null) at.busy = performance.now();
+          if (busy && !now) {
+            window.__cedarStartCycles += 1;
+            if (at.started === null) at.started = performance.now();
+          }
           busy = now;
         }).observe(root, { attributes: true, attributeFilter: ['class'] });
       };
@@ -204,6 +219,21 @@ export async function connect(page, opts = {}) {
 }
 
 // The label of the currently active top-level nav tab, or '(none)'.
+// How the session's start went, as connect() watched it, in seconds from the
+// navigation: `connected` (the websocket is open), `busy` (the server's first
+// sign of work) and `started` (the end of the first busy-to-idle cycle, which
+// is what a reader waits for before anything they do can be answered). The
+// stretch from connected to busy is the server not yet running the session at
+// all: on a process still compiling its server function it was 3 seconds
+// against a tenth of one.
+export function sessionStart(page) {
+  return page.evaluate(() => {
+    const at = window.__cedarStart;
+    const s = (ms) => (ms === null ? null : ms / 1000);
+    return { connected: s(at.connected), busy: s(at.busy), started: s(at.started) };
+  });
+}
+
 export function activeTab(page) {
   return page.evaluate(() => {
     const a = [...document.querySelectorAll('.navbar a')]

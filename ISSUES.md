@@ -36,7 +36,6 @@ alongside other work (M14, M16).
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25). The module servers are now compiled at start; open for the server function itself, which the second session still compiles (about 3 seconds), because Shiny reads `server.R` itself ([M70](#improvements)) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -53,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M74 | Improvement | See [Improvements](#improvements) |
+| M1–M75 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -65,6 +64,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 | [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
 | [I83](#i83--a-deep-links-loading-notice-gave-no-estimate-and-no-running-count) | Defect | A link that runs a report on arrival (`autorun=true`) showed a bare "Loading…" until the report arrived: no estimate and no running count, because the overlay it opens before Shiny connects never went through the code that writes them (resolved 2026-11-25) |
 | [I82](#i82--downstreams-at-a-glance-showed-an-empty-page-while-it-ran-the-other-views) | Defect | Course Dynamics > Downstream opened on an empty page for as long as its analyses ran (two minutes for FYEX 1110 on production, 2026-11-25): At a Glance runs Against Non-Takers and Next Courses, and each showed its wait on its own subtab, which is hidden then (the waits now show on the page's overlay; the length of the run is [M68](#improvements)) |
+| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25), and the second about 3 more. `global.R` now compiles the module servers and the server function at start, and `server.R`'s last line hands the compiled function to Shiny, which reads that file itself. In the development container the second session's server began 2.8 s after the connection before and 0.2 after. `./run-tests.sh --all --fresh` holds it. The first session's remaining 2 seconds are not compilation ([M75](#improvements)) |
 | [I80](#i80--every-session-began-by-recounting-headcounts-program-menu) | Defect | Every session spent about 8 seconds starting (10 on production) before it could respond, on whatever page it opened, 4.5 of them rebuilding Headcount's program menu with one read of the declarations table per program; a deep link to a cached dashboard that loads in 0.2 seconds took 12 to 30 (now 2.3 seconds locally: the rows are found in one pass and the opening choices are shared) |
 | [I79](#i79--a-report-whose-conversion-or-read-stopped-part-way-was-stored-as-a-smaller-report) | Defect | `parse-data.R` stored whatever part of an export its converter had written or its reader returned: on 2026-11-23 Fall 2025's Student Holds were stored as the first 211,142 of 300,138 rows (15,152 of 26,890 students) with no error. A converter that does not exit 0, or any warning from the read, now stops the parse (resolved 2026-11-23; what cut that conversion short is not established) |
 | [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
@@ -325,8 +325,10 @@ the page's overlay is given and expects both modules' waits among them.
 
 ## I81 — The first sessions after a restart wait while the server code is compiled
 
-**Status:** partly resolved 2026-11-25 (branch `perf/session-start`): the
-module servers are compiled at start. Open for the server function (M70).
+**Status:** resolved 2026-11-25: the module servers are compiled at start
+(branch `perf/session-start`), and so is the server function, which is handed
+to Shiny (branch `perf/first-sessions`). What the first session still adds is
+not compilation and is M75.
 **Found:** 2026-11-25, on production: the first visit of the day, by a link to
 a cached dashboard, took 29.6 seconds.
 **Severity:** medium: once per restart, so every morning's first reader.
@@ -366,10 +368,23 @@ loading them: 4.5 seconds added to the start, taken off the first session.
 With I80 fixed too, the first session's deep link is ready in 5.4 seconds
 locally (was 19.2) and later ones in 3.5 (was about 9).
 
-The server function cannot be compiled the same way: Shiny reads `server.R`
-itself for the first session and calls that copy, not the one `global.R`
-sourced (M70). It is compiled on its second call, so the second session still
-waits about 3 seconds (6.0 against 3.5).
+The server function could not be compiled the same way: Shiny reads
+`server.R` itself for the first session and runs what that read returns, not
+the function `global.R` made from the same file (M70). It was compiled on its
+second call, so the second session waited about 3 seconds.
+
+Since `perf/first-sessions`: `global.R` compiles its copy
+(`cedar_compile_server()`, `R/trunk/utils.R`; 2 of the 6.3 seconds the start
+now spends compiling) and the last line of `server.R` returns it
+(`cedar_server_to_run()`), so the function Shiny runs is the compiled one. A
+`server.R` changed since the start is run as it now reads. On fresh starts in
+the development container, from the connection to the server's first sign of
+work: 2.8 seconds for the second session before, 0.2 after, against 0.1 to
+0.2 for later sessions; the second session's whole start went from 6.7 to 8.1
+seconds to 4.5. `tests/e2e/fresh-start.test.mjs` holds that wait for the
+first two sessions of a new process (`./run-tests.sh --all --fresh`), and
+fails with the hand-over taken out. `test-utils.R` holds the two functions and
+`test-ci.R` both ends of the wiring.
 
 ## I80 — Every session began by recounting Headcount's program menu
 
@@ -5215,6 +5230,30 @@ one (the first pass counts). What the step still costs is the comparison
 builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
+**M75 — The first session of a process starts about 2 seconds slower than
+later ones, and it is not compilation.** Open. On fresh starts of the
+development container (2026-11-25, `tests/e2e/fresh-start.test.mjs`, home
+page, from opening the page to the end of the session's first busy-to-idle
+cycle), the first session took 6.1 and 6.5 seconds with the server function
+compiled at start, and 6.1 to 7.6 before; sessions three to six took 4.2 to
+5.0, apart from the one below. Its server begins 0.2 to 0.4 seconds after the
+connection, like any other, so the time is inside the session's own start.
+Compiling every function in the global environment at start (33 seconds
+against 6.3) left it at 5.9, so it is not R compiling CEDAR's functions. Not
+traced: what a process does once on its first session (Shiny's own first
+read of `server.R`, files read on first use, the first render of the home
+page) is where to look, by profiling the server function on a new process
+(`Rprof()` started before it and stopped in `session$onFlushed()`), first
+session against second. Seen beside it and also not traced:
+about one later session in four takes 1.2 to 1.6 seconds longer than its
+neighbours (5.6 to 6.2 against 4.2 to 4.5), most often the fourth. It is not
+garbage collection either: with `gcinfo(TRUE)` on, no full collection fell
+inside any of seven sessions' starts (the first at 6.7 seconds, the fourth at
+5.7), and each start saw one level-1 collection at most. Production's morning restart
+is followed by a request that fetches the page and opens no session, so the
+first reader of the day is this first session. *Done when:* the cause is
+named, and either the start does that work or the entry says why it stays.
+
 **M74 — The projection lock test fails when the machine is busy.**
 Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
 holds a one-second loop to a three-second limit. `test-projection-refresh.R`
@@ -5301,14 +5340,22 @@ a soft restart.
 **M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
 and `app.R` is never used.** With a `server.R` in the directory Shiny ignores
 `app.R`: it sources `ui.R` on the first request and `server.R` on the first
-session, each into its own environment, and calls those copies. So the UI is
-built twice at start (the "Navigation containers" warning appears twice in
-every log), and the server function that runs is not the one `global.R`
-sourced, which is why it cannot be compiled ahead (I81). Done when one of the
-two reads is gone (for instance a `server.R` that only returns the function
-`global.R` already built and compiled), the first two sessions after a restart
-take what the third does, and `docs/developers/index.md` says which file is the
-entry.
+session, each into its own environment, and uses what those reads return. So
+the UI is built twice at start (the "Navigation containers" warning appears
+twice in every log), and the server function Shiny runs is not the one
+`global.R` made. Partly resolved 2026-11-25 (branch `perf/first-sessions`):
+`server.R`'s last line now returns the function `global.R` compiled, which is
+what I81 needed, and `docs/developers/index.md` and `AGENTS.md` say which file
+does what. What remains costs the start and no reader: the UI is still built
+twice, 2.1 seconds each in the development container, once in `global.R` and
+once at the first request (the restart's own warm-up request); `server.R` is
+still read twice; and `app.R` is a file nothing reads. `global.R`'s read of
+`ui.R` is also what puts `cedar_sections`, `cedar_registrations`,
+`cedar_programs` and `cedar_degrees` in the global environment, where
+`server.R` reads them as bare names (on 42 lines), so that read cannot simply go.
+*Done when:* the UI is built once (`ui.R` returning what `global.R` built, the
+way `server.R` now does), `server.R` no longer depends on names `ui.R`
+defines, and `app.R` is deleted or used.
 
 ### Documentation and naming
 

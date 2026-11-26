@@ -222,3 +222,34 @@ test_that("fmt_count() writes a whole number with separators, an em dash for NA,
   expect_equal(fmt_count(integer(0)), character(0))
   expect_error(fmt_count("12"), "numbers")
 })
+
+# ISSUES I81, M70: Shiny runs the function its own read of server.R returns,
+# so that read has to return the one compiled at start.
+test_that("Shiny is handed the server function compiled at start, and an edited file's own", {
+  path <- withr::local_tempfile(fileext = ".R")
+  writeLines("function(input, output, session) NULL", path)
+  read_at_start <- function(input, output, session) "as read at start"
+  read_again <- function(input, output, session) "as read again"
+  is_compiled <- function(f) any(grepl("<bytecode", utils::capture.output(print(f)), fixed = TRUE))
+
+  # global.R's own read of the file: nothing is compiled yet.
+  expect_identical(cedar_server_to_run(read_at_start, NULL, path), read_at_start)
+
+  compiled <- cedar_compile_server(read_at_start, path)
+  expect_false(is_compiled(read_at_start))
+  expect_true(is_compiled(compiled$fn))
+
+  # Shiny's read for a session: the compiled function, not the copy just made.
+  to_run <- cedar_server_to_run(read_again, compiled, path)
+  expect_true(is_compiled(to_run))
+  expect_identical(to_run(NULL, NULL, NULL), "as read at start")
+
+  # The file was edited after the start: what it now says is what runs.
+  Sys.setFileTime(path, compiled$file_time + 60)
+  expect_identical(cedar_server_to_run(read_again, compiled, path), read_again)
+
+  expect_error(cedar_server_to_run(NULL, compiled, path), "is not a function")
+  expect_error(cedar_server_to_run(read_again, list(fn = read_at_start), path),
+               "not what cedar_compile_server")
+  expect_error(cedar_compile_server(read_at_start, paste0(path, ".absent")), "no file at")
+})
