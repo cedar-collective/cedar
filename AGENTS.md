@@ -34,7 +34,7 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 global.R       — runs once at start: data loading, library loading, load_funcs()
 ui.R           — page_navbar() structure; mounts module UIs
 server.R       — module wiring + legacy inline handlers; its last line hands
-                 Shiny the function global.R compiled (Shiny never reads app.R)
+                 Shiny the function global.R compiled
 R/lists/       — static constants and the readers of the institution files
 R/trunk/       — pure infrastructure (filter, utils, cache, logging, data I/O)
 R/branches/    — reusable CEDAR domain computations

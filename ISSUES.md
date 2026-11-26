@@ -5425,8 +5425,8 @@ the container. Production's 11:00 UTC job was changed to
 a soft restart.
 
 **M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
-and `app.R` is never used.** With a `server.R` in the directory Shiny ignores
-`app.R`: it sources `ui.R` on the first request and `server.R` on the first
+and `app.R` was never used.** With a `server.R` in the directory Shiny ignores
+an `app.R`: it sources `ui.R` on the first request and `server.R` on the first
 session, each into its own environment, and uses what those reads return. So
 the UI is built twice at start (the "Navigation containers" warning appears
 twice in every log), and the server function Shiny runs is not the one
@@ -5435,14 +5435,15 @@ twice in every log), and the server function Shiny runs is not the one
 what I81 needed, and `docs/developers/index.md` and `AGENTS.md` say which file
 does what. What remains costs the start and no reader: the UI is still built
 twice, 2.1 seconds each in the development container, once in `global.R` and
-once at the first request (the restart's own warm-up request); `server.R` is
-still read twice; and `app.R` is a file nothing reads. `global.R`'s read of
+once at the first request (the restart's own warm-up request); and `server.R`
+is still read twice. `app.R`, which nothing read, was deleted on 2026-11-25
+with its mount in `compose.dev.yml`. `global.R`'s read of
 `ui.R` is also what puts `cedar_sections`, `cedar_registrations`,
 `cedar_programs` and `cedar_degrees` in the global environment, where
 `server.R` reads them as bare names (on 42 lines), so that read cannot simply go.
 *Done when:* the UI is built once (`ui.R` returning what `global.R` built, the
-way `server.R` now does), `server.R` no longer depends on names `ui.R`
-defines, and `app.R` is deleted or used.
+way `server.R` now does) and `server.R` no longer depends on names `ui.R`
+defines.
 
 ### Documentation and naming
 

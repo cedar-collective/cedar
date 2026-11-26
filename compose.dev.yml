@@ -21,7 +21,6 @@ x-development: &development
     - ./scripts:/srv/shiny-server/cedar/scripts:ro
     - ./dev:/srv/shiny-server/cedar/dev:ro
     - ./institution:/srv/shiny-server/cedar/institution:ro
-    - ./app.R:/srv/shiny-server/cedar/app.R:ro
     - ./global.R:/srv/shiny-server/cedar/global.R:ro
     - ./ui.R:/srv/shiny-server/cedar/ui.R:ro
     - ./server.R:/srv/shiny-server/cedar/server.R:ro
