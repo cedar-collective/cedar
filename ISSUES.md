@@ -30,7 +30,9 @@ else**: other files link to the entry instead of restating where it stands.
 computed twice (I16, M1–M3, M24); then the architecture rules file by file
 (M11 silent fallbacks first, because they hide failures, then M13 logic in
 modules); then interface consistency one tab per PR (M17, M18); file size
-alongside other work (M14, M16).
+alongside other work (M14, M16). The open improvements sorted by the kind of
+fix each needs, and which of them are one piece of work, are under
+[by the kind of fix](#open-improvements-by-the-kind-of-fix) (2026-11-26).
 
 ## Open items
 
@@ -40,7 +42,6 @@ alongside other work (M14, M16).
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
-| [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; mrgather refuses a report it does not have since 2026-11-22; open until production's mrgather is rebuilt from that source) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" (fixed 2026-11-11 through `leads_to`; open for the eleven names in `programs.csv`) |
@@ -96,6 +97,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 | [I53](#i53--declaring-the-major-a-pre-major-leads-to-was-counted-as-a-change-of-major) | Defect | Pathways > Major Changes counted a student moving from a pre-major to its own major as a change of major whenever the two names differ ("FDMA" to "Film and Digital Arts"): 1,414 of 23,388 change events (resolved 2026-11-11: a pre-major and the major it leads to are one program) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
+| [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
 | [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
@@ -4622,8 +4624,27 @@ then its schedule row; with the old `case_when` both read `undated`.
 # Improvements
 
 Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07;
-rechecked 2026-10-14, when only `server.R` had moved (6,356 lines).
+rechecked 2026-10-14, when only `server.R` had moved (6,356 lines); an entry
+that says 2026-11-26 was measured again that day.
 The recommended order before new features is in `ROADMAP.md`.
+
+### Open improvements, by the kind of fix
+
+Sorted 2026-11-26. Each entry stays below under its topic, with its status;
+this table says which entries are one piece of work, and of what kind.
+
+| Kind of fix | Entries | How |
+|---|---|---|
+| A person, a source owner or a production step: no code | M9, M10, M21, M32, M50, M69 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
+| mrgather on production | M65 (and defects I32, I33, I43) | Production's mrgather becomes a checkout of its repository (`ROADMAP.md`, Platform). What is left of the four closes with it. |
+| One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. |
+| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R keep the rest from growing. |
+| How the app loads and starts | M59, M70, M75, M77 | One function that loads the tables as the app holds them, for `global.R`, the cache-warming scripts and the REPL (M59). M77's second half edits model source and goes with the projections below. |
+| The fixture and production disagree | M38, M40, M57 | One migration: each changes the counts pinned in the fixture's header. |
+| Tests, one at a time | M7, M8, M20, M42 | Discrete. |
+| A dimension not yet attached at load | M23, M37 (and defect I45) | A design decision of the kind ADR-001 made for units and course ids: campus with one vocabulary, the degree program as a grain. |
+| Projections | M31, M35, M36 | Discrete, in one model version: each edits model source, and one rebuild serves them all (M77). M2's census sum is in model source too. |
+| Stand-alone | M6 (and defects I67, I68) | Discrete. I67 and I68 are both a choice tile the degree compiler relates to no named course: no prerequisite in one, no match with the English route in the other. |
 
 ### Counting and definitions
 
@@ -4635,14 +4656,21 @@ A/B/C/D/F/W buckets are inline in `R/branches/course-attempts.R`
 **M2 — Census and term type derived by hand.** `registered + dr_late` in
 `R/branches/enrollment-projections.R`; `substr(term, 5, 6)` in
 `R/branches/enrl.R` (2) and `R/branches/relative-terms.R`. *Done when:* they use
-`add_census_enrl()` and `add_term_type_col()`.
+`add_census_enrl()` and `add_term_type_col()`. On 2026-11-26 three are left:
+the census sum in `R/branches/enrollment-projection-inputs.R` (projection
+model source, so it changes with a model version), and the term's last two
+digits read by hand in `R/branches/relative-terms.R` and
+`R/cones/course-adjacency.R`.
 
 **M3 — `max(term)` uses to review against the right-edge policy.** 29 uses:
 `R/branches/population.R` 8, `R/branches/enrollment-projections.R` 5,
 `R/features/dept-dashboard.R` 2, `R/features/course-report.R` 2,
 `R/cones/gen-ed-conversion.R` 2, `R/branches/enrl.R` 2, and singles. Many are a
 legitimate per-student latest term. *Done when:* each is either that, with a
-comment, or replaced by `cedar_data_edges()`.
+comment, or replaced by `cedar_data_edges()`. On 2026-11-26 `max(term` is
+written 46 times in `R/` (`R/branches/population.R` 7, `courses.R` 4,
+`enrollment-projection-context.R` 3, `enrl.R` 3): the files have been split
+and added to since the first count, and nothing holds the number.
 
 **M4 — Duplicated metric explanations.** *Done when:* each reconciled analysis's
 explanation lives in the shared definition records (`docs/_data/definitions.yml`),
@@ -4943,13 +4971,21 @@ the global `major_code_to_name` went with `cedar_lookups` (2026-11-06).
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
 `group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,
 `R/modules/gen-ed.R` 2. *Done when:* each calculation lives in the cone or
-branch that owns the question.
+branch that owns the question. On 2026-11-26: `pathways.R` 33 calls of
+`group_by()` or `summarize()`, `cancellations.R` 10, `gen-ed.R` 2, and none
+in `server.R`.
 
 **M14 — Inline surfaces in `server.R`.** 6,356 lines. *Done when:* the remaining
 inline tabs are modules (templates: `R/modules/headcount.R`,
-`R/modules/dept-trends.R`), with logic in branches/cones/features.
+`R/modules/dept-trends.R`), with logic in branches/cones/features. On
+2026-11-26: 6,049 lines and 19 module servers mounted. The pages still
+written in it, by their outputs: Course Dynamics (`cr_`, 59), the Dept
+Dashboard (`dashboard_`, 18), Low Enrollment (`low_`, 8), Enrollment
+(`enrl_`, 7) and Admin's mappings (`mapping_`, 7).
 
 **M15 — `ggplot` charts.** Six remain. *Done when:* each is native `plot_ly()`.
+On 2026-11-26 three remain: `R/cones/pathway.R`, `R/cones/population-trend.R`
+and `R/modules/cancellations.R`.
 
 **M16 — Oversized files.** Cones over the 500-line budget: `pathway.R` 904,
 `course-demographics.R` 679, `stopout.R` 577, `gen-ed-conversion.R` 542,
@@ -4961,17 +4997,25 @@ text, and `R/modules/enrollment-projections.R` 1,711, of which the server is
 about 430 against a 300-line budget. The view file is deliberately off the
 model-source list, so splitting it costs no bundle rebuild, but a split file
 must stay off that list too. *Done when:* each is split by sub-question or
-its repeated code extracted — alongside other work on the file.
+its repeated code extracted — alongside other work on the file. On
+2026-11-26 the cones over budget are `pathway.R` 929, `major-course-units.R`
+693, `course-demographics.R` 665, `stopout.R` 563, `gen-ed-conversion.R` 542
+and `seatfinder.R` 513; the longest files are `R/modules/pathways.R` 4,071,
+`R/branches/enrl.R` 3,226, `R/features/enrollment-projection-view.R` 2,919
+and `R/modules/enrollment-projections.R` 1,999.
 
 ### Interface consistency
 
 **M17 — Inline styles.** 153 `style =` attributes in module and UI code
 (133 lines on 2026-11-14, 91 of them in `server.R`). *Done when:* replaced by shared helpers and CSS classes
-(`R/modules/ui-helpers.R`), one tab per PR.
+(`R/modules/ui-helpers.R`), one tab per PR. On 2026-11-26: 101 in the modules,
+`server.R` and `ui.R`; 61 of them in `server.R`, most under the Dept
+Dashboard's outputs, then Low Enrollment's.
 
 **M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
 `subtab_header()`, `dashboard_section()`, `dashboard_subsection()`, or
-`section_heading()` with its one-sentence description.
+`section_heading()` with its one-sentence description. On 2026-11-26: 38; 22
+of them in `server.R`, 16 of those Low Enrollment's.
 
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
@@ -4994,7 +5038,11 @@ dropdown takes a department's programs from `cedar_lookups$program_name_lookup`
 (each program name's most common department), so a name two departments share
 lists under one. Counting is by each row's own department (I15); only the
 choices are affected. *Done when:* the choices come from the rows'
-`dept_code`, or from `unit_mapping_rows()`.
+`dept_code`, or from `unit_mapping_rows()`. Resolved 2026-11-16, with M55,
+and marked here on 2026-11-26 when the entry was found still open: the
+choices are `headcount_filter_choices()`'s (`R/branches/headcount.R`), which
+takes a department's programs through `filter_programs_to_dept()`, the rows
+whose own `dept_code` it is, and `cedar_lookups` is gone from the code.
 
 The entries below come from the 2026-11-14 page audit (HIST and HIST 1110 on
 the institutional app). Order: M43 first, on the dean-facing pages, then one
