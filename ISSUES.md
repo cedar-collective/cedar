@@ -4637,11 +4637,11 @@ this table says which entries are one piece of work, and of what kind.
 |---|---|---|
 | A person, a source owner or a production step: no code | M9, M10, M21, M32, M50, M69 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
 | mrgather on production | M65 (and defects I32, I33, I43) | Production's mrgather becomes a checkout of its repository (`ROADMAP.md`, Platform). What is left of the four closes with it. |
-| One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. |
-| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R keep the rest from growing. |
+| One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. Ratchets hold M3, M53, M54 and M76 since 2026-11-26; the helpers are still to write. |
+| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
 | How the app loads and starts | M59, M70, M75, M77 | One function that loads the tables as the app holds them, for `global.R`, the cache-warming scripts and the REPL (M59). M77's second half edits model source and goes with the projections below. |
 | The fixture and production disagree | M38, M40, M57 | One migration: each changes the counts pinned in the fixture's header. |
-| Tests, one at a time | M7, M8, M20, M42 | Discrete. |
+| Tests, one at a time | M7, M8, M20, M42, M79 | Discrete. |
 | A dimension not yet attached at load | M23, M37 (and defect I45) | A design decision of the kind ADR-001 made for units and course ids: campus with one vocabulary, the degree program as a grain. |
 | Projections | M31, M35, M36 | Discrete, in one model version: each edits model source, and one rebuild serves them all (M77). M2's census sum is in model source too. |
 | Stand-alone | M6 (and defects I67, I68) | Discrete. I67 and I68 are both a choice tile the degree compiler relates to no named course: no prerequisite in one, no match with the English route in the other. |
@@ -4670,7 +4670,15 @@ legitimate per-student latest term. *Done when:* each is either that, with a
 comment, or replaced by `cedar_data_edges()`. On 2026-11-26 `max(term` is
 written 46 times in `R/` (`R/branches/population.R` 7, `courses.R` 4,
 `enrollment-projection-context.R` 3, `enrl.R` 3): the files have been split
-and added to since the first count, and nothing holds the number.
+and added to since the first count, and nothing held the number. *Held since
+2026-11-26* by `tests/testthat/test-architecture.R` ("a max(term) is a stated
+latest term, or it does not grow"): a line taking `max(term)` or
+`slice_max(term)` counts unless it carries `MAX-TERM-OK:` and its reason, on
+the line or within three above, and each file's count is an allowance that
+may only go down. 54 lines in 23 files, `R/branches/data-edges.R` left out as
+where the edges are computed. None is marked yet: the review this entry asks
+for is each one marked or replaced by an edge, until the allowances are
+empty.
 
 **M4 — Duplicated metric explanations.** *Done when:* each reconciled analysis's
 explanation lives in the shared definition records (`docs/_data/definitions.yml`),
@@ -4733,7 +4741,10 @@ hand, which `outcome_category` already stores. Stop-out (`get_stopout()`,
 stop-out read `cedar_attempts` through `prepare_course_attempts()` and
 `attempt_outcome_flags()`, the class-list path and `classify_grades()` are
 gone, their tests run on `test_attempts`, and the two remaining callers are
-the only ones, each with a comment saying why.
+the only ones, each with a comment saying why. *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("readers that classify the class list
+themselves do not grow"): the four files above are allowed their one call of
+`classify_enrollment_outcomes()` each, and no other file any.
 
 **M54 — A DFW rate is computed by hand in about eight places, each with its
 own floor and rounding.** `100 * n_dfw / n` with a small-cell guard is
@@ -4750,7 +4761,19 @@ Bottleneck, Population Course Pressure) display them as they come. Reading
 drifts. Found 2026-11-15. *Done when:* one trunk helper (a rate with a
 floor, NA under it, never rounded) computes every one of them, each display
 rounds for itself, and `get_course_outcome_rates()` returns
-`summarize_attempt_outcomes()`' rates unrounded.
+`summarize_attempt_outcomes()`' rates unrounded. *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("a DFW count divided by hand does not
+grow"): a line that divides a name holding `dfw` counts (turning a percent
+into a share, `/ 100`, does not), 26 lines in 14 files, each file's count an
+allowance that may only go down. That is more places than the eight above:
+`R/cones/dfw-section-spread.R` (4), `dfw-course-board.R`,
+`downstream-outcomes.R`, `R/features/gen-ed.R`, `dfw-dashboard-view.R`,
+`course-report.R` and two projection branches write one too. The pattern is
+blunt both ways. Six of the 26 are a share or a statistic built on a rate
+(said beside their allowances), and the local helpers (`rate_or_na()`,
+`ratio()`, `safe_pct()`) are not seen. It stops the next
+`100 * n_dfw / n`; the helper is still this entry's fix, and a rate over
+counts that are not attempts rows has nowhere shared to go until it exists.
 
 **M55 — Headcount selects a department's programs by name.** **Done
 2026-11-16.** The module filtered minors and concentrations with
@@ -5010,12 +5033,20 @@ and `R/modules/enrollment-projections.R` 1,999.
 (133 lines on 2026-11-14, 91 of them in `server.R`). *Done when:* replaced by shared helpers and CSS classes
 (`R/modules/ui-helpers.R`), one tab per PR. On 2026-11-26: 101 in the modules,
 `server.R` and `ui.R`; 61 of them in `server.R`, most under the Dept
-Dashboard's outputs, then Low Enrollment's.
+Dashboard's outputs, then Low Enrollment's. *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("inline styles given a fixed string do
+not grow"): 102 `style =` given a fixed string, in 10 files, each file's
+count an allowance that may only go down. A style built from a value (24
+`style = paste0(` or `sprintf(`, a bar's width among them) is not counted.
 
 **M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
 `subtab_header()`, `dashboard_section()`, `dashboard_subsection()`, or
 `section_heading()` with its one-sentence description. On 2026-11-26: 38; 22
-of them in `server.R`, 16 of those Low Enrollment's.
+of them in `server.R`, 16 of those Low Enrollment's. *Held since 2026-11-26*
+by `tests/testthat/test-architecture.R` ("bare headings do not grow"): 37 in
+7 files, each file's count an allowance that may only go down
+(`R/modules/ui-helpers.R` is left out: the section helpers write their own
+heading tag there).
 
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
@@ -5178,7 +5209,14 @@ inline styles. Trace colours chosen for a white page (a near-black line or
 label) and the sparkline strokes in `R/modules/ui-helpers.R` are not checked.
 *Reproduce:* switch to dark mode and open Regstats, a Dept Trends degree
 table or Pathways' warning line. *Done when:* each is a CSS class reading a
-token, and a dark screenshot of each page shows no light-mode colour.
+token, and a dark screenshot of each page shows no light-mode colour. *Held
+since 2026-11-26* by `tests/testthat/test-architecture.R` ("colours written
+into R code do not grow"): every hex value written outside
+`R/trunk/utils.R`, where the palette is, counts, and each file's count is an
+allowance that may only go down. 123 in 19 files, far more than the nine
+inline styles above: `R/modules/regstats.R` 29, `pathways.R` 21, `server.R`
+13, `cancellations.R` 12, `retention.R` 12, `ui-helpers.R` 5, and 29 trace
+and line colours in eleven branch, cone and feature files.
 
 **M59 — Each cache-warming script copies global.R's load sequence.**
 `scripts/warm-dept-dashboard-cache.R`, `warm-dept-trends-cache.R` and
@@ -5298,6 +5336,27 @@ of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
 
+**M79 — The pull-request check failed once on a change to `ISSUES.md`
+alone, and what the page showed was not kept.** Open. #416 changed one
+Markdown file. Its first "Synthetic checks" run (2026-11-26, run 45768839743,
+attempt 1) passed the R suite (9,203 passed, 0 failed) and the demo suite's
+first six browser steps, then failed "Regstats runs": "timed out waiting for
+fixture enrollment bump", 93 seconds after the step began. The step had read
+the Worth a Look chart and table, clicked the Enrollment Bumps sub-tab
+(`clickSubTabIn()`, `tests/e2e/reports-smoke.test.mjs`: one `link.click()`,
+with no look at whether the tab opened) and waited for rows in
+`regstats-rs_bumps_table`. The app's log shows the report computed in 0.42
+seconds and nothing after it; the runner's own account (#409) found the same
+R process, no kill for memory, 477 MiB in use and the app answering. The
+second attempt, same commit, passed in 8m29s. The step's screenshot
+(`/tmp/cedar-smoke-regstats-runs.png`) is not among the files the workflow
+uploads (`.github/workflows/pr-checks.yml` keeps the compose log and
+`/tmp/cedar-synthetic-demo.png`), so whether the sub-tab never opened or
+opened empty is not known. *Reproduce:* not on demand; one failure seen.
+*Done when:* the workflow uploads every `/tmp/cedar-smoke-*.png` a failed
+step saves, and either the cause is found from one or `clickSubTabIn()`
+waits for the tab it clicked to be the active one before the step reads it.
+
 **M78 — `./run-tests.sh --changed` compared a branch with the local `main`,
 however old.** Resolved 2026-11-26 (branch `test/model-source-warning`). The
 change analysis took its diff from `git merge-base HEAD main`. A clone worked
@@ -5354,7 +5413,17 @@ enrolled rows and the campus on the entering term) and
 counts the rows at another level). M67 was one such copy missing. Found
 2026-11-25 looking for a helper before writing one; none was changed. *Done
 when:* each reads through `scope_student_terms()`, or its header says why its
-scope differs.
+scope differs. On 2026-11-26 the count taken for a ratchet found the same two
+filters in four more cones: `R/cones/exit-credits.R` (4 lines, in
+`.exit_later_return()` and `get_exit_credits()`), `return-rates.R` (2),
+`summer-finishers.R` (2) and `course-similar-students.R` (1). *Held since
+2026-11-26* by `tests/testthat/test-architecture.R` ("a student scope written
+by hand does not grow"): a line in a branch, a cone or a feature that tests
+`student_level` or `student_campus` against an option counts, 24 lines in 12
+files, each file's count an allowance that may only go down. Six of the 24,
+in `R/branches/population.R`, `headcount.R` and `major-change-detection.R`,
+scope declarations (`cedar_programs`, which carries the same two columns) and
+stay, said beside their allowances.
 
 **M68 — Against Non-Takers took one to two minutes for a large course, and
 runs when Downstream opens.** Resolved 2026-11-25 (branch

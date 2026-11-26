@@ -19,6 +19,8 @@ This Roadblocks-specific rule does not change CEDAR's all-attempt course DFW rat
 
 **Never bound an analysis with `max(term)`, a hardcoded term, or arithmetic on `cedar_current_term`.** Use the edges computed once at startup by `cedar_report_edges()` (`R/branches/data-edges.R`). This is the same class of rule as the campus and DFW policies.
 
+A student's or a group's own latest term (the last term a student was enrolled, a course's most recent offering) is not an edge, and `max(term)` is how it is written. Such a line carries `MAX-TERM-OK:` and the reason, on it or within three lines above. `test-architecture.R` counts every `max(term)` and `slice_max(term)` without the mark, per file, and a file's count may only go down (ISSUES M3): the lines written before the mark existed are still to be read, and each marked or given an edge.
+
 ## Why an edge is not one number
 
 CEDAR's local data runs behind the registrar, and a term does not arrive all at once — registration appears months early, grades land weeks late. At any moment the tail looks like this:

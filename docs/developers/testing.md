@@ -632,6 +632,48 @@ projection files (`test-projection-inputs.R`, `-model.R`, `-view.R`,
 `-page-text.R`) hold every sentence the Projections page and Course Dynamics
 show.
 
+### A backlog held by a ratchet
+
+A rule the code does not yet meet everywhere is held by a ratchet in
+`test-architecture.R`. The test counts the violation in each file and compares
+it with that file's allowance, which is its count on the day the ratchet was
+written. A file over its allowance fails, and so does a file under it, so the
+record follows the code down and a fix cannot be spent on a new violation in
+the same file. A file with no allowance is allowed none.
+
+| Held | What counts | Entry |
+|---|---|---|
+| Silent fallbacks | an `error = function(e)` handler that hands back a value and tells no one | M11 |
+| Units resolved outside `attach_unit()` | a call of a resolver, or a read of the mapping files | I9 |
+| Open blue boxes | `alert alert-info` or `alert-box--info` | M43 |
+| Fixed waits | `Sys.sleep(` in an R test, `sleep(` in a browser script | M74 |
+| Inline styles | `style =` given a fixed string; one built from a value (a bar's width) is not counted | M17 |
+| Bare headings | `h3(` to `h6(` outside `R/modules/ui-helpers.R` | M18 |
+| Colours written in R | a hex value outside `R/trunk/utils.R`, where the palette is | M58 |
+| A latest term | a line taking `max(term)` or `slice_max(term)` that does not carry `MAX-TERM-OK:` | M3 |
+| Class-list classification | a call of `classify_enrollment_outcomes()` outside `R/trunk/utils.R` | M53 |
+| A DFW count divided by hand | a line dividing a name that holds `dfw` | M54 |
+| A student scope written by hand | `student_level` or `student_campus` tested against an option, in a branch, a cone or a feature | M76 |
+
+- **Your change adds one:** write it the way the rule says. The allowance is
+  not raised.
+- **Your change removes one:** lower that file's number in the same change,
+  and delete the entry at zero. The failure gives the number.
+- **Code moved to another file takes its allowance with it:** one number goes
+  down and the other up by as much, and the pull request says so. That is the
+  only way a number rises.
+- **An exception the rule itself makes is said where it is written.** A
+  student's or a group's own latest term is not a right edge: the line carries
+  `MAX-TERM-OK:` and the reason, on it or within three lines above, and is not
+  counted.
+- **A pattern reads text, not meaning.** Where an allowance holds something
+  that is not the violation (a standard error built on a DFW rate, a branch
+  that scopes declarations and not student-terms), the comment beside it says
+  so, and that number stays.
+
+A ratchet stops a backlog from growing; it does not shrink one. The entry
+named beside each says what clearing it takes.
+
 ### The measure of the suite
 
 The number of tests and expectations says nothing about the suite's cost. Watch
