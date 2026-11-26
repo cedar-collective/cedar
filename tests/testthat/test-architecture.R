@@ -414,10 +414,49 @@ test_that("legacy custom test runners stay retired", {
     "tests/test-course-report-standalone.R",
     "tests/test-credit-hours-standalone.R",
     "tests/test-crosslist-sample.R",
-    "tests/test-dept-dashboard-standalone.R"
+    "tests/test-dept-dashboard-standalone.R",
+    # A one-off check of the browser helpers, committed marked "Throwaway".
+    "tests/e2e/_verify.mjs"
   )
 
   expect_false(any(file.exists(file.path(cedar_base_dir, retired))))
+})
+
+# A test that waits a fixed time passes on a quiet machine and fails on a busy
+# one (ISSUES M74: a lock test held to three seconds), and a browser check
+# that sleeps passes on the previous run's output (docs/developers/
+# e2e-testing.md, rule 1). The counts below are today's, each of them the wait
+# inside a bounded poll: look, wait, look again, give up after a stated number
+# of tries. A new test waits for a state the same way, through the helper that
+# already does it, or does not wait at all. tests/e2e/lib.mjs is the browser
+# harness: waiting for the app is its job and it is not counted.
+test_that("tests do not wait a fixed time, and the waits there are do not grow", {
+  r_tests <- list.files(file.path(cedar_base_dir, "tests", "testthat"), "\\.R$",
+                        recursive = TRUE, full.names = TRUE)
+  in_r <- architecture_count_by_file(r_tests, function(file) {
+    sum(gregexpr("\\bSys\\.sleep\\(", read_code(file), perl = TRUE)[[1]] > 0L)
+  })
+  architecture_expect_ratchet(in_r, c(
+    # set_file_time_back(): set, wait, look, up to 20 times.
+    "tests/testthat/helper-projection-refresh.R" = 1L,
+    # Two polls for another process's file, and the 120 seconds that process
+    # holds its lock for (it is killed when the test ends).
+    "tests/testthat/test-projection-refresh.R" = 3L
+  ), "fixed wait(s) in R")
+
+  browser <- list.files(file.path(cedar_base_dir, "tests", "e2e"), "\\.mjs$", full.names = TRUE)
+  browser <- browser[basename(browser) != "lib.mjs"]
+  expect_gt(length(browser), 25L)
+  in_browser <- architecture_count_by_file(browser, function(file) {
+    code <- sub("//.*$", "", readLines(file, warn = FALSE))
+    sum(grepl("(^|[^A-Za-z0-9_.$])sleep\\(", code, perl = TRUE))
+  })
+  architecture_expect_ratchet(in_browser, c(
+    # Its own waitFor(): a poll with a timeout.
+    "tests/e2e/nav.test.mjs" = 1L,
+    # The screenshot tool gives the tab a beat to paint; it asserts nothing.
+    "tests/e2e/shot.mjs" = 1L
+  ), "fixed wait(s) in a browser script")
 })
 
 test_that("deploy CI invokes the canonical non-browser gate", {
