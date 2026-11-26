@@ -348,6 +348,96 @@ and the memory limits of the browser stages are on
 
 ---
 
+### One heavy job at a time
+
+A development machine with 8 GB runs one of these at a time: the R suite, a
+browser tour, a real-data script on the host, a table rebuild, a projection
+build. Run two and the result is a failure that names neither:
+
+- A projection bundle build took about 2.5 hours beside the R gate and host
+  scripts, and 21 minutes alone the next day (2026-10-24 and 25). It is one
+  emulated R process at 100% of a core. Time a build alone before concluding
+  a change slowed it.
+- A host real-data script beside a report tour cost the app its R process (a
+  second start in `docker logs`) and failed one step with "Execution context
+  was destroyed"; the same tour alone passed (2026-11-14).
+- The full rebuild of the saved tables beside the R gate and the synthetic
+  stack was killed for memory after 35 minutes of swapping (2026-11-04).
+- A projection build beside the local app is killed in the Docker VM (exit
+  137, no R error): `docker compose stop cedar-shiny` first.
+
+**Do not edit a file a run is reading.** `Rscript` reads a script as it
+executes it, so editing `R/data-parsers/transform-to-cedar.R` or a
+`scripts/*.R` file during its own run ends the run with a parse error no
+`parse()` reproduces ("unexpected '}'"), after the work was saved, and with
+exit status 1. The same goes for a source file mounted into a running
+container and a test file a suite is reading.
+
+**Check the disk before an image build or a browser run** (`df -h`). Docker's
+build cache grows with every image build. On a full disk `docker ps` hangs
+with no error (the VM has stopped), or a build fails with "input/output
+error" and the app answers 500. `docker builder prune -af` returns the most.
+
+### Testing a branch in a git worktree
+
+A worktree has the tracked files only. Three things the main checkout has and
+it lacks:
+
+| Missing | Symptom | Do |
+|---|---|---|
+| `config/config.R`, `config/shiny_config.R` | an image built from the worktree starts and the app stops | copy them in |
+| `tests/e2e/node_modules` | "warm up app" fails with `Cannot find package 'puppeteer-core'` | link the main checkout's (a link is not matched by the ignore rule: never `git add` it) |
+| `data/` | the `admin` suite ends with ENOENT on `data/catalog-normalizations/…` | link the main checkout's `data`, and add `data` to `.git/info/exclude` |
+
+**No image build is needed to browser-test a branch.** The app image runs any
+checkout's source when it is mounted over the baked copy. From the main
+checkout, start the local app with a compose override that mounts the
+worktree's `R/`, `www/`, `docs/`, `institution/`, `global.R`, `ui.R` and
+`server.R` read-only over `/srv/shiny-server/cedar/…`:
+
+```bash
+docker compose -f docker-compose.yml -f <override>.yml up -d --no-build cedar-shiny
+docker inspect cedar-shiny --format '{{range .Mounts}}{{println .Source}}{{end}}'   # names the worktree?
+./run-tests.sh --e2e <suite>                # from the worktree
+docker compose up -d --no-build cedar-shiny # back to the image's own source
+```
+
+The override is a few lines and belongs in a scratch directory. A mounted
+`entrypoint.sh` needs the executable bit, which the repository's copy does not
+carry: mount a `chmod 755` copy. An image is built from a worktree only when
+the image itself changes (a dependency, the Dockerfile).
+
+**The synthetic stack without a build.** `bash scripts/dev.sh up` builds. Its
+source is mounted from the checkout anyway, so the image already on the
+machine serves: stop the institutional app (same port), then from the worktree
+
+```bash
+docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml up -d --no-build --force-recreate
+./run-tests.sh --e2e demo
+docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml down
+```
+
+**A one-off R script on real data, on uncommitted code.** The
+`cedar-projections` service bakes source too. Mount the working tree over it,
+with the app stopped for memory:
+
+```bash
+docker compose stop cedar-shiny
+docker compose run --rm --no-deps -T -v "$PWD:/srv/shiny-server/cedar:ro" \
+  cedar-projections scripts/<script>.R <args> </dev/null
+docker compose start cedar-shiny
+```
+
+Keep its output out of the repository and out of pull requests: the
+repository is public and the counts are institutional.
+
+**Several open pull requests, tested together.** In a clean worktree, branch
+from `origin/main`, merge each pull request's branch, and run the gates on
+that tree. Merge the pull requests in the same order, then compare
+`origin/main^{tree}` with the tested tree: identical means what deployed is
+what was tested. Merged back to back they leave one deploy, because each push
+cancels the run before it while that run is still in its test job.
+
 ## Running the R suite
 
 CEDAR is a Shiny app, not an R package: `devtools::test()`,
@@ -580,7 +670,17 @@ Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'
 `cedar-repl.R` sets `cedar_base_dir` and `cedar_data_dir` (required globals with
 no defaults), loads lists, trunk, branches, cones and features with
 `modules = FALSE`, and binds each CEDAR table lazily, so a table is read on
-first use. For method development keep one `R --vanilla --quiet` process
+first use.
+
+**The host reads the repository's `data/`; the app reads `CEDAR_DATA_DIR`.**
+`cedar-repl.R` takes its tables from `data/` under the checkout. The container
+mounts the directory `.env` names as `CEDAR_DATA_DIR`, which need not be the
+same one. Where they differ, a number from the host disagrees with the app for
+no reason in the code: compare the dates of the two directories' files before
+believing either, or run the script in the container
+([a one-off R script on real data](#testing-a-branch-in-a-git-worktree)).
+
+For method development keep one `R --vanilla --quiet` process
 alive, source the helper once, and re-source only the changed file:
 
 ```r
@@ -674,3 +774,29 @@ only reads the published bundle. `test-architecture.R` keeps projection code
 free of Shiny and globals; the `test-projection-*.R` files (inputs, model, view, page text) own formula,
 cutoff, selection, empty-scope and artifact-contract behavior. A method change
 is incomplete until both the fixture tests and the real-data aftcast are rerun.
+
+---
+
+## Traps, by symptom
+
+Each of these has cost an hour, most of them more than once. The symptom
+rarely names its cause.
+
+| What you see | What it is | Where |
+|---|---|---|
+| `devtools::test()` or `test_local()` fails; "No test files found" in the container | CEDAR is not a package: run `Rscript --vanilla` from the repository root, and in the container from `/srv/shiny-server/cedar` | [Running the R suite](#running-the-r-suite), [the three environments](#the-three-environments) |
+| "QS format not detected" | data files are qs2: `qs2::qs_read()` | [Dependencies](#dependencies) |
+| `could not find function` for a module's UI function | the R suite does not load modules | [the suite does not load Shiny modules](#the-suite-does-not-load-shiny-modules) |
+| The setup wizard starts, or paths resolve wrong | `source("global.R")`, or `source("setup.R")` from outside `tests/testthat` | [what not to do](#what-not-to-do) |
+| A fix does not show in the browser | the container runs the source it was built with | [the three environments](#the-three-environments) |
+| A library error after a package change | never `renv::deactivate()` or a bare `renv::restore()` | [Dependencies](#dependencies) |
+| Untracked `_problems/` and `testthat-problems.rds` | left by a failing run | [after a failing run](#after-a-failing-run) |
+| A parse error no `parse()` reproduces, at the end of a long run | the script was edited while it ran | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| A job killed with exit 137 and no R error | memory: two heavy jobs at once | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| `docker ps` hangs; a build fails with "input/output error"; the app answers 500 | the disk is full | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| `Cannot find package 'puppeteer-core'`; ENOENT under `data/` | a worktree lacks what git ignores | [testing a branch in a git worktree](#testing-a-branch-in-a-git-worktree) |
+| A host real-data number that disagrees with the app | the host reads the repository's `data/`, the app reads `CEDAR_DATA_DIR` | [the persistent real-data lab](#the-persistent-real-data-lab) |
+| "Execution context was destroyed"; a page back on its empty state | the app's R process was replaced under the browser | [the browser stages are memory-bound](e2e-testing.html#the-browser-stages-are-memory-bound-and-running-out-does-not-look-like-it) |
+| `frame got detached` | the machine slept | [before a browser run](e2e-testing.html#before-a-browser-run-on-a-development-machine) |
+| An input a test set is empty; a picker reads "Type to search..." | the test touched the page before the session had started | [E2E rules](e2e-testing.html#e2e-rules--the-four-that-cause-every-flake) |
+| A browser timeout on a control that exists | a selector rotted: `node tests/e2e/check-ids.mjs` | [E2E rules](e2e-testing.html#e2e-rules--the-four-that-cause-every-flake) |

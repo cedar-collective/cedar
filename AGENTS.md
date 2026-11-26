@@ -306,20 +306,11 @@ All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** th
 
 `./run-tests.sh --changed` picks stages from the diff; it selects, it never certifies. When reporting, name the exact command, pass/fail counts, skips, whether Chrome and the app came up, and whether the image was rebuilt.
 
-**Gotchas that cost an hour each:**
+**Running them.** R tests run as `Rscript --vanilla` from the repository root: CEDAR is not a package, and **module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`), so a module change is parsed, rendered and looked at. A browser suite runs through `./run-tests.sh --e2e <suite>` against an app serving the source under test: **the image bakes source with `COPY`**, so rebuild it or mount the checkout, and check `docker ps`. One CEDAR app, one port (3838). One heavy job at a time on a development machine.
 
-- **`--vanilla` is required**; CEDAR is not a package (`devtools::test()` fails). Data files are **qs2**, not qs.
-- Host path `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`; in the container, `/srv/shiny-server/cedar` (not `/srv/shiny-server`).
-- **The container bakes source with `COPY`**: a running container has old code until rebuilt. Check `docker ps`.
-- One CEDAR app, one port (3838): the synthetic and institutional stacks are alternatives.
-- **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`; `helper-load-functions.R` sources three module files for their pure helpers and no test file sources one): parse, render and look.
-- Dependencies go through `scripts/r-environment.R`, never a bare renv call; never `renv::deactivate()`.
-- Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
-- Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'`.
+Never: `source("global.R")`; `source("setup.R")` from outside `tests/testthat`; hand-source a module; call renv directly (`scripts/r-environment.R`) or `renv::deactivate()`; `sleep()` in a test (`waitForIdle()` / `runAndWait()` in a browser suite, a bounded poll in R); touch a page before `connect()` returns; edit a file a run is reading.
 
-**E2E rules** (`tests/e2e/lib.mjs` solves each): after a rebuild, run a suite through `./run-tests.sh --e2e <suite>`, not bare `node`, so the home-page warm-up is the process's first session (I75); never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
-
-Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
+A failure that does not name its cause is in [traps, by symptom](docs/developers/testing.md#traps-by-symptom). Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
 
 **Text-first previews.** A computation-heavy feature gets a committed text formatter over its payload before its Shiny surface. Tests and UI consume the typed payload, never the text. It is computational evidence, not UI evidence.
 

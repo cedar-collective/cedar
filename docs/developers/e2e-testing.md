@@ -70,6 +70,51 @@ evidence: an unreadable page identifies nothing and must not stop a run.
 `CEDAR_ALLOW_APP_MODE_MISMATCH=1` overrides deliberately; `CEDAR_DEV_PORT` still
 moves the demo for a genuine side-by-side comparison.
 
+## Before a browser run on a development machine
+
+- **Chrome shows in the Dock.** Each suite, and each stage of the report tour,
+  starts the installed Chrome headless with a new profile. On macOS every
+  launch still appears in the Dock, so a tour looks like Chrome starting over
+  and over. It is not a loop: say so to whoever shares the machine before
+  starting one.
+- **Keep the machine awake**: `caffeinate -i ./run-tests.sh --e2e <suite>`. A
+  lid closed mid-run fails the next step with `waitForFunction failed: frame
+  got detached`, a lost client and not an app failure; `pmset -g log` shows
+  "Clamshell Sleep" at the same second.
+- **Run a tour alone** ([one heavy job at a time](testing.html#one-heavy-job-at-a-time)).
+- **A script that may hang writes to a file.** `node script.mjs | cut …`
+  prints nothing until the script exits.
+
+## A page whose results are shared or built ahead
+
+[Shared results](shiny-modules.html#results-shared-by-every-session-and-built-ahead)
+are kept for the life of the process, which changes what a second run of a
+suite sees.
+
+- **A rerun on the same process reads what the first run built.** A check
+  that requires a wait label ("Building…") passes only on a new process. Hold
+  the sharing itself instead: open a second session, which builds nothing,
+  and compare how long each worked with no overlay up
+  (`downstream-glance.test.mjs`).
+- **After a rebuild or a restart, run a suite through `./run-tests.sh --e2e
+  <suite>`, not bare `node`.** The runner's warm-up opens the home page as the
+  process's first session, as a reader's first visit does (ISSUES I75).
+- **Before a page that shares results merges**, restart the app, open the home
+  page first, then the page. The suites open their tab directly and cannot
+  see a result that an observer on another tab read too early (ISSUES I75).
+- **The build-ahead says when it is done.** Its log lines are
+  `[preload] 7 of 15: <key>: built (2.8s)`, and
+  `[global.R] Downstream built ahead for: …` lists the courses. A session
+  opened before the last line waits behind the job running. `--fresh` waits
+  for it.
+- **That a built-ahead result is the one the page reads** shows as one wait
+  label on the page ("Reading the course's outcomes…") and no build of that
+  result in the log or in `report_timing.csv`.
+- **A variable given to the container does not reach the app by itself**:
+  shiny-server starts R with a clean environment, and `entrypoint.sh` writes
+  the ones the app reads to the worker's `.Renviron` (`test-ci.R` holds both
+  ends).
+
 ## The browser stages are memory-bound, and running out does not look like it
 
 **All twelve browser suites pass.** The long-standing "Headcount failure" and
