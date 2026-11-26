@@ -174,6 +174,10 @@ for **63.9%** of students with 3+ terms, so it is a genuine per-term field by th
 test and needs no cohort restriction. It is the default x-axis in Pathways → Course Timing for that
 reason. Prefer it unless the question is specifically about credit progress.
 
+**Its meaning changed from Summer 2025** ([ISSUES I92](../../ISSUES.md)): from then on a student is
+placed a step lower than the same student was before, so a comparison by classification across that
+term compares two rules. Within a rule it is still a per-term field.
+
 **Every consumer has been migrated.** None of them falls back to the banned fields when
 `student_terms` is absent — they return NA and say so, because a missing number is visible downstream
 and a wrong one is not:
