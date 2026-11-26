@@ -245,6 +245,9 @@ stage() {
     echo "PASS  $name"; pass=$((pass+1))
   else
     echo "FAIL  $name"; fail=$((fail+1)); failed_stages+=("$name")
+    # A browser stage: say what the app's container shows (defined with the
+    # browser stages below).
+    if [ "${EXPLAIN_APP:-0}" -eq 1 ]; then explain_app_state || true; fi
     return 1
   fi
 }
@@ -373,9 +376,100 @@ if [ "$E2E" -eq 1 ]; then
       sleep 5
     done
   }
+  # ── After a failed browser stage: what the app's container says ────────────
+  #
+  # A browser stage that fails names the step that was running, and that step
+  # is often not the cause. The app's R process is killed for memory and starts
+  # again, so every open session is dropped and the page reloads under whatever
+  # was waiting; the container restarts; the disk fills, and Docker answers
+  # with input/output errors and the app with 500. Each has been read as a
+  # broken page for an afternoon (docs/developers/e2e-testing.md; ISSUES M73).
+  # So the runner notes what the container looked like before the suites and,
+  # after a failed stage, says what changed. It explains a failure; it never
+  # turns one into a pass, and it never retries.
+  #
+  # The app is one R process, which shiny-server starts at the first request
+  # and again whenever it dies. Its pid tells one from the next at once; the
+  # log would only show the next one after it had begun.
+  app_worker() {   # app_worker <container>
+    docker exec "$1" pgrep -f SockJSAdapter 2>/dev/null | tr '\n' ' ' | sed 's/ *$//' || true
+  }
+  container_fact() {   # container_fact <name> <State field>
+    docker inspect --format "{{.State.$2}}" "$1" 2>/dev/null || true
+  }
+  note_app_state() {
+    WATCH_CONTAINER="$(app_container)"
+    WATCH_WORKER=""; WATCH_STARTED=""; WATCH_OOM=""
+    if [ -n "$WATCH_CONTAINER" ]; then
+      WATCH_WORKER="$(app_worker "$WATCH_CONTAINER")"
+      WATCH_STARTED="$(container_fact "$WATCH_CONTAINER" StartedAt)"
+      WATCH_OOM="$(container_fact "$WATCH_CONTAINER" OOMKilled)"
+    fi
+  }
+  explain_app_state() {
+    command -v docker >/dev/null 2>&1 || return 0
+    local name worker free_kb free code memory found=0 same=""
+    name="$(app_container)"
+    echo
+    if [ -z "$name" ]; then
+      echo "What the app's container says: no running container publishes port $(app_port)."
+      if [ -n "${WATCH_CONTAINER:-}" ]; then
+        echo "  - ${WATCH_CONTAINER} was running before the suites and has stopped: docker logs ${WATCH_CONTAINER}"
+      fi
+      return 0
+    fi
+    echo "What the app's container says (${name}):"
+    if [ -n "${WATCH_WORKER:-}" ]; then
+      worker="$(app_worker "$name")"
+      if [ "$worker" != "$WATCH_WORKER" ]; then
+        found=1
+        echo "  - The app's R process is not the one the suites began with (pid ${WATCH_WORKER} then, ${worker:-none running} now)."
+        echo "    Every session open when it went was dropped, so the step that failed is probably not the cause."
+      else
+        same="the R process is the one the suites began with, "
+      fi
+    fi
+    if [ -n "${WATCH_STARTED:-}" ] && [ "$(container_fact "$name" StartedAt)" != "$WATCH_STARTED" ]; then
+      found=1
+      echo "  - The container itself restarted during the suites."
+    fi
+    if [ "$(container_fact "$name" OOMKilled)" = true ]; then
+      found=1
+      if [ "${WATCH_OOM:-}" = true ]; then
+        echo "  - Docker reports a process in it killed for memory, before the suites began (OOMKilled was already true)."
+      else
+        echo "  - Docker reports a process in it killed for memory (OOMKilled: true)."
+      fi
+      echo "    Usually a second CEDAR container is up, or courses are built ahead (CEDAR_PRELOAD_COURSES):"
+      echo "    docs/developers/e2e-testing.md, the browser stages are memory-bound."
+    fi
+    free_kb="$(df -Pk . 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    free="$(awk -v kb="${free_kb:-0}" 'BEGIN { printf "%.1f", kb / 1048576 }')"
+    if [ "${free_kb:-0}" -lt 2097152 ] 2>/dev/null; then
+      found=1
+      echo "  - The disk has ${free} GiB free. Docker stops, or answers with input/output errors, as it fills."
+    fi
+    code="$(curl --max-time 10 -s -o /dev/null -w '%{http_code}' "$APP_URL" 2>/dev/null || true)"
+    if [ "$code" = 500 ]; then
+      found=1
+      echo "  - The app answers 500: it stopped as it started. docker logs ${name} 2>&1 | grep -B 5 'Execution halted'"
+    elif [ "$code" != 200 ]; then
+      found=1
+      echo "  - The app does not answer at ${APP_URL} (HTTP ${code:-none})."
+    fi
+    if [ "$found" -eq 0 ]; then
+      echo "  - Nothing here explains the failure: ${same}no process was killed for memory,"
+      echo "    the disk has ${free} GiB free and the app answers. Read the suite's own output above."
+    fi
+    # docker drops the spaces a format begins with, so the line is indented here.
+    memory="$(docker stats --no-stream --format '{{.Name}}  {{.MemUsage}}' "$name" 2>/dev/null || true)"
+    if [ -n "$memory" ]; then echo "  memory now: ${memory}"; fi
+  }
+
   if [ "$FRESH" -eq 1 ] && [ "$REBUILD" -eq 0 ]; then
     run_stage "restart app (a new process)" restart_app
   fi
+  EXPLAIN_APP=1
   run_stage "app responds at ${APP_URL}" wait_for_app_response "$APP_URL" 240
 
   # Which data surface is actually answering? Both stacks serve the same port,
@@ -480,8 +574,14 @@ if [ "$E2E" -eq 1 ]; then
     WANT_MODE=either
   fi
   if [ "$WANT_MODE" != either ]; then
+    # This stage says what is wrong itself; the container has nothing to add.
+    EXPLAIN_APP=0
     run_stage "app data surface" check_app_mode "$WANT_MODE"
+    EXPLAIN_APP=1
   fi
+
+  # From here a failure is a suite's: note the container as the suites meet it.
+  note_app_state
 
   # First, and only on a process nothing has opened yet.
   if [ "$FRESH" -eq 1 ]; then
@@ -508,6 +608,7 @@ if [ "$E2E" -eq 1 ]; then
     [ -f "tests/e2e/$s.test.mjs" ] || { echo "no such suite: $s"; fail=$((fail+1)); failed_stages+=("e2e: $s missing"); finish; }
     wait_for_app_response "$APP_URL" 60 || {
       echo "app stopped responding before suite '$s'" >&2
+      explain_app_state || true
       fail=$((fail+1)); failed_stages+=("app unresponsive before $s"); finish
     }
     if [ "$s" = "reports-smoke" ]; then

@@ -243,6 +243,81 @@ test_that("a fresh run restarts the app, waits for its build-ahead and times its
   expect_length(browser_calls(absent), 0)
 })
 
+test_that("after a failed browser stage the runner says what the app's container shows", {
+  # Executable doubles, as above. A suite that fails names the step that was
+  # running, and the cause is often elsewhere: the app's R process killed for
+  # memory and another started, the container restarted or gone, the disk
+  # full (docs/developers/e2e-testing.md). docker, df and curl answer here
+  # what they would in each case; the failing suite is what changes the app.
+  testthat::local_edition(3)
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  state <- file.path(bin, "state")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            'did="$(cat "$CEDAR_FAKE_STATE" 2>/dev/null)"',
+            'if [ "${0##*/}" = node ] && [ -n "$CEDAR_RUNNER_FAIL" ] && [[ "$*" = *"$CEDAR_RUNNER_FAIL"* ]]; then',
+            '  printf "%s" "$CEDAR_FAKE_HAPPENS" > "$CEDAR_FAKE_STATE"; exit 1',
+            "fi",
+            'case "${0##*/} $*" in',
+            '  "docker ps"*) [ "$did" = gone ] || echo cedar-test-app ;;',
+            # shiny-server's R process is the one running its SockJSAdapter.R.
+            '  "docker exec"*"pgrep -f SockJSAdapter"*) case "$did" in killed) echo 3120 ;; dead) ;; *) echo 275 ;; esac ;;',
+            '  "docker inspect"*OOMKilled*) if [ "$did" = killed ]; then echo true; else echo false; fi ;;',
+            '  "docker inspect"*StartedAt*) if [ "$did" = restarted ]; then echo 2026-11-25T10:20:00Z; else echo 2026-11-25T10:00:00Z; fi ;;',
+            '  "docker stats --no-stream --format {{.Name}}  {{.MemUsage}} "*) echo "cedar-test-app  3.41GiB / 3.83GiB" ;;',
+            '  "df "*) printf "Filesystem 1024-blocks Used Available Capacity Mounted\\n/dev/disk 9 9 %s 50%% /\\n" "$CEDAR_FAKE_FREE_KB" ;;',
+            '  curl*http_code*) printf "%s" "$CEDAR_FAKE_HTTP" ;;',
+            "esac",
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep", "df")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                        CEDAR_RUNNER_LOG = log, CEDAR_FAKE_STATE = state))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  # What the runner printed about the container: from its heading to the next
+  # empty line.
+  run <- function(fail = "nav.test.mjs", happens = "", free_kb = "10485760", http = "200") {
+    unlink(state)
+    withr::local_envvar(c(CEDAR_RUNNER_FAIL = fail, CEDAR_FAKE_HAPPENS = happens,
+                          CEDAR_FAKE_FREE_KB = free_kb, CEDAR_FAKE_HTTP = http))
+    printed <- suppressWarnings(system2("bash", c(shQuote(runner), "--e2e", "nav"), stdout = TRUE, stderr = FALSE))
+    from <- grep("^What the app's container says", printed)
+    said <- if (length(from) == 0L) character(0) else {
+      rest <- printed[from[1]:length(printed)]
+      rest[seq_len(match("", rest, nomatch = length(rest) + 1L) - 1L)]
+    }
+    list(status = attr(printed, "status") %||% 0L, said = said)
+  }
+
+  killed <- run(happens = "killed")
+  dead <- run(happens = "dead")
+  restarted <- run(happens = "restarted")
+  nothing <- run()
+  gone <- run(happens = "gone")
+  full <- run(free_kb = "204800", http = "500")
+  # Explaining a failure never changes it.
+  expect_equal(c(killed$status, dead$status, restarted$status, nothing$status, gone$status, full$status),
+               rep(1L, 6))
+
+  expect_snapshot(writeLines(c(
+    "== The R process was killed for memory and another has started", killed$said,
+    "", "== The R process is gone and none has started yet", dead$said,
+    "", "== The container restarted", restarted$said,
+    "", "== Nothing happened to the container", nothing$said,
+    "", "== The container stopped", gone$said,
+    "", "== The disk is nearly full and the app answers 500", full$said
+  )))
+
+  # A run that passes says nothing about the container.
+  passed <- run(fail = "")
+  expect_equal(passed$status, 0L)
+  expect_length(passed$said, 0L)
+})
+
 test_that("the instructor-gate password is handed from .env to the Shiny worker", {
   # ISSUES.md I55: .env and .Renviron are kept out of the image, and
   # shiny-server starts its R worker with a clean environment. The password

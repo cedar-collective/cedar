@@ -100,6 +100,30 @@ report tour rewrites the error to say the session dropped and why; the guards
 are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
 the browser stages and names other running CEDAR containers.
 
+**After a failed browser stage the runner says what the app's container
+shows.** It notes the container before the first suite and, when a stage
+fails, prints what changed:
+
+```
+What the app's container says (cedar-shiny):
+  - The app's R process is not the one the suites began with (pid 275 then, 3120 now).
+    Every session open when it went was dropped, so the step that failed is probably not the cause.
+  - Docker reports a process in it killed for memory (OOMKilled: true).
+  memory now: cedar-shiny  3.41GiB / 3.83GiB
+```
+
+| It reports | From |
+|---|---|
+| The R process is not the one the suites began with, or none is running | the pid of shiny-server's R process (`pgrep` in the container), before and after |
+| The container restarted, or stopped | `docker inspect`'s `StartedAt` against its value before the suites; no container on the app's port |
+| A process killed for memory, and whether that was before the suites | `OOMKilled`, before and after |
+| A disk nearly full | under 2 GiB free where the checkout is: Docker stops, or answers with input/output errors, as it fills |
+| The app answering 500, or not at all | one request to the app |
+
+When none of them holds it says so, which is the case for reading the suite's
+own output as a real failure. It explains a failure and never changes one:
+the stage still fails, and nothing is retried (`test-ci.R` holds each case).
+
 The same limit decides one setting. The app builds Course Dynamics >
 Downstream ahead for the courses analysed most when it starts
 ([built ahead](shiny-modules.md#downstream-for-the-courses-analysed-most)),
