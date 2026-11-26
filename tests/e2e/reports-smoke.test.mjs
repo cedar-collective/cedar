@@ -469,19 +469,40 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         [...document.querySelectorAll('#enrl_output_tabs a[data-bs-toggle="tab"], #enrl_output_tabs a[data-toggle="tab"]')]
           .some(a => a.textContent.trim() === 'Classlist')), false,
         'the Classlist subtab is folded into Courses');
+      assert.equal(await page.evaluate(() =>
+        [...document.querySelectorAll('#enrl_output_tabs a[data-bs-toggle="tab"], #enrl_output_tabs a[data-toggle="tab"]')]
+          .some(a => a.textContent.trim() === 'Low Enrollment')), false,
+        'Low Enrollment is its own page under Courses');
+    });
 
-      // TERM has registrations, so Low Enrollment reports its sections (alerts),
-      // never the schedule-only history comparison meant for a term nobody has joined.
-      await clickSubTabIn(page, 'enrl_output_tabs', 'Low Enrollment');
-      await waitForOutput(page, 'Low Enrollment summary', [
-        { type: 'text', id: 'low_enrl_summary', disallowed: ['Gather Enrollments'] },
+    await withStep(page, [], 'Low Enrollment runs', async () => {
+      await openReport(page, 'Low Enrollment', 'low-enrollment');
+      // The thresholds are folded under "Adjust thresholds" and part of the
+      // run; the closed line says the standard values are in force.
+      await page.waitForFunction(() =>
+        document.getElementById('low_enrollment-le_threshold_state')?.innerText === 'standard values',
+        { timeout: STEP_TIMEOUT, polling: 250 });
+      assert.equal(await page.evaluate(() =>
+        document.getElementById('low_enrollment-le_threshold_state').closest('details').open), false,
+        'Adjust thresholds should start closed');
+      await setInput(page, 'low_enrollment-le_campus', CAMPUSES);
+      await setInput(page, 'low_enrollment-le_term', [TERM]);
+      await setIfPresent(page, 'low_enrollment-le_dept', [DEPT]);
+      await click(page, 'low_enrollment-le_button');
+      await waitForOutput(page, 'Low Enrollment output', [
+        { type: 'text', id: 'low_enrollment-le_output', disallowed: ['click Find Low Enrollment'] },
       ]);
+      // TERM has registrations, so the page lists its sections, never the
+      // schedule check meant for a term nobody has joined; the scope bar says
+      // which list ran and under which thresholds.
       const lowEnrl = await page.evaluate(() => ({
-        summary: document.getElementById('low_enrl_summary')?.innerText || '',
-        banner: document.getElementById('enrl_mode_banner')?.innerText || '',
+        output: document.getElementById('low_enrollment-le_output')?.innerText || '',
+        scope: document.getElementById('low_enrollment-le_filter_summary')?.innerText || '',
       }));
-      assert.match(lowEnrl.summary, /Total Courses|No courses of concern/);
-      assert.doesNotMatch(lowEnrl.banner, /Schedule check/);
+      assert.match(lowEnrl.output, /Total Sections|Nothing to review/i);
+      assert.doesNotMatch(lowEnrl.output, /Schedule check/);
+      assert.match(lowEnrl.scope, /Sections, by registrations/i);
+      assert.match(lowEnrl.scope, /Lower 12, Upper 12, Split 10, Graduate 5/i);
     });
 
     await withStep(page, [], 'Regstats runs', async () => {

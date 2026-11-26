@@ -1547,16 +1547,6 @@ a:hover { color: var(--link-color); }
 }
 #enrl_summary table.dataTable { font-size: 0.9em; }
 
-/* ── Empty uiOutput placeholders ─────────────────────────────────────────── */
-/* Collapse to zero height while empty, but never display:none — Shiny treats a
-   hidden output as suspended and never renders it, so it would stay empty. */
-#enrl_mode_banner, #low_enrl_summary {
-  margin: 0 !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-  overflow: hidden;
-}
-
 /* ── Scope bars — shared base ─────────────────────────────────────────────── */
 /* .enrl-scope-bar and .rs-scope-bar share structure; only flex direction /
    gap / padding differ between them */
@@ -2224,6 +2214,12 @@ h4.cedar-section-heading {
   margin-bottom: 12px;
 }
 .stat-card--left { text-align: left; }
+/* A card that counts one band takes the band's tint (the alert tokens). */
+.stat-card--critical { background: var(--alert-critical-bg); border-top-color: var(--alert-critical-border); }
+.stat-card--warning  { background: var(--alert-warning-bg);  border-top-color: var(--alert-warning-border); }
+.stat-card--info     { background: var(--alert-info-bg);     border-top-color: var(--alert-info-border); }
+.stat-card--success  { background: var(--alert-success-bg);  border-top-color: var(--alert-success-border); }
+.stat-card--neutral  { background: var(--alert-neutral-bg);  border-top-color: var(--alert-neutral-border); }
 .stat-num { font-size: 1.6em; font-weight: bold; margin: 0; color: var(--charcoal-soil); }
 .stat-lbl { font-size: 0.8em; color: var(--text-muted); margin: 2px 0 0 0; }
 

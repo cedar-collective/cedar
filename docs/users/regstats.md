@@ -299,6 +299,7 @@ Source: cedar_registrations (classlist registrations), cedar_sections (section c
 
 ## Related analyses
 
-- [Enrollment tab](enrollment-tab) — section-level enrollment with Low Enrollment alerts and enrollment concerns for future terms
+- [Enrollment tab](enrollment-tab) — section-level enrollment across terms
+- [Low Enrollment](low-enrollment) — sections at or near their threshold, and a schedule check for a term nobody has registered for
 - [Dept Dashboard](dept-dashboard) — current-term snapshot including drop rate alerts by course
 - [Course Dynamics](course-reports) — one-course view of enrollment history and drop patterns over time

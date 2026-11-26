@@ -513,7 +513,7 @@ test_that("silent error fallbacks do not grow, and the backlog shrinks on record
     "R/modules/ui-helpers.R" = 1L,
     "R/modules/waitlist.R" = 1L,
     "R/trunk/logging.R" = 7L,
-    "server.R" = 5L
+    "server.R" = 4L
   )
   architecture_expect_ratchet(measured, allowance, "silent fallback(s)")
 })
@@ -559,7 +559,7 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
     "R/modules/gen-ed.R" = 3L,
     "R/modules/pathways.R" = 4L,
     "R/modules/regstats.R" = 7L,
-    "server.R" = 12L,
+    "server.R" = 8L,
     "ui.R" = 1L
   )
   architecture_expect_ratchet(measured, allowance, "open blue box(es)")
@@ -593,8 +593,7 @@ test_that("inline styles given a fixed string do not grow, and the backlog shrin
     "R/modules/regstats.R" = 7L,
     "R/modules/retention.R" = 3L,
     "R/modules/ui-helpers.R" = 3L,
-    "server.R" = 61L,
-    "ui.R" = 8L
+    "server.R" = 54L
   )
   architecture_expect_ratchet(measured, allowance, "inline style(s) given a fixed string")
 })
@@ -617,7 +616,7 @@ test_that("bare headings do not grow, and the backlog shrinks on record (M18)", 
     "R/modules/instructor-gate.R" = 2L,
     "R/modules/pathways.R" = 3L,
     "R/modules/retention.R" = 1L,
-    "server.R" = 22L,
+    "server.R" = 8L,
     "ui.R" = 4L
   )
   architecture_expect_ratchet(measured, allowance, "bare heading(s)")
@@ -656,7 +655,7 @@ test_that("colours written into R code do not grow, and the backlog shrinks on r
     "R/modules/regstats.R" = 29L,
     "R/modules/retention.R" = 12L,
     "R/modules/ui-helpers.R" = 5L,
-    "server.R" = 13L
+    "server.R" = 12L
   )
   architecture_expect_ratchet(measured, allowance, "colour(s) written as a hex value")
 })

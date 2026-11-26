@@ -51,7 +51,6 @@ Seats and enrollment for the sections you choose, with filters for campus, colle
 
 - **Courses** — seats, first-day fill, census and final for each section or course, with crosslist views (home, split-level, crosslisted, away, all)
 - **Trend Signals** — level trends and growing/declining course signals for one department
-- **Low Enrollment** — sections below configurable thresholds; a schedule check against history for future terms
 - **Trends** — multi-year growing/declining course analysis using regression
 
 **Best for:** schedulers, IR analysts, anyone tracking enrollment patterns.
@@ -85,8 +84,8 @@ the page from **Courses > Projections**.
 ### Courses menu
 
 The **Courses** dropdown holds everything looked up by course or section: one
-course's history, the term being registered for, and the sections that were
-cancelled.
+course's history, the term being registered for, the sections running small,
+and the sections that were cancelled.
 
 | Tab | What it answers |
 |-----|----------------|
@@ -95,6 +94,7 @@ cancelled.
 | **Open Seats** | Which courses have available capacity? Which ran last year but aren't running this year? [Guide →](open-seats) |
 | **Waitlists** | Which courses have waitlist pressure? Who's waiting by program or classification? [Guide →](waitlists) |
 | **Projections** | What course demand and section need does the saved model estimate for the next Spring or Fall? [Guide →](enrollment-projections) |
+| **Low Enrollment** | Which sections are running under the enrollment expected for their level, and which scheduled courses have run small before? [Guide →](low-enrollment) |
 | **Cancellations** | Which scheduled sections were cancelled, and how does that vary by term or department? [Guide →](cancellations) |
 
 For one course's retention, use Course Dynamics → Downstream → Coming Back.
@@ -122,7 +122,7 @@ narrowed by campus, college, department or level:
 
 | Tab | What it answers |
 |-----|----------------|
-| **Enrollment** | Section- and course-level enrollment across terms, with Low Enrollment alerts. [Guide →](enrollment-tab) |
+| **Enrollment** | Section- and course-level enrollment across terms, and which courses are growing or shrinking. [Guide →](enrollment-tab) |
 | **Headcount** | How many unique students are declared in a major/minor/concentration, per term? [Guide →](headcount) |
 | **Gen Ed** | How are Gen Ed courses enrolling, and what grade-outcome patterns are visible? [Guide →](gen-ed) |
 | **DFW Rates** | Is the lower-division DFW rate going up or down, which courses hold the DFW grades, and where do sections disagree? [Guide →](dfw-rates) |
@@ -149,7 +149,7 @@ For one course's history, see **Courses → Course Dynamics**.
 |-----------|-----------|
 | Department chair | Dept Dashboard → Course Dynamics |
 | Graduate program director | Pathways → Course Dynamics |
-| Scheduler | Enrollment (Low Enrollment tab) → Regstats |
+| Scheduler | Low Enrollment → Regstats |
 | Dean / associate dean | Dept Dashboard → Dept Trends → Regstats |
 | IR analyst | Enrollment → Pathways → Course Dynamics → Data & Usage |
 
