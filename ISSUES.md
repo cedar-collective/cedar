@@ -257,10 +257,10 @@ places to look.
   on attempted credits. It is the wrong figure to set against a degree's 120
   credits or against classification: on it 51% of Fall 2025 seniors are at
   120 or more, on earned credits 34%.
-- **No function gives an earned position yet.** The one above was worked out
-  in a scratch script. A page that bands *enrolled* students by credits
-  earned needs it built beside the attempted one (`ROADMAP.md`), with the
-  same two guards (`timeline_valid`, a recorded pair of totals).
+- **The earned position is `build_credit_timeline(opt$earned = TRUE)`**
+  (added 2026-11-26, branch `credits/earned-position`): the reading above,
+  with the same two guards (`timeline_valid`, a recorded pair of totals,
+  `transfer_earned_known`).
 
 ### Reproduce
 

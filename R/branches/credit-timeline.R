@@ -34,6 +34,17 @@
 #   * The transfer block is as of the pull. Credit transferred in mid-career is
 #     attributed to the student's start. Most transfer credit arrives at
 #     admission, so this is usually right, but it is an assumption, not a fact.
+#   * Attempted, not earned, unless asked. The default position counts every
+#     credit attempted, here and elsewhere: the right figure for the attempted
+#     -credit ceiling, the wrong one to set against a degree's credits or a
+#     classification (ISSUES I91: on it 27% of one fall's juniors read 90 or
+#     more). `opt$earned = TRUE` adds the earned position beside it: credits
+#     completed here (passing grades) plus the earned block,
+#     overall_credits_earned - inst_credits_earned, recovered the same way
+#     and as stable (measured 2026-11-26: one gap on every row for 90.9% of
+#     students, 91.1% for the attempted pair). The earned block is the
+#     smaller for 29% of students (credit attempted elsewhere and not
+#     earned) and the larger for 2% (credit granted without an attempt).
 #   * The UNM running total starts at zero on the first term IN THE DATA. For a
 #     student already enrolled when the window opens, their timeline begins
 #     mid-career reading zero. `timeline_valid` marks who this applies to;
@@ -59,6 +70,10 @@
 #'   \describe{
 #'     \item{`student_ids`}{Character vector. Restrict to these students. Strongly
 #'       recommended — the full table is ~520k rows.}
+#'     \item{`earned`}{Logical, default FALSE. TRUE adds the earned position
+#'       (below), and then needs `completed_unm_credits` and
+#'       `cumulative_completed_unm_credits` on `student_terms` and
+#'       `inst_credits_earned` and `overall_credits_earned` on `programs`.}
 #'   }
 #'
 #' @return Tibble with `student_id`, `term`, `unm_credits_entering`,
@@ -69,11 +84,18 @@
 #'   `total_credits_entering`,
 #'   `total_credits_after`, and `timeline_valid` (FALSE when the student's first
 #'   term in the data is the first term of the data, so their earlier
-#'   coursework is invisible and the running total starts too low).
+#'   coursework is invisible and the running total starts too low). All of
+#'   these are ATTEMPTED credits. With `opt$earned`, before `timeline_valid`:
+#'   `unm_earned_entering`, `unm_earned_after` (completed here, before and
+#'   after the term), `transfer_earned`, `transfer_earned_known` (as
+#'   `transfer_credits_known`, for the earned pair), `total_earned_entering`
+#'   and `total_earned_after`.
 build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) {
 
   needed <- c("student_id", "term", "unm_credits_entering",
               "cumulative_attempted_unm_credits", "timeline_valid")
+  earned <- isTRUE(opt$earned)
+  if (earned) needed <- c(needed, "completed_unm_credits", "cumulative_completed_unm_credits")
   missing_cols <- setdiff(needed, names(student_terms))
   if (length(missing_cols) > 0) {
     stop("[credit-timeline.R] student_terms is missing required column(s): ",
@@ -86,13 +108,19 @@ build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) 
     st <- dplyr::filter(st, student_id %in% opt$student_ids)
   }
   if (nrow(st) == 0) {
-    return(tibble::tibble(
+    empty <- tibble::tibble(
       student_id = character(), term = integer(),
       unm_credits_entering = numeric(), unm_credits_after = numeric(),
       transfer_credits = numeric(), transfer_credits_known = logical(),
       total_credits_entering = numeric(),
-      total_credits_after = numeric(), timeline_valid = logical()
-    ))
+      total_credits_after = numeric()
+    )
+    if (earned) {
+      empty <- dplyr::mutate(empty, unm_earned_entering = numeric(), unm_earned_after = numeric(),
+                             transfer_earned = numeric(), transfer_earned_known = logical(),
+                             total_earned_entering = numeric(), total_earned_after = numeric())
+    }
+    return(dplyr::mutate(empty, timeline_valid = logical()))
   }
 
   # Attempted basis throughout. The transfer block below is a difference of two
@@ -112,7 +140,7 @@ build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) 
 
   transfer <- .credit_timeline_transfer_block(programs, unique(timeline$student_id))
 
-  timeline %>%
+  out <- timeline %>%
     dplyr::left_join(transfer, by = "student_id") %>%
     dplyr::mutate(
       transfer_credits_known = !is.na(transfer_credits),
@@ -123,6 +151,28 @@ build_credit_timeline <- function(student_terms, programs = NULL, opt = list()) 
     dplyr::select(student_id, term, unm_credits_entering, unm_credits_after,
                   transfer_credits, transfer_credits_known, total_credits_entering, total_credits_after,
                   timeline_valid)
+  if (!earned) return(out)
+
+  # The earned position, on the same rows. Completed here before the term is
+  # the running total less the term's own: a term with no completed credits
+  # recorded (NA) leaves the position unknown, never zero.
+  here <- st %>%
+    dplyr::transmute(student_id, term,
+                     unm_earned_entering = cumulative_completed_unm_credits - completed_unm_credits,
+                     unm_earned_after = cumulative_completed_unm_credits)
+  brought <- .credit_timeline_transfer_block(programs, unique(timeline$student_id),
+                                             inst = "inst_credits_earned", overall = "overall_credits_earned") %>%
+    dplyr::rename(transfer_earned = transfer_credits)
+  out %>%
+    dplyr::left_join(here, by = c("student_id", "term")) %>%
+    dplyr::left_join(brought, by = "student_id") %>%
+    dplyr::mutate(
+      transfer_earned_known = !is.na(transfer_earned),
+      transfer_earned       = dplyr::coalesce(transfer_earned, 0),
+      total_earned_entering = transfer_earned + unm_earned_entering,
+      total_earned_after    = transfer_earned + unm_earned_after
+    ) %>%
+    dplyr::relocate(timeline_valid, .after = dplyr::last_col())
 }
 
 
@@ -203,22 +253,24 @@ credit_timeline_validity <- function(rows, opt = list()) {
 # student's records 93% of the time and a median ignores the odd restated row.
 # Negative results are floored at zero: overall < institution is a data error,
 # not negative transfer credit.
-.credit_timeline_transfer_block <- function(programs, student_ids) {
+# `inst` and `overall` name the pair: attempted by default, the earned pair
+# for the earned position.
+.credit_timeline_transfer_block <- function(programs, student_ids, inst = "inst_credits_attempted",
+                                            overall = "overall_credits_attempted") {
   empty <- tibble::tibble(student_id = character(), transfer_credits = numeric())
   if (is.null(programs)) return(empty)
 
-  if (!all(c("student_id", "inst_credits_attempted",
-             "overall_credits_attempted") %in% names(programs))) {
+  if (!all(c("student_id", inst, overall) %in% names(programs))) {
     stop("[credit-timeline.R] programs must have student_id, ",
-         "inst_credits_attempted and overall_credits_attempted to recover ",
+         inst, " and ", overall, " to recover ",
          "transfer credit. Pass programs = NULL for a UNM-only timeline.")
   }
 
   block <- programs %>%
     dplyr::filter(student_id %in% student_ids,
-                  !is.na(inst_credits_attempted), !is.na(overall_credits_attempted)) %>%
-    dplyr::distinct(student_id, inst_credits_attempted, overall_credits_attempted) %>%
-    dplyr::mutate(gap = overall_credits_attempted - inst_credits_attempted) %>%
+                  !is.na(.data[[inst]]), !is.na(.data[[overall]])) %>%
+    dplyr::distinct(student_id, inst_value = .data[[inst]], overall_value = .data[[overall]]) %>%
+    dplyr::mutate(gap = overall_value - inst_value) %>%
     dplyr::group_by(student_id) %>%
     dplyr::summarize(transfer_credits = max(stats::median(gap, na.rm = TRUE), 0),
                      .groups = "drop")
