@@ -52,7 +52,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M77 | Improvement | See [Improvements](#improvements) |
+| M1–M78 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -5250,8 +5250,27 @@ of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
 
+**M78 — `./run-tests.sh --changed` compared a branch with the local `main`,
+however old.** Resolved 2026-11-26 (branch `test/model-source-warning`). The
+change analysis took its diff from `git merge-base HEAD main`. A clone worked
+in branches and worktrees rarely pulls its local `main`: on the development
+machine that day it stood 25 merges behind `origin/main`, and the analysis of
+a branch that changed 13 files listed 104, selected nine browser suites and
+the first-sessions run, and would have called `R/trunk/utils.R` model source
+in a branch that had not touched it. It now takes the later of the two points where
+the branch left `origin/main` (as of the last fetch) and the local `main`.
+`test-ci.R` holds both orders against a stand-in `git`.
+
 **M77 — Nothing says a change touches projection model source until the
-deploy takes an hour.** Open. `enrollment_projection_model_source_files()`
+deploy takes an hour.** Open; the first half of *Done when* is done
+(2026-11-26, branch `test/model-source-warning`):
+`scripts/projection-model-source.sh` reads the list from the function's own
+text (`test-ci.R` holds that the two are one list), `./run-tests.sh --changed`
+marks a listed file and says what the deploy will do, and the pull-request
+checks carry it as the name of a check, `Deploy: rebuilds both projection
+bundles (about 45 minutes)` or `Deploy: no projection rebuild`, which never
+fails. What is left is the second half: `utils.R` is still on the list whole.
+`enrollment_projection_model_source_files()`
 (`R/features/enrollment-projections.R`) lists 22 files, and an edit to any of
 them, a comment included, makes the next deploy rebuild both projection
 bundles, about 20 minutes each, inside a deploy step that is stopped at 60

@@ -42,5 +42,14 @@ test_that("breaks that could prove nothing are refused before a test runs", {
   expect_equal(already$status, 2L)
   expect_false(any(grepl("^1\\. ", already$report)))
 
-  expect_snapshot(writeLines(c(unlist(lapply(refused, `[[`, "said"), use.names = FALSE), already$said)))
+  # A breaks file that is not YAML is refused in the script's own words, with
+  # the parser's line; R's error and a status of 1 said neither.
+  unreadable <- run_check_test_catches(root, breaks_file_with_a_ragged_block)
+  expect_equal(unreadable$status, 2L)
+  expect_length(unreadable$report, 0L)
+
+  expect_snapshot(
+    writeLines(c(unlist(lapply(refused, `[[`, "said"), use.names = FALSE), already$said, unreadable$said)),
+    # The breaks file is a temporary one, named differently each run.
+    transform = function(lines) gsub("[^ ]*breaks\\.yml", "<breaks.yml>", lines))
 })

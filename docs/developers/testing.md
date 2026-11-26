@@ -294,7 +294,14 @@ source; never call focused or synthetic success a full institutional pass.
 | `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
 | `dev/**` | R suite + `demo` |
 | `global.R`, `entrypoint.sh` | R suite, and a note that the app's start changed: run `--all --fresh` and the demo gate afterwards |
+| a file the projection model is hashed from (`bash scripts/projection-model-source.sh` prints the list) | what its path selects, marked `PROJECTION MODEL SOURCE`, and a note that the deploy after the merge rebuilds both projection bundles |
 | `docs/**`, `*.md` only | nothing |
+
+The diff is this branch's since it left `origin/main` (as of the last fetch)
+or the local `main`, whichever is the later: a local `main` left weeks behind
+would put everyone's work since into it. The pull-request checks say the same
+about model source where a merger sees it, as a check named `Deploy: rebuilds
+both projection bundles (about 45 minutes)` or `Deploy: no projection rebuild`.
 
 It selects; it never certifies. It cannot know a cone change moved a rendered
 number, so widen it by hand when the blast radius is larger than the paths.

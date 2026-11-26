@@ -84,3 +84,62 @@ jobs:
       - name: Stop synthetic app
         if: always()
         run: docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml down
+
+  # Which files of the proposed merge are projection model source. An edit to
+  # one, a comment included, makes the deploy after the merge rebuild both
+  # projection bundles, and nothing said so until the deploy had run 45
+  # minutes (ISSUES M77). The job after this one carries the answer in its
+  # name, so the list of checks shows it to whoever is about to merge.
+  model-source:
+    name: Projection model source in the diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      touched: ${{ steps.diff.outputs.touched }}
+    steps:
+      - name: Checkout proposed merge
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # The merge commit and its first parent, which is main.
+          fetch-depth: 2
+
+      - name: List the model-source files the merge would change
+        id: diff
+        run: |
+          touched="$(git diff --name-only HEAD^1 HEAD | bash scripts/projection-model-source.sh --touched)"
+          echo "touched=$(printf '%s' "$touched" | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
+          if [ -z "$touched" ]; then
+            echo "No projection model source in this diff."
+            exit 0
+          fi
+          printf '%s\n' "$touched" | while IFS= read -r file; do
+            echo "::warning file=${file},line=1::Projection model source: merged, this change makes the next deploy rebuild both projection bundles (about 45 minutes)."
+          done
+
+  deploy-cost:
+    name: "${{ needs.model-source.outputs.touched != '' && 'Deploy: rebuilds both projection bundles (about 45 minutes)' || 'Deploy: no projection rebuild' }}"
+    needs: model-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Say what the deploy after this merge does
+        env:
+          TOUCHED: ${{ needs.model-source.outputs.touched }}
+        run: |
+          if [ -z "$TOUCHED" ]; then
+            echo "No projection model source in the diff: the deploy rebuilds no bundle."
+            exit 0
+          fi
+          echo "Projection model source in the diff: ${TOUCHED}"
+          {
+            echo "### The deploy after this merge rebuilds both projection bundles"
+            echo
+            echo "Projection model source in the diff: \`${TOUCHED% }\`"
+            echo
+            echo "That is about 45 minutes of a deploy step that is stopped at 60 (ISSUES M77, I6)."
+            echo "If no projection reads the change, it belongs in a file that is not on the list"
+            echo "(\`bash scripts/projection-model-source.sh\` prints it). If the model did change,"
+            echo "merge this pull request by itself and let its deploy finish."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -77,7 +77,11 @@ catches_arguments <- function(args) {
 
 catches_read_breaks <- function(path, root, default_timeout) {
   if (!file.exists(path)) catches_stop("no breaks file at ", path)
-  breaks <- yaml::read_yaml(path)
+  # The parser's own message names the line: most often a block of text whose
+  # lines are indented by different amounts, which needs `|2-` in place of `|-`.
+  breaks <- tryCatch(yaml::read_yaml(path), error = function(e) {
+    catches_stop(path, " cannot be read as YAML: ", sub("^\\([^)]*\\) ", "", conditionMessage(e)))
+  })
   if (!is.list(breaks) || length(breaks) == 0L || !is.null(names(breaks))) {
     catches_stop(path, " is not a list of breaks (each entry starts with '- name:')")
   }

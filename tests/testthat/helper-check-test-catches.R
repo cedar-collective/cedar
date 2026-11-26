@@ -58,14 +58,31 @@ tree_checksums <- function(root) {
   stats::setNames(unname(tools::md5sum(file.path(root, files))), files)
 }
 
+# A breaks file as a person writes one, and gets wrong: the lines of a block
+# of text indented by different amounts, where `|-` takes the first line's.
+breaks_file_with_a_ragged_block <- c(
+  "- name: a block whose lines are indented by different amounts",
+  "  file: R/sums.R",
+  "  old: |-",
+  "      add_one <- function(x) {",
+  "    }",
+  "  new: x",
+  "  tests: [test-sums.R]"
+)
+
 # scripts/check-test-catches.R on the tree at `root`: its exit status, the
-# report it printed, and what it said on stderr. A minute is the limit for a
-# run here; a break that carries its own limit keeps it.
+# report it printed, and what it said on stderr. `breaks` is a list of
+# entries, or the lines of a breaks file. A minute is the limit for a run
+# here; a break that carries its own limit keeps it.
 run_check_test_catches <- function(root, breaks) {
   work <- tempfile("catches-run-")
   dir.create(work)
   on.exit(unlink(work, recursive = TRUE), add = TRUE)
-  yaml::write_yaml(unname(breaks), file.path(work, "breaks.yml"))
+  if (is.character(breaks)) {
+    writeLines(breaks, file.path(work, "breaks.yml"))
+  } else {
+    yaml::write_yaml(unname(breaks), file.path(work, "breaks.yml"))
+  }
   status <- system2(file.path(R.home("bin"), "Rscript"),
                     c("--vanilla", shQuote(file.path(cedar_base_dir, "scripts", "check-test-catches.R")),
                       shQuote(file.path(work, "breaks.yml")), "--root", shQuote(root), "--timeout", "60"),

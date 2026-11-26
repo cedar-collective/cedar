@@ -92,8 +92,18 @@ REPORT_SCOPE=smoke
 # know that a cone change altered a rendered number, so widen it by hand when
 # the blast radius is larger than the paths suggest.
 plan_from_changes() {
-  local base files f
-  base="$(git merge-base HEAD main 2>/dev/null || true)"
+  local base="" ref candidate files f
+  # Where this branch left main. The local main of a clone that works in
+  # branches and worktrees is rarely pulled, and against a main weeks old the
+  # diff is everyone's work since (ISSUES M78). So ask origin/main as well,
+  # as it stood at the last fetch, and take the later of the two.
+  for ref in origin/main main; do
+    candidate="$(git merge-base HEAD "$ref" 2>/dev/null || true)"
+    [ -n "$candidate" ] || continue
+    if [ -z "$base" ] || git merge-base --is-ancestor "$base" "$candidate" 2>/dev/null; then
+      base="$candidate"
+    fi
+  done
   if [ -n "$base" ]; then
     files="$(git diff --name-only "$base" HEAD; git diff --name-only; git ls-files --others --exclude-standard)"
   else
@@ -107,6 +117,14 @@ plan_from_changes() {
   if [ -z "$files" ]; then
     echo "  (no changes detected — defaulting to the R gate)"
     return
+  fi
+
+  # A file the projection model is hashed from: the deploy after the merge
+  # rebuilds both bundles, which nothing said until it had (ISSUES M77).
+  local model_source
+  if ! model_source="$(printf '%s\n' "$files" | bash scripts/projection-model-source.sh --touched)"; then
+    echo "  could not read the projection model-source list (scripts/projection-model-source.sh)" >&2
+    exit 2
   fi
 
   local need_r=0 need_browser=0 need_deps=0 need_fresh=0 only_docs=1
@@ -145,8 +163,20 @@ plan_from_changes() {
       *)
         need_r=1; only_docs=0; reason="unclassified -> R suite" ;;
     esac
+    if printf '%s\n' "$model_source" | grep -F -x -q -- "$f"; then
+      reason="${reason}; PROJECTION MODEL SOURCE"
+    fi
     printf '  %-44s %s\n' "$f" "$reason"
   done <<< "$files"
+
+  if [ -n "$model_source" ]; then
+    echo "  => projection model source is in this diff: $(printf '%s' "$model_source" | tr '\n' ' ')"
+    echo "     Merged, it makes the next deploy rebuild both projection bundles: about 45"
+    echo "     minutes of a deploy step that is stopped at 60 (ISSUES M77, I6). If no"
+    echo "     projection reads the change, it belongs in a file that is not on the list"
+    echo "     (bash scripts/projection-model-source.sh prints it). If the model did"
+    echo "     change, say so in the pull request and merge it by itself."
+  fi
 
   if [ "$only_docs" -eq 1 ]; then
     echo "  => documentation only: no R or browser run required"
