@@ -78,7 +78,11 @@ test_that("automatic runs share the manual lock, retry failures, and honor reque
   })
   expect_equal(calls, 1L)
   dir.create(paste0(path, ".lock"))
-  expect_error(env$run_projection_auto_refresh(config, path), "already running")
+  # A build that only records the call: were the lock not to hold, this test
+  # fails here and does not start a real build (ISSUES M74).
+  expect_error(env$run_projection_auto_refresh(config, path, build = function(args) calls <<- calls + 1L),
+               "already running")
+  expect_equal(calls, 1L)
   unlink(paste0(path, ".lock"), recursive = TRUE)
   write_projection_request(path)
   env$run_projection_auto_refresh(config, path, build = function(args) {
@@ -314,19 +318,31 @@ test_that("the lock of a killed build is taken over; a live build keeps its lock
   holder_pid <- as.integer(sub("^pid: ", "", readLines(owner, warn = FALSE)[1]))
   on.exit(tools::pskill(holder_pid, tools::SIGKILL), add = TRUE)
 
-  # Alive past the stale limit: its heartbeat keeps the lock, however long.
-  Sys.sleep(4)
-  expect_error(env$take_projection_lock(lock, stale_after = 3, heartbeat_every = 1),
+  # Alive, so its heartbeat keeps the lock, however long ago it was taken. No
+  # race against the clock (ISSUES M74: a one-second beat held to a
+  # three-second limit failed on a busy machine): the heartbeat is set back an
+  # hour, and the holder's next beat brings it forward.
+  beat <- file.path(lock, "heartbeat")
+  beat_age <- function() as.numeric(difftime(Sys.time(), file.mtime(beat), units = "secs"))
+  Sys.setFileTime(beat, Sys.time() - 3600)
+  for (i in seq_len(300)) {
+    if (beat_age() < 60) break
+    Sys.sleep(0.2)
+  }
+  expect_lt(beat_age(), 60)
+  expect_error(env$take_projection_lock(lock, stale_after = 600, heartbeat_every = 1),
                "Rebuild already running")
 
   # Killed, so nothing releases the lock. Before the stale limit it still
-  # holds; after it, the next run takes the lock over and can release it.
+  # holds.
   tools::pskill(holder_pid, tools::SIGKILL)
   expect_true(dir.exists(lock))
-  Sys.sleep(5)
-  taken <- NULL
+  expect_error(env$take_projection_lock(lock, stale_after = 600, heartbeat_every = 1),
+               "Rebuild already running")
+  # Past it, the next run takes the lock over and can release it.
+  expect_true(set_file_time_back(beat, Sys.time() - 3600))
   expect_message(
-    taken <- env$take_projection_lock(lock, stale_after = 3, heartbeat_every = 1),
+    taken <- env$take_projection_lock(lock, stale_after = 600, heartbeat_every = 1),
     "Taking over the rebuild lock")
   expect_equal(list.files(lock, pattern = "^owner-", full.names = TRUE),
                attr(taken, "owner_path"))
@@ -361,8 +377,7 @@ test_that("only one run takes over a dead lock, and a lock taken over is not rel
   # That holder's heartbeat stops (as if suspended) and a second run takes the
   # lock over; the first, releasing late, must leave the second's lock alone.
   unlink(attr(first, "owner_path"))
-  Sys.sleep(2.5)
-  Sys.setFileTime(beat, long_ago + 60)
+  expect_true(set_file_time_back(beat, long_ago + 60))
   second <- env$take_projection_lock(lock, heartbeat_every = 1)
   env$release_projection_lock(first)
   expect_true(dir.exists(lock))
