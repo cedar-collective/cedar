@@ -100,9 +100,17 @@ get_exit_requirement_progress <- function(students, programs, attempts, requirem
     summarize(title = first(title), semester = first(semester), .groups = "drop")
   required$course_id <- vapply(required$subject_course, course_id_of, character(1), tbl = known,
                                caller = "get_exit_requirement_progress")
-  last_exit <- max(as.integer(students$exit_term))
-  required$readable <- required$course_id %in%
-    attempts$subject_course[attempts$outcome %in% c("pass", "dfw") & as.integer(attempts$term) <= last_exit]
+  # A course can be read if it was graded by the last term anyone left in.
+  # With no student there is no such term, and nothing can be read (max() of
+  # nothing warns and gives -Inf; ISSUES M64).
+  exit_terms <- as.integer(students$exit_term)
+  graded_by_last_exit <- if (length(exit_terms) == 0L) {
+    character(0)
+  } else {
+    attempts$subject_course[attempts$outcome %in% c("pass", "dfw") &
+                              as.integer(attempts$term) <= max(exit_terms)]
+  }
+  required$readable <- required$course_id %in% graded_by_last_exit
 
   # CAMPUS_ROLLUP: a student passed the course wherever it was taught; the
   # requirement is the course, not a campus's offering of it.

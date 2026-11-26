@@ -397,19 +397,33 @@ for report in "${REPORTS[@]}"; do
     fi
 done
 
+if [[ "$MODE" == "production" ]]; then
+    FETCH_DOCKER=/usr/bin/docker
+    FETCH_COMPOSE_FILE="$PROD_MRGATHER_COMPOSE_FILE"
+else
+    FETCH_DOCKER=docker
+    FETCH_COMPOSE_FILE="$MRGATHER_DIR/docker-compose.yml"
+fi
+
+# One fetch at a time. Every fetch on a machine signs in through one saved
+# browser profile, and mrgather clears that profile's lock as it starts (a
+# fetch stopped part-way leaves one behind), so nothing but this keeps a
+# second browser out of the profile, and a second set of exports out of the
+# folder, that another fetch is using (ISSUES.md M66). Asked of docker, not
+# kept in a file: a fetch that died leaves no container, so nothing to clear.
+FETCH_OTHER=""
+if [[ "$SKIP_FETCH" != true && "$DRY_RUN" != true ]]; then
+    FETCH_OTHER=$("$FETCH_DOCKER" ps --filter "name=cedar-mrgather-fetch-" --format '{{.Names}}' | head -n 1)
+fi
+
 if [[ "$SKIP_FETCH" == true ]]; then
     log_success "All files current — skipping fetch"
     FETCH_STATUS="SKIPPED"
     FETCH_NOTE="files already from today"
+elif [[ -n "$FETCH_OTHER" ]]; then
+    log_error "Another fetch is running ($FETCH_OTHER): not starting a second"
 else
     log_step "Fetching from MyReports..."
-    if [[ "$MODE" == "production" ]]; then
-        FETCH_DOCKER=/usr/bin/docker
-        FETCH_COMPOSE_FILE="$PROD_MRGATHER_COMPOSE_FILE"
-    else
-        FETCH_DOCKER=docker
-        FETCH_COMPOSE_FILE="$MRGATHER_DIR/docker-compose.yml"
-    fi
     # Named, so the watchdog can remove it: ending the compose client alone
     # need not remove a --rm container.
     FETCH_CONTAINER="cedar-mrgather-fetch-$$"
@@ -466,6 +480,9 @@ NOT_FETCHED=()
 for report in "${REPORTS[@]}"; do
     if [[ "$DRY_RUN" == true || "$SKIP_FETCH" == true ]]; then
         ARRIVED+=("$report")
+    elif [[ -n "$FETCH_OTHER" ]]; then
+        # A file from today may be one the other fetch is still writing.
+        continue
     elif file_glob=$(report_file_glob "$report") && ! has_todays_file "$file_glob"; then
         NOT_FETCHED+=("$report")
     else
@@ -473,7 +490,10 @@ for report in "${REPORTS[@]}"; do
     fi
 done
 
-if [[ "$SKIP_FETCH" != true ]]; then
+if [[ -n "$FETCH_OTHER" ]]; then
+    FETCH_STATUS="FAILED"
+    FETCH_NOTE="another fetch is running ($FETCH_OTHER)"
+elif [[ "$SKIP_FETCH" != true ]]; then
     FETCH_PROBLEM=""
     if [[ -n "$FETCH_STOP_REASON" ]]; then
         FETCH_PROBLEM="$FETCH_STOP_REASON"

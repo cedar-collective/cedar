@@ -3,9 +3,10 @@
 # The script's fetch step, run on its own against a stand-in `docker` on the
 # PATH. `compose ... run` behaves as `fetch` says (a shell snippet: the
 # stand-in's stdout is mrgather's); `rm -f` records the container it was asked
-# to remove and ends the running fetch, as removing the container does.
+# to remove and ends the running fetch, as removing the container does; `ps`
+# lists the fetch containers `running` names and records what it was asked.
 run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "20261020",
-                           time_limit = 60L, reports = c("cl", "desr")) {
+                           time_limit = 60L, reports = c("cl", "desr"), running = character(0)) {
   script <- readLines("../../scripts/update-data.sh", warn = FALSE)
   first <- grep("^report_file_glob\\(\\) \\{", script)
   last <- grep("^# ── Step 2: Parse raw data", script)
@@ -18,9 +19,15 @@ run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "2026
   dir.create(bin)
   on.exit(unlink(root, recursive = TRUE), add = TRUE)
   file.create(file.path(downloads, files))
+  writeLines(running, file.path(root, "running"))
   docker <- file.path(bin, "docker")
   writeLines(c(
     "#!/usr/bin/env bash",
+    'if [[ "$1" == "ps" ]]; then',
+    '  echo "$*" > "$FAKE_ROOT/ps.args"',
+    '  cat "$FAKE_ROOT/running"',
+    "  exit 0",
+    "fi",
     'if [[ "$1" == "rm" ]]; then',
     '  echo "$3" > "$FAKE_ROOT/removed"',
     '  kill "$(cat "$FAKE_ROOT/fetch.pid")" 2>/dev/null',
@@ -64,7 +71,8 @@ run_fetch_step <- function(files = character(0), fetch = "exit 0", today = "2026
     parse = sub("^PARSE:", "", out[startsWith(out, "PARSE:")]),
     tables = sub("^TABLES:", "", out[startsWith(out, "TABLES:")]),
     removed = read_one("removed"),
-    args = read_one("fetch.args")
+    args = read_one("fetch.args"),
+    asked_running = read_one("ps.args")
   )
 }
 
