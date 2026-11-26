@@ -30,3 +30,6 @@ renv/projects
 .env.*.local
 .Renviron
 .Rapp.history
+
+# What a start took on this machine (tests/e2e/fresh-start.test.mjs)
+tests/e2e/.fresh-start-history.jsonl

@@ -9,6 +9,11 @@
 //            waitForSelector, readReactable, colIndex, sleep } from './lib.mjs';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const CHROME = process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -232,6 +237,75 @@ export function sessionStart(page) {
     const s = (ms) => (ms === null ? null : ms / 1000);
     return { connected: s(at.connected), busy: s(at.busy), started: s(at.started) };
   });
+}
+
+// ── What a start took last time ──────────────────────────────────────────────
+// fresh-start prints each session's whole start and holds none of it: sessions
+// of one process differ by a second and a half among themselves. What it can
+// do is put the numbers beside the last run on other code, so a start that got
+// slower is on the screen while the change is still in hand, and not first
+// seen by a reader after a deploy (ISSUES I81).
+//
+// A record is one run: { at, code, started: [...], began: [...] }, seconds per
+// session. `code` is the checkout's commit, with "+changes" when the tree had
+// uncommitted edits. The app runs the checkout's code only when its image was
+// rebuilt from it or the checkout is mounted, which a record cannot know: it
+// says what was checked out.
+
+// One history for every worktree of a checkout, beside the main checkout's
+// suites; CEDAR_START_HISTORY names another file.
+export function startHistoryFile() {
+  if (process.env.CEDAR_START_HISTORY) return process.env.CEDAR_START_HISTORY;
+  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    { cwd: HERE, encoding: 'utf8' }).trim();
+  return path.join(path.dirname(common), 'tests', 'e2e', '.fresh-start-history.jsonl');
+}
+
+export function checkedOutCode() {
+  const git = (...args) => execFileSync('git', args, { cwd: HERE, encoding: 'utf8' }).trim();
+  return git('rev-parse', '--short', 'HEAD') + (git('status', '--porcelain') ? '+changes' : '');
+}
+
+export function readStartHistory(file) {
+  if (!fs.existsSync(file)) return [];
+  return fs.readFileSync(file, 'utf8').split('\n').filter((line) => line.trim()).map((line, i) => {
+    let record = null;
+    try { record = JSON.parse(line); } catch { /* said below */ }
+    if (!record || typeof record.code !== 'string' || typeof record.at !== 'string' ||
+        !Array.isArray(record.started)) {
+      throw new Error(`${file} line ${i + 1} is not a record of a run: delete the line, or the file`);
+    }
+    return record;
+  });
+}
+
+export function recordStarts(file, record) {
+  fs.appendFileSync(file, JSON.stringify(record) + '\n');
+}
+
+// The latest run on code other than `code` that timed as many sessions; null
+// when there is none.
+export function lastRunOnOtherCode(history, code, sessions) {
+  const others = history.filter((r) => r.code !== code && r.started.length === sessions);
+  return others.length ? others[others.length - 1] : null;
+}
+
+// The lines fresh-start prints under its sessions. `before` is a record or null.
+export function compareStarts(now, before) {
+  const secs = (xs) => xs.map((x) => x.toFixed(1)).join(' ');
+  const median = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return (s[Math.floor((s.length - 1) / 2)] + s[Math.ceil((s.length - 1) / 2)]) / 2;
+  };
+  const signed = (x) => `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(1)} s`;
+  const lines = [`whole start, sessions 1 to ${now.started.length}: ${secs(now.started)} s  (${now.code})`];
+  if (!before) return [...lines, 'no run on other code is recorded yet, so there is nothing to put beside it'];
+  lines.push(`the last run on other code:   ${secs(before.started)} s  (${before.code}, ${before.at.slice(0, 10)})`);
+  lines.push(`since then: first session ${signed(now.started[0] - before.started[0])}, ` +
+    `second ${signed(now.started[1] - before.started[1])}, ` +
+    `the later ones ${signed(median(now.started.slice(2)) - median(before.started.slice(2)))} at the median`);
+  lines.push('printed, not held: sessions of one process differ by a second and a half among themselves');
+  return lines;
 }
 
 export function activeTab(page) {

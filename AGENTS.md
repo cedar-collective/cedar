@@ -24,6 +24,7 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 | Enrollment projections: the contract | [enrollment-projections.md](docs/developers/enrollment-projections.md), [forecasting-lessons.md](docs/developers/forecasting-lessons.md) |
 | Degree Explorer and the catalog tooling | [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md), [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md) |
 | Running tests, fixtures, environments | [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md) |
+| Where a slow page's time goes; profiling a session or a cone; which times a test holds | [performance-monitoring.md](docs/developers/performance-monitoring.md) |
 | The synthetic institution | [synthetic-institution.md](docs/developers/synthetic-institution.md) |
 
 ---
