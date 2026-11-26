@@ -5406,7 +5406,8 @@ builder's as-of joins for entering GPA and credits (about half of the 2.2
 seconds).
 
 **M75 — The first session of a process starts about 2 seconds slower than
-later ones, and it is not compilation.** Open. On fresh starts of the
+later ones, and it is not compilation.** The shared result it traced to is
+built ahead since 2026-11-26; open for the slow later session. On fresh starts of the
 development container (2026-11-25, `tests/e2e/fresh-start.test.mjs`, home
 page, from opening the page to the end of the session's first busy-to-idle
 cycle), the first session took 6.1 and 6.5 seconds with the server function
@@ -5430,18 +5431,70 @@ first reader of the day is this first session. **Traced 2026-11-25**, by the
 profile this entry asked for
 ([a session's start](docs/developers/performance-monitoring.md#a-sessions-start)):
 three sessions in turn on a new process of the development container, the
-build-ahead finished. Inside the server function the first sampled 4.3
-seconds and the next two 2.0 and 2.1. The lines the first has and the others
-have not: `headcount.R:132` and `:95`, 1.3 seconds, the Headcount module's
-set-up reading its filter choices through `cedar_shared_result()`, which the
-first session of a process builds (`ui-helpers.R:1639`) and every later one
-reads; `headcount.R:195`, 0.7, the first render of its download control;
-`population.R:1297` to `1323`, 0.4, program labels; and 0.3 in Gen Ed's
-set-up (`gen-ed.R:1177`, `:1211`). So most of it is a result shared by every
-session that the first one still builds. One run, emulated. *Done when:*
-Headcount's filter choices are a job of the build-ahead
-(`cedar_preload_shared_results()`), the same profile shows what is left, and
-either the start does that too or the entry says why it stays.
+build-ahead finished. The lines the first session had and the others had not
+were the Headcount module's set-up (`R/modules/headcount.R`) reading its
+filter choices through `cedar_shared_result()`, which the first session of a
+process built and every later one read. The reading written here that day
+was wrong in two ways. It gave 0.7 seconds to "the first render of
+Headcount's download control" and 0.4 to program labels as costs of their
+own: the profile names a file by its base name, two files are `headcount.R`,
+and line 195 is in `R/branches/headcount.R`, inside
+`headcount_filter_choices()`; the labels (`population.R:1297` to `1323`) are
+under it too, so all of it was the one build. And its 4.3 seconds against
+2.0 came from a process that had also built ten courses ahead, which no
+later run here did.
+
+**The shared result, fixed 2026-11-26** (branch
+`headcount/choices-built-ahead`): the choices are the first job of the
+build-ahead (`headcount_choices_job()`, `headcount_preload_jobs()`,
+`R/modules/headcount.R`), and the module's server reads the same job, so the
+key built ahead is the key asked for. Like for like (the development
+container, no course built ahead, the profile recipe, three sessions on each
+of three new processes before and three after): the first session sampled
+3.36, 3.30 and 3.34 seconds before, 1.04, 1.00 and 0.92 of it building the
+choices, and 3.12, 2.94 and 2.90 after, none of it. The build's second is
+gone from the first session, and the session is shorter by about a third of
+one: the rest of it took a little longer in many places, none of them one
+line. Later sessions sampled 1.9 to 2.7 either way, but for the two below.
+In a browser (`./run-tests.sh --e2e --fresh headcount`, which holds none of
+it) six starts took 5.5 4.8 4.9 5.8 4.7 4.8 seconds on the branch against
+5.6 4.1 4.3 5.6 3.6 3.7 the day before on other code: one start differs from
+the next by more than the fix moves the first. So this entry's two seconds
+were never there to save. What the fix settles is the rule: a result every
+session reads as it starts is built ahead.
+
+**What is left of the first session is R compiling functions on their first
+call.** In all six first sessions profiled, before the fix and after, 0.60
+to 0.72 seconds of the samples have `compiler:::tryCmpfun` on the stack; the
+second session has 0.04 to 0.12 and the third none. The largest are the Gen
+Ed module's server function (0.26, `R/modules/gen-ed.R:1211`) and the
+projections module's (0.06 to 0.16). `cedar_compile_server()` compiles
+`server` at start; the module functions it calls are compiled when a session
+first calls them. "It is not compilation", in this entry's title, was true
+of the build and is not true of the rest. It stays: compiling the module
+functions at start adds to every start to save the day's first reader about
+half a second, and `cedar_compile_server()` is in `R/trunk/utils.R`,
+projection model source (M77), so the change costs a rebuild of both
+bundles. It belongs with the next model version if anywhere.
+
+**The slow later session: two profiled, not traced.** Two of the twelve
+later sessions sampled 3.12 and 3.90 seconds where their neighbours sampled
+1.9 to 2.7. In each the extra sat in one place, and not the same place. In
+one, 1.5 seconds were in `paste0()` under Shiny's hashing of the names of
+the calls on the stack (`saveCallStackDigest()`, `getCallNames()`, Shiny
+1.10.0), which it does whenever a condition is raised: here the `req()` of
+`output$gen_ed-instructor_dfw_plot` (`R/modules/gen-ed.R:913`), failing as
+it should with nothing asked for. Every profiled session has such digests,
+0.02 to 0.34 seconds of them in all. In the other, 1.1 seconds were inside
+the creation of one observer (`cedar_copy_url_observer()`, `observeEvent()`),
+which takes 0.02 in the session before it. Two unrelated lines each stalling
+for over a second is what a garbage collection looks like in a profile that
+does not record collections, as these do not (`gc.profiling` off): the time
+is given to whatever was running. The `gcinfo(TRUE)` check above found no
+full collection inside seven starts, none of them one of these. *Done when:*
+a slow later session is profiled with `Rprof(gc.profiling = TRUE)` and the
+stall is a collection or is not, and the unprofiled one-in-four (5.6 to 6.2
+seconds against 4.2 to 4.5) is shown to be the same thing or another.
 
 **M74 — The projection lock test fails when the machine is busy.**
 Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
