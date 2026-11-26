@@ -4635,7 +4635,7 @@ this table says which entries are one piece of work, and of what kind.
 
 | Kind of fix | Entries | How |
 |---|---|---|
-| A person, a source owner or a production step: no code | M9, M10, M21, M32, M50, M69 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
+| A person, a source owner or a production step: no code | M9, M10, M21, M32, M50 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
 | mrgather on production | M65 (and defects I32, I33, I43) | Production's mrgather becomes a checkout of its repository (`ROADMAP.md`, Platform). What is left of the four closes with it. |
 | One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. Ratchets hold M3, M53, M54 and M76 since 2026-11-26; the helpers are still to write. |
 | Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
@@ -5582,7 +5582,8 @@ analysed most are built ahead at start since 2026-11-25, so their first reader
 does not wait for the three comparisons either
 ([built ahead](docs/developers/shiny-modules.md#downstream-for-the-courses-analysed-most)).
 
-**M69 — A soft restart leaves the previous R process running.**
+**M69 — A soft restart leaves the previous R process running.** Resolved
+2026-11-26 on production, and in the install page's cron line.
 `restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
 for new sessions and, with `app_idle_timeout 0`, never ends the old one. On
 production on 2026-11-25 the process started after the 10:00 UTC container
@@ -5591,9 +5592,13 @@ restart was still there at 14:19 beside the one the 11:00 soft restart started:
 container restart. Done when the morning job ends with one R process (a hard
 restart there, or the soft restart ends the old worker), checked with `ps` in
 the container. Production's 11:00 UTC job was changed to
-`restart-cedar.sh --hard-restart` on 2026-11-25; its first run is 2026-11-26.
-`docs/developers/droplet-installation.md` still gives a new host one job with
-a soft restart.
+`restart-cedar.sh --hard-restart` on 2026-11-25. Its first run, 2026-11-26:
+at 13:34 UTC the container had started at 11:00:02 and held one R process,
+started at 11:00:12, 2.6 GB resident, with 72 MB of swap in use on the host
+where the day before two processes had 1.4 GB there.
+`docs/developers/droplet-installation.md` and `scripts/README.md` gave a new
+host one job with a soft restart; both now end the line with
+`--hard-restart` and say why.
 
 **M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
 and `app.R` was never used.** With a `server.R` in the directory Shiny ignores
