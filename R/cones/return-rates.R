@@ -14,7 +14,10 @@
 # and is counted apart again.
 #
 # Groups are the table's own descriptions (home campus, classification,
-# primary college) and two warning signs known by the end of the term: a late
+# primary college), how the student arrived and their semester since
+# (`entry_type`, `semester_here`: columns the caller attaches from
+# student_term_semesters(), branches/population.R), and two warning signs
+# known by the end of the term: a late
 # withdrawal (`late_withdrawals` > 0) and a DFW grade (`dfw_grades` > 0, late
 # drops counted apart). The DFW sign needs posted grades: past `last_graded`,
 # or with no graded row, it is unknown (NA), never "no DFW".
@@ -22,7 +25,7 @@
 # Depends on: get_term_type() (trunk/utils.R), between_term_finishers() (branches/retention-context.R)
 
 RETURN_RATE_GROUPS <- c("student_campus", "student_classification", "primary_college_code",
-                        "late_withdrawal", "dfw")
+                        "entry_type", "semester_here", "late_withdrawal", "dfw")
 
 #' Return to the next regular term, per anchor term and group
 #'

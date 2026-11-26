@@ -2558,6 +2558,109 @@ rr01 <- local({
   list(student_terms = student_terms, attempts = attempts, dashboard = dashboard)
 })
 
+# RT01: the return rate after each semester since arrival (test-return-rates.R).
+# Four falls (202080..202380, k = 1..4), every undergraduate at home campus
+# ABQ, every return observable, read with min_n 5. Each row is its own
+# student; programs records each one's arrival ("First Time Freshman" or
+# "New Transfer") in the term named:
+#   RT01-F1  200 first-time, arrived that fall (1st semester): 140, 148,
+#            156, 164 come back (70, 74, 78, 82%): rising.
+#   RT01-F3  100 first-time, arrived the fall before (3rd): 85 back: steady.
+#   RT01-F5  100 first-time, arrived two falls before (5th): 92, 86, 80, 74
+#            back: falling.
+#   RT01-F8  6 first-time in their 8th semester (a spring start three and a
+#            half years before), 5 back: the last semester drawn.
+#   RT01-F10 6 first-time in their 10th semester, all back: after the last
+#            semester drawn, the overall line only (24 over the four falls).
+#   RT01-F7  10 first-time in their 7th semester in the first two falls
+#            only, all back: read earlier, not in the latest, left out.
+#   RT01-F2  3 first-time in their 2nd semester (arrived that spring), 2
+#            back: under min_n every fall, never read.
+#   RT01-T1  40 new transfers in their 1st semester, 30 back (75%): one
+#            semester, so no lowest; steady.
+#   RT01-X   4 with no arrival on record, all back: the overall line only
+#            (16 over the four falls).
+# First-time students come back least often after their 1st semester in
+# three of the four falls; after their 5th in the last. Every student
+# together: 469 in each of the first two falls, 459 after. The arrival
+# records begin with RT01-F10's first, Spring 2016, so every semester drawn is
+# reached; `by_semester` is the rates table the semester lines read, for a
+# test that sets the records' start later.
+rt01 <- local({
+  falls <- c(202080L, 202180L, 202280L, 202380L)
+  block <- function(tag, n, back, arrived, entry) {
+    tibble::tibble(i = seq_len(n), tag = tag, returned = seq_len(n) <= back, arrived = arrived, entry = entry)
+  }
+  one <- function(term, k) {
+    dplyr::bind_rows(
+      block("F1", 200L, 132L + 8L * k, term, "first_time"),
+      block("F3", 100L, 85L, term - 100L, "first_time"),
+      block("F5", 100L, 98L - 6L * k, term - 200L, "first_time"),
+      block("F8", 6L, 5L, term - 370L, "first_time"),
+      block("F10", 6L, 6L, term - 470L, "first_time"),
+      if (k <= 2L) block("F7", 10L, 10L, term - 300L, "first_time"),
+      block("F2", 3L, 2L, term - 70L, "first_time"),
+      block("T1", 40L, 30L, term, "transfer"),
+      block("X", 4L, 4L, NA_integer_, NA_character_)
+    ) %>%
+      dplyr::mutate(term = term, student_id = sprintf("RT01-%s%03d-%d", tag, i, term))
+  }
+  rows <- dplyr::bind_rows(lapply(seq_along(falls), function(k) one(falls[[k]], k)))
+  student_terms <- rows %>%
+    dplyr::transmute(student_id, term, enrolled = TRUE, student_level = "UG", student_campus = "ABQ",
+                     student_classification = "Sophomore, 2nd Yr", primary_college_code = "AS", late_withdrawals = 0L,
+                     dfw_grades = 0L, graded_rows = 1L, returned_next_regular_term = returned,
+                     return_observable = TRUE, degree_awarded = FALSE)
+  programs <- rows %>%
+    dplyr::filter(!is.na(arrived)) %>%
+    dplyr::transmute(student_id, term = arrived, student_level = "Undergraduate",
+                     student_population = ifelse(entry == "first_time", "First Time Freshman", "New Transfer"))
+  dashboard <- build_retention_dashboard(student_terms, NULL, NULL, list(
+    term_type = "fall", student_level = "UG", data_edges = rr01_edges, min_n = 5L,
+    courses = FALSE, milestones = FALSE), programs = programs)
+  semesters <- student_term_semesters(student_terms, programs) %>% dplyr::select(student_id, term, entry_type, semester_here)
+  by_semester <- get_return_rates(
+    student_terms %>% dplyr::left_join(semesters, by = c("student_id", "term")),
+    list(term_type = "fall", student_level = "UG", data_edges = rr01_edges, min_n = 5L,
+         group_cols = c("entry_type", "semester_here")), NULL)$rates
+  list(student_terms = student_terms, programs = programs, dashboard = dashboard, by_semester = by_semester)
+})
+
+# RT02: how student_term_semesters() counts (test-return-rates.R). Arrivals
+# in programs' student_population, rows in student_terms:
+#   A  first-time Fall 2020: Fall 2020, Spring 2021, Fall 2021 are its
+#      1st, 2nd and 3rd semesters.
+#   B  first-time Summer 2020: Summer 2020 has no semester; Fall 2020 is the
+#      1st, Spring 2021 the 2nd.
+#   C  first-time Fall 2020, away, back in Fall 2022: its 5th semester (terms
+#      passed, not terms enrolled).
+#   D  first-time Fall 2019, a new transfer in Fall 2022: Spring 2021 is its
+#      4th semester as first-time; Fall 2022 its 1st as a transfer.
+#   E  readmitted, no arrival on record: no row.
+#   F  Fall 2020 recorded both ways: first-time.
+#   G  a row in Spring 2020, before its Fall 2020 arrival: no row for it.
+#   H  first-time Spring 2021: Spring 2021 the 1st, Fall 2021 the 2nd.
+#   I  first-time Fall 2020 as an undergraduate, a graduate student in Fall
+#      2024: Fall 2021 is its 3rd semester; the graduate term has no row (no
+#      arrival at that level).
+#   J  a new transfer graduate student in Fall 2022: Spring 2023 its 2nd
+#      semester at that level.
+# Every row is an undergraduate's (UG) but I's Fall 2024 and J's (GR).
+rt02 <- list(
+  student_terms = tibble::tibble(
+    student_id = c("A", "A", "A", "B", "B", "B", "C", "C", "D", "D", "E", "F", "G", "G", "H", "H", "I", "I", "J"),
+    term = c(202080L, 202110L, 202180L, 202060L, 202080L, 202110L, 202080L, 202280L, 202110L, 202280L,
+             202080L, 202080L, 202010L, 202080L, 202110L, 202180L, 202180L, 202480L, 202310L),
+    student_level = c(rep("UG", 17), "GR", "GR")),
+  programs = tibble::tibble(
+    student_id = c("A", "B", "C", "D", "D", "E", "F", "F", "G", "H", "I", "J"),
+    term = c(202080L, 202060L, 202080L, 201980L, 202280L, 202080L, 202080L, 202080L, 202080L, 202110L, 202080L, 202280L),
+    student_level = c(rep("Undergraduate", 11), "Graduate/GASM"),
+    student_population = c("First Time Freshman", "First Time Freshman", "First Time Freshman",
+                           "First Time Freshman", "New Transfer", "Readmit Student", "New Transfer",
+                           "First Time Freshman", "First Time Freshman", "First Time Freshman",
+                           "First Time Freshman", "New Transfer")))
+
 # RS01: who the Retention page counts in Fall 2022 (test-return-rates.R).
 # Enrolled that fall at home campus ABQ unless said; the record's arrivals:
 #   W-A  undergraduate; first-time in Fall 2022 itself            first-time
@@ -2581,7 +2684,8 @@ rr01 <- local({
 rs01 <- local({
   st <- function(id, term = 202280L, level = "UG", campus = "ABQ", enrolled = TRUE) tibble::tibble(
     student_id = id, term = term, enrolled = enrolled, student_level = level, student_campus = campus)
-  said <- function(id, term, population) tibble::tibble(student_id = id, term = term, student_population = population)
+  said <- function(id, term, population, level = "Undergraduate") tibble::tibble(
+    student_id = id, term = term, student_population = population, student_level = level)
   student_terms <- dplyr::bind_rows(
     st("W-A"), st("W-B", 202180L), st("W-B"), st("W-C", 202210L), st("W-C"),
     st("W-D", 202080L), st("W-D"), st("W-E"), st("W-F"), st("W-F", 202310L), st("W-G"),
@@ -2600,7 +2704,8 @@ rs01 <- local({
       said("W-E", 202280L, "Readmit"),
       said("W-F", 202280L, "Continuing"), said("W-F", 202310L, "Summer First Time/Beg Freshman"),
       said("W-G", 202280L, "New Transfer from NM Inst"), said("W-G", 202280L, "First Time/Beginning Freshman"),
-      said("W-H", 202280L, "Frst Time Grad/Prf Deg not UNM"), said("W-I", 202280L, "Continuing"),
+      said("W-H", 202280L, "Frst Time Grad/Prf Deg not UNM", "Graduate/GASM"),
+      said("W-I", 202280L, "Continuing", "Graduate/GASM"),
       said("W-K", 202280L, "New Transfer from NM Inst"),
       said("W-L", 202280L, "First Time/Beginning Freshman"),
       said("W-M", 202180L, "First Time/Beginning Freshman")),

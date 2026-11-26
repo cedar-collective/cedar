@@ -4,10 +4,15 @@
 // Asserts the tab opens on fall terms and undergraduates and builds without a
 // run button: the data scope bar saying who is counted (the level's students
 // in the latest term, first-time, transfer and start-not-on-record students
-// adding to them, and the levels left out); the return line with a label a term and the dashed trend line
-// labelled with its slope and verdict (no cards), the warning-sign table (a late withdrawal and a DFW grade, each with
-// and without), the classification and college tables with a trend line and
-// no word, the course table, every method slot filled; a re-read when the
+// adding to them, and the levels left out); the return rate a line a semester
+// since arrival for first-time students, every student together dotted
+// behind, each point its hover's counts and no number on any, a semester whose
+// students started in a spring marked, the lead sentence naming the semester
+// lowest over the terms (no cards), transfer students on the control, and a
+// level with no start on record drawn as one line that says so;
+// the warning-sign table (a late withdrawal and a DFW grade, each with and
+// without), the college table with a trend line and no word, the course
+// table, every method slot filled; a re-read when the
 // term type or the student level changes, the courses-by-GPA section with
 // the rest of the page (ISSUES M67); and the home card's link.
 //
@@ -53,8 +58,8 @@ const waitBuilt = async () => {
 try {
   await connect(page, { tab: 'retention', expect: 'Retention' });
   await waitBuilt();
-  await requireIds(page, [`${NS}term_type`, `${NS}level`, `${NS}campus`, `${NS}overall_plot`, `${NS}signs_table`,
-                          `${NS}classification_table`, `${NS}college_table`, `${NS}courses_table`]);
+  await requireIds(page, [`${NS}term_type`, `${NS}level`, `${NS}campus`, `${NS}stage_entry`, `${NS}overall_plot`, `${NS}signs_table`,
+                          `${NS}college_table`, `${NS}courses_table`]);
   const termType = await page.$eval(`input[name="${NS}term_type"]:checked`, (el) => el.value);
   ok(termType === 'fall', `the page opens on fall terms (${termType})`);
   const level = await page.$eval(`#${NS}level`, (el) => el.value);
@@ -81,32 +86,75 @@ try {
   const noCards = await page.evaluate(() => !document.querySelector('#retention_dashboard-overall_finding .finding-card'));
   ok(noCards, 'the chart carries the finding: no cards');
   const lead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
-  ok(/^The share of fall students who came back the next regular term is (rising|falling|not clearly rising or falling): /.test(lead),
-     `the section opens on the verdict over the terms (${lead.slice(0, 60)}…)`);
+  const leadRe = (who, type) => new RegExp(`^${who} students came back least often after their \\d+(st|nd|rd|th) semester` +
+    `( \\(those who started in a spring\\))?: in (every one of the \\d+|\\d+ of the \\d+) ${type} terms read\\. ` +
+    `(Their share coming back is|Too few)`);
+  ok(leadRe('First-time', 'fall').test(lead),
+     `the section opens on the semester lowest over the terms, then the semesters moving (${lead.slice(0, 120)}…)`);
   const ln = await line();
-  // Each point is its own counts: the rate drawn is came back over students read, as the hover states them.
-  const drawn = await page.evaluate((el) => {
+  // One line a stage, every student together dotted first; each point is its
+  // own counts: came back over students read, as the hover states them.
+  const stages = await page.evaluate((el) => {
     const r = document.getElementById(el);
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
-    const d = p?.data?.[0];
-    return (d?.hovertext || []).map((h, i) => {
-      const m = String(h).replace(/,/g, '').match(/([0-9]+) of ([0-9]+) came back/);
-      return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
-    });
+    return (p?.data || []).map((d) => ({
+      name: d.name, dash: d.line?.dash || null, mode: d.mode, n: (d.y || []).filter((v) => v !== null).length,
+      last: (d.y || [])[(d.y || []).length - 1],
+      // A term not read between a line's first and last breaks it: no point there.
+      gaps: (d.hovertext || []).map((h, i) => {
+        if (d.y[i] === null) return 'gap';
+        const m = String(h).replace(/,/g, '').match(/([0-9]+) of ([0-9]+) came back/);
+        return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
+      }) }));
   }, `${NS}overall_plot`);
-  ok(drawn.length >= 3 && drawn.every((gap) => gap !== null && gap < 0.05),
-     `every term's rate is its hover's counts divided (${drawn.length} terms)`);
-  ok(ln && ln.n >= 3 && ln.text.length === ln.n, `the return line labels each of its ${ln?.n} terms`);
-  ok(ln?.trend && ln.trend.x.length === 2 && ln.trend.line?.dash === 'dash',
-     'the trend is a dashed line from the first term to the last');
-  ok(/points a year/.test(ln?.label || '') && /(rising|falling|steady)/.test(ln?.label || ''),
-     `the trend line is labelled with its slope and verdict (${ln?.label})`);
+  ok(stages[0]?.name === 'Every student together' && stages[0]?.dash === 'dot',
+     `every student together is the dotted line (${stages[0]?.name})`);
+  const semesterName = /^\d+(st|nd|rd|th) semester( \(spring start\))?$/;
+  ok(stages.length >= 5 && stages.length <= 9 && stages.slice(1).every((t) => semesterName.test(t.name) && t.dash === null),
+     `a solid line a semester, eight at most (${stages.slice(1).map((t) => t.name).join(' | ')})`);
+  // In a fall, the even semesters started in a spring and say so; the odd do not.
+  ok(stages.slice(1).every((t) => /spring start/.test(t.name) === (parseInt(t.name, 10) % 2 === 0)),
+     'in a fall, the even semesters are marked as spring starts');
+  ok(stages.every((t) => t.n >= 3 && t.gaps.length === t.n && t.gaps.every((g) => g === 'gap' || (g !== null && g < 0.05))),
+     `every point is its hover's counts divided (${stages.map((t) => t.n).join(', ')} terms)`);
+  ok(stages.every((t) => !/text/.test(t.mode)), 'no number on any point');
+  const lasts = stages.slice(1).map((t) => t.last);
+  ok(Math.max(...lasts) - Math.min(...lasts) > 1,
+     `the semesters differ where the overall rate does not show it (${lasts.map((v) => v.toFixed(1)).join(', ')})`);
+  const stageMethod = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
+  ok(/with no start on record/.test(stageMethod) && /after their 8th semester/.test(stageMethod) &&
+     /before the arrival records begin in (Fall|Spring) \d{4}/.test(stageMethod),
+     'the method note counts the students in no line');
+
+  // Transfer students: their own semesters, the dotted line as it was.
+  const traces = () => page.evaluate((el) => {
+    const r = document.getElementById(el);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return (p?.data || []).map((d) => ({ name: d.name, y: JSON.stringify(d.y) }));
+  }, `${NS}overall_plot`);
+  const firstLines = await traces();
+  await setInput(page, `${NS}stage_entry`, 'transfer');
+  const transferLead = await waitFor(page, (ns) => /^Transfer students /.test(
+    document.getElementById(`${ns}overall_finding`)?.innerText.trim() || ''), { timeout: 120000, args: [NS] });
+  await waitForIdle(page, { timeout: 120000 });
+  const tLead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
+  ok(transferLead && leadRe('Transfer', 'fall').test(tLead), `transfer students get their own sentence (${tLead.slice(0, 100)}…)`);
+  const tLines = await traces();
+  ok(tLines[0]?.name === 'Every student together' && tLines[0]?.y === firstLines[0]?.y && tLines.length >= 5 &&
+     JSON.stringify(tLines.slice(1)) !== JSON.stringify(firstLines.slice(1)),
+     `transfer students' own semesters, every student together unchanged (${tLines.length - 1} lines)`);
+  ok((await outputsInError(page, NS)).length === 0, `no output in error for transfer students (${(await outputsInError(page, NS)).join('; ')})`);
+  await setInput(page, `${NS}stage_entry`, 'first_time');
+  await waitFor(page, (ns) => /^First-time students /.test(
+    document.getElementById(`${ns}overall_finding`)?.innerText.trim() || ''), { timeout: 120000, args: [NS] });
+  await waitForIdle(page, { timeout: 120000 });
+  ok(JSON.stringify(await traces()) === JSON.stringify(firstLines), 'back on first-time students, the same lines');
 
   const signs = await readReactable(page, `${NS}signs_table`, { limit: 5 });
   ok(signs.rows?.map((r) => r[0]).join('|') === 'A late withdrawal|A DFW grade', `the two warning signs (${signs.rows?.map((r) => r[0])})`);
   ok(signs.rows?.every((r) => parseFloat(r[3]) < parseFloat(r[4])), `each sign comes back less often than without it (${signs.rows?.map((r) => `${r[3]} vs ${r[4]}`)})`);
 
-  for (const id of ['classification_table', 'college_table']) {
+  for (const id of ['college_table']) {
     const t = await readReactable(page, `${NS}${id}`, { limit: 5 });
     ok(t.rows?.length > 0 && t.rows.every((r) => r.length === 5), `${id} lists groups with a trend cell (${t.rows?.length})`);
     const words = await page.evaluate((el) => [...document.querySelectorAll(`#${el} .rt-tbody .rt-tr`)]
@@ -335,6 +383,10 @@ try {
     return now && now !== f;
   }, { timeout: 300000, args: [undergrad] });
   ok(narrowed, `another student level (${second}) re-reads the page`);
+  // No student at that level has a start on record: one line, and it says so.
+  const oneLine = await waitFor(page, (ns) => /No first-time students at this level have a start on record/
+    .test(document.getElementById(`${ns}overall_finding`)?.innerText || ''), { timeout: 120000, args: [NS] });
+  ok(oneLine, `a level with no start on record is drawn together and says so (${second})`);
   await waitFor(page, (ns, before) => {
     const val = document.querySelector(`#${ns}scope .scope-chip-val`);
     return !!val && val.textContent.trim() !== before;

@@ -38,7 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Retention's By Classification table, Pathways Course Timing and Regstats' fall sophomores read across it unmarked |
+| [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
@@ -131,7 +131,7 @@ of it and a mark on the readings that cross it.
 **Found:** 2026-11-26, drawing the Retention page's return rate at each
 classification (branch `retention/stage-headline`, held for it).
 **Affects:** every comparison by `student_classification` across Summer 2025:
-Retention's By Classification table (on production now), Pathways Course
+Retention's By Classification table (removed with the semester lines), Pathways Course
 Timing (classification is its default axis), Regstats' fall sophomore
 courses (`classification = "Sophomore, 2nd Yr"`), the entering-class reading
 by classification, the course demographics by classification, and the
@@ -200,8 +200,10 @@ The change is confirmed (its first term and what it counts) and recorded as
 an entry in `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`), annotated,
 never recoded; and every reading that follows classification across terms
 either marks the break on its chart and fits no trend across it, or reads a
-measure the change does not touch (credits earned, semesters here). The
-Retention stages wait on the second.
+measure the change does not touch (credits earned, semesters here).
+Retention has done the second: its first section reads each semester since
+arrival (`student_term_semesters()`), and its By Classification table is
+gone. Pathways Course Timing and Regstats' fall sophomores remain.
 
 ## I91 — The running credit total counts attempted credits, and read as earned it disagrees with classification
 

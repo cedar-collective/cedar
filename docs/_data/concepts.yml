@@ -25,11 +25,16 @@ concepts:
     description of who takes summer courses, not as proof that a summer course
     keeps a student.
   retention.return-rate: >-
-    Of the students enrolled in a term, what share is enrolled again the next
-    fall or spring? Students who finished their degree are taken out first,
-    since they did not leave. Each point is one term's students, and the dashed
-    line says whether the share has been moving up or down over the terms or is
-    only wobbling as it usually does.
+    Of the students in a semester here, what share is enrolled again the next
+    fall or spring? A student's 1st semester is the term they arrived, and
+    every fall and spring after it counts whether they enrolled or not, so the
+    3rd semester is a year on. First-time and transfer students are read
+    apart, and a semester whose students started in a spring says so.
+    Students who finished their degree are taken out first, since they did not
+    leave. Each line is one semester over the terms; the dotted line is every
+    student together, which hides how far apart the semesters are. Each
+    Entering Class follows one class from its start; this asks, of everyone
+    in a given semester, how many come back for the next.
   retention.warning-signs: >-
     By the end of a term two things are already known about a student: whether
     they withdrew from a course late, and whether they got a D, F or other
@@ -37,9 +42,9 @@ concepts:
     beside students without it, and how much of the group that did not come
     back carried the sign. A sign marks who to reach, not why they left.
   retention.groups: >-
-    The same return rate, read separately for each classification and for each
-    college, so you can see whether a change is everywhere or in one place. The
-    small line in each row is that group's own history.
+    The same return rate, read separately for each college, so you can see
+    whether a change is everywhere or in one place. The small line in each row
+    is that college's own history.
   retention.class-pace: >-
     Staying is not the same as finishing on time. This follows each fall's new
     students and, as each year begins, puts every one of them in a single

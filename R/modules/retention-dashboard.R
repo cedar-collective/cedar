@@ -54,10 +54,13 @@ retentionDashboardUI <- function(id, campuses) {
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading who came back…",
     dashboard_section(
       "How Often Students Come Back",
-      "Is the share of students who come back the next fall or spring rising or falling?",
+      "After each semester here, is the share of students who come back the next fall or spring rising or falling?",
       method = uiOutput(ns("method_overall")), concept = "retention.return-rate",
+      radioButtons(ns("stage_entry"), "Students who started as",
+                   choices = stats::setNames(names(RETENTION_STAGE_ENTRIES), unname(RETENTION_STAGE_ENTRIES)),
+                   selected = "first_time", inline = TRUE),
       uiOutput(ns("overall_finding")),
-      plotly::plotlyOutput(ns("overall_plot"), height = "340px")
+      plotly::plotlyOutput(ns("overall_plot"), height = "420px")
     ),
     dashboard_section(
       "Who Isn't Coming Back",
@@ -66,15 +69,10 @@ retentionDashboardUI <- function(id, campuses) {
       reactable::reactableOutput(ns("signs_table"))
     ),
     dashboard_section(
-      "By Classification and College",
-      "Is the return rate moving the same way in every classification and college?",
+      "By College",
+      "Is the return rate moving the same way in every college?",
       method = uiOutput(ns("method_groups")), concept = "retention.groups",
-      fluidRow(
-        column(6, dashboard_subsection("Classification", "The student's classification that term.",
-                                       reactable::reactableOutput(ns("classification_table")))),
-        column(6, dashboard_subsection("College", "The college of the student's primary major that term.",
-                                       reactable::reactableOutput(ns("college_table"))))
-      )
+      reactable::reactableOutput(ns("college_table"))
     ),
     entering$classes,
     dashboard_section(
@@ -281,18 +279,28 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
         tags$li("A place to look, not a finding. The other courses are each student's own choice of a term, and a course usually taken beside lighter ones shows a larger gap for that reason."))
     })
 
+    # The chosen kind of student's semesters (display only: the payload holds both).
+    stage_rows <- reactive({ p <- payload(); req(p, input$stage_entry); retention_stage_entry(p$stages, input$stage_entry) })
     output$overall_finding <- renderUI({
       p <- payload()
       if (is.null(p)) return(empty_state("The retention figures could not be built; the notification says why."))
       if (nrow(p$series) == 0L) return(empty_state("No student in this scope has a settled next term to read."))
-      # The verdict over the terms; the chart below shows each term's rate
-      # and the trend's line.
-      lead_text(retention_lead_sentence(p$trend[1, , drop = FALSE], .retention_type(p)))
+      req(input$stage_entry)
+      # Each semester over the terms; with none read for the chosen students,
+      # every student as one line, and it says so.
+      if (NROW(stage_rows()$series) > 0L) return(lead_text(retention_stage_sentence(p$stages, input$stage_entry, .retention_type(p))))
+      lead_text(paste(retention_lead_sentence(p$trend[1, , drop = FALSE], .retention_type(p)),
+                      paste0("No ", RETENTION_STAGE_WORDS[[input$stage_entry]], " at this level have a start on record ",
+                             "to count semesters from, so every student is drawn together.")))
     })
-    output$overall_plot <- plotly::renderPlotly({ p <- payload(); req(p, nrow(p$series) > 0L); plot_return_series(p) })
+    output$overall_plot <- plotly::renderPlotly({
+      p <- payload(); req(p, nrow(p$series) > 0L, input$stage_entry)
+      if (NROW(stage_rows()$series) > 0L) plot_return_stages(p, input$stage_entry) else plot_return_series(p)
+    })
     output$method_overall <- renderUI({
-      p <- payload(); req(p)
+      p <- payload(); req(p, input$stage_entry)
       m <- p$meta
+      sel <- stage_rows()
       tags$ul(
         tags$li(paste0("Every student enrolled in each of the ", .retention_type(p), " terms (registered, or withdrawn ",
                        "after census) at the student level chosen above, counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
@@ -306,11 +314,38 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                          fmt_count(m$n_applied_between), " more have applied to graduate in a summer whose ",
                          "degrees are not posted yet, and are counted as finishing)") else "",
                        ". A degree on hold is not a degree.")),
-        tags$li(paste0("The dashed line is the trend, fitted through the terms; it is rising or falling when its ",
-                       "slope is beyond both chance and the ordinary term-to-term swings. ",
-                       retention_trend_arithmetic(p$trend[1, , drop = FALSE]))),
-        tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
-                       " students whose return can be read. Hover a term for its counts.")))
+        if (NROW(sel$series) > 0L) {
+          st <- p$stages
+          tagList(
+            tags$li(paste0("Each line is a semester since the student arrived, as a first-time or a transfer student: ",
+                           "the term they arrived is their 1st semester (the fall after, for a summer start), and ",
+                           "every fall and spring after it counts, enrolled or not, so a student away for a year comes back in ",
+                           "a later semester. A student who left and came back as a new transfer starts again. ",
+                           if (m$term_type == "fall") "In a fall, the odd semesters are students who started in a fall or the summer before it, the even ones students who started in a spring. "
+                           else "In a spring, the odd semesters are students who started in a spring, the even ones students who started in a fall or the summer before it. ",
+                           "Not by classification: its meaning changed from Summer 2025. The dotted line is every student together.")),
+            tags$li(paste0("In the dotted line only, counted over the terms: ", fmt_count(st$unplaced$n_no_start),
+                           " with no start on record (readmitted, moved from another level, or here before the records begin); ",
+                           fmt_count(st$unplaced$n_beyond), " after their ", .retention_ordinal(st$last), " semester; and ",
+                           fmt_count(st$unplaced$n_before_records), " in a semester whose earliest starters came before the ",
+                           "arrival records begin in ", fmt_term(st$arrivals_from), ", so that the semester's students could ",
+                           "not all be placed.")),
+            tags$li(paste0("A semester's line is rising or falling when its fitted slope is beyond both chance and the ",
+                           "ordinary term-to-term swings. ",
+                           paste0(sel$trend$stage_label, ": ", vapply(seq_len(nrow(sel$trend)), function(i)
+                             retention_trend_arithmetic(sel$trend[i, , drop = FALSE]), character(1)), collapse = " "),
+                           " Every student together: ", retention_trend_arithmetic(p$trend[1, , drop = FALSE]))),
+            tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a semester's term is drawn when it has ",
+                           m$min_n, " students whose return can be read",
+                           if (sel$n_past > 0L) paste0(", and a semester with none in the latest term is left out (",
+                                                       fmt_count(sel$n_past), ")") else "",
+                           ". Hover a point for its counts.")))
+        } else tagList(
+          tags$li(paste0("The dashed line is the trend, fitted through the terms; it is rising or falling when its ",
+                         "slope is beyond both chance and the ordinary term-to-term swings. ",
+                         retention_trend_arithmetic(p$trend[1, , drop = FALSE]))),
+          tags$li(paste0("Enrollment settled through ", fmt_term(m$edge), "; a term's rate needs ", m$min_n,
+                         " students whose return can be read. Hover a term for its counts."))))
     })
 
     # Each fall's entering classes, year by year: read on their own, the
@@ -469,10 +504,6 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        " students.")))
     })
 
-    output$classification_table <- reactable::renderReactable({
-      p <- payload(); req(p, NROW(p$groups) > 0L)
-      .retention_group_table(p$groups[p$groups$dimension == "classification", , drop = FALSE])
-    })
     output$college_table <- reactable::renderReactable({
       p <- payload(); req(p, NROW(p$groups) > 0L)
       .retention_group_table(p$groups[p$groups$dimension == "college", , drop = FALSE], college_names)
@@ -481,7 +512,7 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
       p <- payload(); req(p)
       tags$ul(
         tags$li("The same students as the first section: everyone enrolled that term at the chosen level and home campus, transfer students included."),
-        tags$li("Classification is the student's that term; college is the college of the primary major that term."),
+        tags$li("College is the college of the student's primary major that term."),
         tags$li(paste0("A group's rate is read in each term it had ", p$meta$min_n, " or more students whose return ",
                        "could be read; a group not read in the latest term is left out (",
                        fmt_count(p$meta$n_groups_past), " here). Sorted with the lowest latest rate first.")))
