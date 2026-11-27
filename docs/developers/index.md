@@ -86,9 +86,9 @@ cedar/
 ├── config/             # Configuration files
 ├── data/               # Data files (not in repo)
 ├── tests/              # Test suite (testthat + e2e browser tests)
-├── app.R               # Shiny app entry point
-├── ui.R                # Shiny UI
-└── server.R            # Shiny server
+├── global.R            # Runs once as the app starts: data, functions, then ui.R and server.R
+├── ui.R                # Shiny UI; Shiny reads it itself for the first request
+└── server.R            # Shiny server; Shiny reads it itself and runs what its last line returns
 ```
 
 ## The "Cones" Concept

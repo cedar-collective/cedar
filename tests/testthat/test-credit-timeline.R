@@ -128,6 +128,57 @@ test_that("a programs table without the credit pair fails loudly", {
 })
 
 
+test_that("the earned position counts credits completed here and the earned block, beside the attempted", {
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct, opt = list(earned = TRUE))
+  a <- dplyr::filter(tl, student_id == "CT_A") %>% dplyr::arrange(term)
+  # Earned block overall(70) - inst(45) = 25; then 12, 12, 9 (a failed course), 12 completed.
+  expect_equal(a$transfer_earned, rep(25, 4))
+  expect_equal(a$unm_earned_entering, c(0, 12, 24, 33))
+  expect_equal(a$total_earned_entering, c(25, 37, 49, 58))
+  expect_equal(a$total_earned_after, c(37, 49, 58, 70))
+  # The attempted position is the same as without the option.
+  expect_equal(a$total_credits_entering, c(30, 42, 54, 66))
+  c_rows <- dplyr::filter(tl, student_id == "CT_C") %>% dplyr::arrange(term)
+  expect_equal(c_rows$total_earned_entering, c(0, 9))
+  expect_equal(c_rows$unm_earned_after, c(9, 15))
+  expect_false(any(c_rows$transfer_earned_known))
+  expect_equal(names(tl)[ncol(tl)], "timeline_valid")
+})
+
+test_that("a student with no earned pair on record has an unknown earned block, whatever the attempted one", {
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct, opt = list(earned = TRUE))
+  b <- dplyr::filter(tl, student_id == "CT_B")
+  expect_true(all(b$transfer_credits_known))
+  expect_false(any(b$transfer_earned_known))
+  expect_equal(b$transfer_earned, c(0, 0))
+})
+
+test_that("without the option the timeline is the attempted one alone, as its callers read it", {
+  tl <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct)
+  expect_identical(names(tl), c("student_id", "term", "unm_credits_entering", "unm_credits_after",
+                                "transfer_credits", "transfer_credits_known", "total_credits_entering",
+                                "total_credits_after", "timeline_valid"))
+  # The earned columns are not needed then: a caller's frame without them still reads.
+  plain <- build_credit_timeline(dplyr::select(cedar_student_terms_ct, -completed_unm_credits, -cumulative_completed_unm_credits),
+                                 dplyr::select(cedar_programs_ct, -inst_credits_earned, -overall_credits_earned))
+  expect_identical(plain, tl)
+  empty <- build_credit_timeline(cedar_student_terms_ct, cedar_programs_ct, opt = list(student_ids = "NOBODY", earned = TRUE))
+  expect_equal(nrow(empty), 0)
+  expect_true(is.numeric(empty$total_earned_entering))
+})
+
+test_that("the earned position stops without the columns it reads", {
+  expect_error(
+    build_credit_timeline(dplyr::select(cedar_student_terms_ct, -cumulative_completed_unm_credits), cedar_programs_ct,
+                          opt = list(earned = TRUE)),
+    "missing required column")
+  expect_error(
+    build_credit_timeline(cedar_student_terms_ct, dplyr::select(cedar_programs_ct, -overall_credits_earned),
+                          opt = list(earned = TRUE)),
+    "overall_credits_earned")
+})
+
+
 # =============================================================================
 # attach_credit_position()
 # =============================================================================

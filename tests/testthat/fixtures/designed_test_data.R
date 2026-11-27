@@ -4047,17 +4047,26 @@ cedar_student_terms_gg <- tibble::tribble(
 #
 # The frozen columns say 15/45 for CT_A at every term — the number they ended
 # with — which is what makes lag() on them subtract zero.
+#
+# Earned (build_credit_timeline(opt$earned = TRUE)):
+#   CT_A  completes 12, 12, 9, 12 (a 3-credit course failed in 202180).
+#         Earned block = overall(70) - inst(45) = 25: 5 credits attempted
+#         elsewhere were not earned.
+#         Earned entering: 25, 37, 49, 58.  After: 37, 49, 58, 70.
+#   CT_B  its program rows carry no earned pair: transfer_earned_known is
+#         FALSE (0, "not recorded") while its attempted block is known.
+#   CT_C  completes 9 then 6: earned entering 0, 9; after 9, 15.
 
 cedar_student_terms_ct <- tibble::tribble(
-  ~student_id, ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits, ~unm_credits_entering, ~timeline_valid,
-  "CT_A",      202080L,  12,  12,   0, TRUE,
-  "CT_A",      202110L,  12,  24,  12, TRUE,
-  "CT_A",      202180L,  12,  36,  24, TRUE,
-  "CT_A",      202210L,  12,  48,  36, TRUE,
-  "CT_B",      202010L,  12,  12,   0, FALSE,
-  "CT_B",      202080L,  12,  24,  12, FALSE,
-  "CT_C",      202080L,   9,   9,   0, TRUE,
-  "CT_C",      202110L,   9,  18,   9, TRUE
+  ~student_id, ~term,   ~attempted_unm_credits, ~cumulative_attempted_unm_credits, ~unm_credits_entering, ~timeline_valid, ~completed_unm_credits, ~cumulative_completed_unm_credits,
+  "CT_A",      202080L,  12,  12,   0, TRUE,  12, 12,
+  "CT_A",      202110L,  12,  24,  12, TRUE,  12, 24,
+  "CT_A",      202180L,  12,  36,  24, TRUE,   9, 33,
+  "CT_A",      202210L,  12,  48,  36, TRUE,  12, 45,
+  "CT_B",      202010L,  12,  12,   0, FALSE, 12, 12,
+  "CT_B",      202080L,  12,  24,  12, FALSE, 12, 24,
+  "CT_C",      202080L,   9,   9,   0, TRUE,   9,  9,
+  "CT_C",      202110L,   9,  18,   9, TRUE,   6, 15
 )
 
 cedar_programs_ct <- tibble::tibble(
@@ -4066,6 +4075,8 @@ cedar_programs_ct <- tibble::tibble(
   # Frozen: the same totals on every row, as Academic Studies actually returns.
   inst_credits_attempted    = rep(c(48, 24), times = c(4, 2)),
   overall_credits_attempted = rep(c(78, 54), times = c(4, 2)),
+  inst_credits_earned       = rep(c(45, NA), times = c(4, 2)),
+  overall_credits_earned    = rep(c(70, NA), times = c(4, 2)),
   program_name = "Test Program"
 )
 

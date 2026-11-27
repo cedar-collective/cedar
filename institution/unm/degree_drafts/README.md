@@ -6,3 +6,8 @@ catalog id on Degree Explorer, labelled a draft until the reading it was
 compiled from (`degree_drafts.csv`) is signed off in Admin > Catalog Review.
 The hand-built files one folder up are not changed. See
 [Publishing a compiled board](../../../docs/developers/catalog-normalization.md#publishing-a-compiled-board).
+
+`degree_reading_questions.csv` lists every open question in every program's
+latest reading, board or not, with its catalog passage and who can settle it
+(the reading's `triage`). Admin > Catalog Review > Catalog questions shows it. See
+[Open questions](../../../docs/developers/catalog-normalization.md#open-questions-and-who-can-settle-them).

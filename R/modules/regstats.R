@@ -6,68 +6,34 @@ regstatsUI <- function(id, sections, thresholds, dept_choices, default_term = NU
       "Registration Statistics",
       cedar_definition_summary("regstats"),
       fluidRow(
-        column(2,
-          selectInput(ns("rs_campus"), "Campus", multiple = TRUE,
-            choices  = sort(unique(sections$campus)),
-            selected = cedar_campus_default(sections))
-        ),
-        column(2,
-          selectInput(ns("rs_college"), "College", multiple = TRUE,
-            choices = sort(unique(sections$college)))
-        ),
-        column(2,
-          selectInput(ns("rs_term"), "Term", multiple = TRUE,
-            choices  = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-            selected = if (!is.null(default_term)) as.character(default_term) else NULL)
-        ),
-        column(2,
-          selectInput(ns("rs_pt"), "Part of Term", multiple = TRUE,
-            choices = sort(unique(sections$part_term)))
-        ),
-        column(2,
-          selectizeInput(ns("rs_dept"), "Department", multiple = TRUE,
-            choices = dept_choices)
-        ),
-        column(2,
-          selectInput(ns("rs_level"), "Level", multiple = TRUE,
-            choices  = sort(unique(sections$level)),
-            selected = "lower")
-        ),
+        cedar_section_scope_inputs(
+          ns, "rs", sections, dept_choices, default_term,
+          fields = c("campus", "college", "term", "pt", "dept", "level"),
+          widths = c(college = 2, pt = 2, level = 2),
+          labels = c(pt = "Part of Term"))
       ),
-      # The flagging thresholds are a reader's adjustment, not a filter: they
-      # stay folded under one line that says whether the standard values are
-      # in force, so a shared link that changed one is visible while closed
-      # (ISSUES M43). A link still restores them; hidden inputs keep binding.
       fluidRow(
         column(10,
-          tags$details(
-            class = "cedar-scope-details cedar-threshold-details",
-            tags$summary(
-              tags$span(class = "filter-context-title", "Adjust thresholds"),
-              tags$span(class = "cedar-scope-details-hint",
-                        textOutput(ns("rs_threshold_state"), inline = TRUE))
+          cedar_threshold_fold(ns("rs_threshold_state"),
+            column(2,
+              numericInput(ns("rs_min_impacted"), "Min Impacted",
+                value = thresholds[["min_impacted"]])
             ),
-            fluidRow(
-              column(2,
-                numericInput(ns("rs_min_impacted"), "Min Impacted",
-                  value = thresholds[["min_impacted"]])
-              ),
-              column(2,
-                numericInput(ns("rs_pct_sd"), "Min SDs",
-                  value = thresholds[["pct_sd"]])
-              ),
-              column(2,
-                numericInput(ns("rs_chronic_fill_rate"), "Chronic Fill Rate",
-                  value = thresholds[["chronic_fill_rate"]], min = 0, max = 1, step = 0.05)
-              ),
-              column(2,
-                numericInput(ns("rs_min_wait"), "Min Waiting",
-                  value = thresholds[["min_wait"]])
-              ),
-              column(2,
-                numericInput(ns("rs_min_sat_terms"), "Min Terms at Cap",
-                  value = thresholds[["min_sat_terms"]], min = 1, step = 1)
-              )
+            column(2,
+              numericInput(ns("rs_pct_sd"), "Min SDs",
+                value = thresholds[["pct_sd"]])
+            ),
+            column(2,
+              numericInput(ns("rs_chronic_fill_rate"), "Chronic Fill Rate",
+                value = thresholds[["chronic_fill_rate"]], min = 0, max = 1, step = 0.05)
+            ),
+            column(2,
+              numericInput(ns("rs_min_wait"), "Min Waiting",
+                value = thresholds[["min_wait"]])
+            ),
+            column(2,
+              numericInput(ns("rs_min_sat_terms"), "Min Terms at Cap",
+                value = thresholds[["min_sat_terms"]], min = 1, step = 1)
             )
           )
         ),
@@ -393,15 +359,9 @@ regstatsServer <- function(id, students, sections, course_flows, data_summary, t
                           chronic_fill_rate = "Chronic Fill Rate",
                           min_wait = "Min Waiting", min_sat_terms = "Min Terms at Cap")
     output$rs_threshold_state <- renderText({
-      changed <- Filter(function(k) {
-        v <- input[[paste0("rs_", k)]]
-        !is.null(v) && !is.na(v) &&
-          !isTRUE(all.equal(as.numeric(v), as.numeric(thresholds[[k]])))
-      }, names(threshold_labels))
-      if (length(changed) == 0) return("standard values")
-      paste0("changed: ", paste(vapply(changed, function(k) sprintf(
-        "%s %s (standard %s)", threshold_labels[[k]], input[[paste0("rs_", k)]],
-        thresholds[[k]]), character(1)), collapse = "; "))
+      values <- lapply(setNames(nm = names(threshold_labels)),
+                       function(key) input[[paste0("rs_", key)]])
+      cedar_threshold_state(values, thresholds, threshold_labels)
     })
 
     # The thresholds a run used, in words, for its method panel.

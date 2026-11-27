@@ -33,9 +33,9 @@ Not sure where to start? The [User Guide](users/) has a quick reference by role.
 **Short answer:** Look at sections below your enrollment thresholds, and at
 courses running well below their own history.
 
-**In CEDAR:** **Explore → Enrollment → Low Enrollment** lists active sections
-under configurable thresholds by course level; for a future term, its concerns
-mode uses prior patterns to flag courses likely to struggle. The **Dept
+**In CEDAR:** **Courses → Low Enrollment** lists active sections at or near
+the threshold for their course level; for a future term nobody has registered
+for, its schedule check compares each scheduled course with its own history. The **Dept
 Dashboard** (pick campus, department, and term, then **Gather Data**) shows
 courses running above and below their historical averages for the same kind of
 term.
@@ -44,7 +44,7 @@ term.
 count — it is labelled *in progress*. Compare it with earlier terms at the same
 point in registration, not with their final numbers.
 
-**More:** [Enrollment](users/enrollment-tab#low-enrollment) ·
+**More:** [Low Enrollment](users/low-enrollment) ·
 [Dept Dashboard](users/dept-dashboard)
 
 ### Is a course turning students away?
@@ -52,8 +52,8 @@ point in registration, not with their final numbers.
 **Short answer:** Check true waitlist demand against seats, across several
 terms, together with how full the course gets.
 
-**In CEDAR:** **Registration → Waitlists** (then **Inspect Waitlists**) shows
-who is waiting, by course, program, and class standing. **Registration →
+**In CEDAR:** **Courses → Waitlists** (then **Inspect Waitlists**) shows
+who is waiting, by course, program, and class standing. **Courses →
 Regstats** flags **High Waitlists** and **Saturation** against each course's
 own history.
 
@@ -72,7 +72,7 @@ own history.
 **Short answer:** Find courses with room in the term, compared with the same term
 last year.
 
-**In CEDAR:** **Registration → Open Seats**, set your filters, then **Find Open
+**In CEDAR:** **Courses → Open Seats**, set your filters, then **Find Open
 Seats**. Tabs separate common courses, courses that ran last year but not this
 year, new courses, and Gen Ed.
 
@@ -87,7 +87,7 @@ and EA.
 **Short answer:** Start from the saved demand projection for each course, then
 read how much its history supports it.
 
-**In CEDAR:** **Registration → Projections** shows projected demand and section
+**In CEDAR:** **Courses → Projections** shows projected demand and section
 need for the next Spring or Fall, for ABQ and EA together. Its **Scenario**
 sub-tab answers *"if one group of students grows, what happens to the courses
 they take?"*
@@ -107,7 +107,7 @@ they take?"*
 **Short answer:** Compare each course with its own history at the same point in
 the term.
 
-**In CEDAR:** **Registration → Regstats** sorts courses into signals —
+**In CEDAR:** **Courses → Regstats** sorts courses into signals —
 **Enrollment Bumps**, **Enrollment Dips**, **High Waitlists**, **Saturation**,
 **Early Drops**, **Late Drops**, and **Downstream Concerns**.
 

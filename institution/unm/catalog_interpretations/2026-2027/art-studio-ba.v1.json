@@ -1,0 +1,1470 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "BJxsXgmqj5",
+  "unit_key": "1489c56c506ff09946869b765eb7ce04ce3cda4c370fd11235b9c41f6ee06cc5",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "admit-courses",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "admission",
+        "kind": "all",
+        "label": "ARTS1220 and ARTS1230, each with C or better, before admission or readmission to the College of Fine Arts as a declared major",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "For all B.F.A. and B.A. Art Studio students: ARTS 1220 and ARTS 1230, grades of C or better, completed before admission or readmission to the College of Fine Arts as a declared major",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-df62f94289567e724877b76e",
+            "quote": "completion of ARTS 1220 Art Practices I, and ARTS 1230 Art Practices II (with grades of \"C\" or better) are required prior to their admission or readmission to the College of Fine Arts as a declared major"
+          }
+        ]
+      },
+      {
+        "id": "admit-arts1220",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "admission",
+        "kind": "course",
+        "label": "ARTS 1220 Art Practices I",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:Bkb1W5Eqjc"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-df62f94289567e724877b76e",
+            "quote": "ARTS 1220 Art Practices I"
+          }
+        ]
+      },
+      {
+        "id": "admit-arts1230",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "admission",
+        "kind": "course",
+        "label": "ARTS 1230 Art Practices II",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:H1Q0qEqiq"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-df62f94289567e724877b76e",
+            "quote": "ARTS 1230 Art Practices II"
+          }
+        ]
+      },
+      {
+        "id": "gened-total",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Complete at least 31 credits of General Education coursework",
+        "minimum": 31,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "UNM General Education Program courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-97dda723d1c1ef9b815682cd",
+            "quote": "Earn at least 31 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-1e893aacc16b42cb76b75ac5",
+            "quote": "General Education Curriculum"
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM's General Education curriculum; courses in the program's requirements may also fulfill it",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "All undergraduate students fulfill UNM's General Education Program requirements; some courses in a program's requirements may also fulfill a General Education requirement. Some College of Fine Arts degrees require specific classes toward it; this program's captured requirements name none.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2cf984410b5ce3a8179e96da",
+            "quote": "all undergraduate students are required to fulfill UNM"
+          },
+          {
+            "block_id": "b-a8d85ccf0bc5f159bfed3ca3",
+            "quote": "All degrees in the College of Fine Arts require completion of the General Education curriculum"
+          }
+        ]
+      },
+      {
+        "id": "major",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete all of the Art Studio major requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-31ce4db901c57c047398c75f",
+            "quote": "Major Requirements"
+          },
+          {
+            "block_id": "b-0fd9780d26704274d9f31efb",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-f3652e4231cb19a6c24b6b91",
+            "quote": "\"45\""
+          }
+        ]
+      },
+      {
+        "id": "arth-lower",
+        "parent_id": "major",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits in ARTH 2000–2999",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTH courses numbered 2000 to 2999",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-01131cc36352e485592c5103",
+            "quote": "Earned at least 6 credits from ARTH 2000 - 2999"
+          }
+        ],
+        "minimum_course_number": 2000
+      },
+      {
+        "id": "arth-upper",
+        "parent_id": "major",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits in ARTH 300–499",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTH courses numbered 300 to 499",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7c418b6b27d060864e540066",
+            "quote": "Earned at least 6 credits from ARTH 300 - 499"
+          }
+        ],
+        "minimum_course_number": 300
+      },
+      {
+        "id": "core",
+        "parent_id": "major",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete ARTS1220, ARTS1230 and ARTS1610",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-04c1f6d991d36f19252c0166",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1220",
+        "parent_id": "core",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1220 - Art Practices I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bkb1W5Eqjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dc5e2cf45b892f8f0ad23e6a",
+            "quote": "ARTS1220 - Art Practices I (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1230",
+        "parent_id": "core",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1230 - Art Practices II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1Q0qEqiq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c8de13b779a9ffe77fcf348f",
+            "quote": "ARTS1230 - Art Practices II (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1610",
+        "parent_id": "core",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1610 - Drawing I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1S1iVqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0170bc3db73a3417be78551d",
+            "quote": "ARTS1610 - Drawing I (3)"
+          }
+        ]
+      },
+      {
+        "id": "intro-studios",
+        "parent_id": "major",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 9 credits from the listed introductory studio courses",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ab8a48d15bb44c66cfc6d845",
+            "quote": "Earn at least 9 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1310",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1310 - Introduction to Ceramics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SylAejVcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6e70ffd0a54512efe6de2c0c",
+            "quote": "ARTS1310 - Introduction to Ceramics (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1143",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1143 - Introduction to Art & Ecology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkWa8qNco5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bc9f5963c5a2d2ec3b606a43",
+            "quote": "ARTS1143 - Introduction to Art & Ecology (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1410",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1410 - Introduction to Photography (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bklaq45o9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a86d8fd951f0158457b1c915",
+            "quote": "ARTS1410 - Introduction to Photography (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1510",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1510 - Introduction to Electronic Arts (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skwkc4qs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c76ac1520709542e225b0a6d",
+            "quote": "ARTS1510 - Introduction to Electronic Arts (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1630",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1630 - Painting I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1e_y545sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9b0a4b217c5d2e701171d2c9",
+            "quote": "ARTS1630 - Painting I (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1710",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1710 - Introduction to Printmaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1WdcqVcoc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f072b809ae43b270e036af0b",
+            "quote": "ARTS1710 - Introduction to Printmaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1810",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1810 - Jewelry and Small Metal Construction I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1ekY9V9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b2c1c7083fefc59a86043ec9",
+            "quote": "ARTS1810 - Jewelry and Small Metal Construction I (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1840",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1840 - Sculpture I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJmwL9Eqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1a7f223bb8fb06ef1b4342c9",
+            "quote": "ARTS1840 - Sculpture I (3)"
+          }
+        ]
+      },
+      {
+        "id": "arts-upper",
+        "parent_id": "major",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 15 credits in ARTS 300–499",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTS courses numbered 300 to 499",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5f2dd4b020e2a94bd9f4def",
+            "quote": "Earned at least 15 credits from ARTS 300 - 499"
+          }
+        ],
+        "minimum_course_number": 300
+      },
+      {
+        "id": "electives",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete all three elective pools",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a955ebf902a85f498464f34b",
+            "quote": "Electives"
+          },
+          {
+            "block_id": "b-550a8918779332938a3e1be4",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "elective-cfa",
+        "parent_id": "electives",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 elective credits from other College of Fine Arts departments or the School of Architecture and Planning",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses from other College of Fine Arts departments or from the School of Architecture and Planning",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2b4d9ac848780f477dd64673",
+            "quote": "Earn at least 6 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-3bb6cb282777042f40064cae",
+            "quote": "Courses from other College of Fine Arts departments or from the School of Architecture and Planning"
+          }
+        ]
+      },
+      {
+        "id": "elective-outside",
+        "parent_id": "electives",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 12 elective credits outside the major",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses outside the major offered by any college, including the College of Fine Arts",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d4f1d5fc2920671f11a44d9e",
+            "quote": "Earn at least 12 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-b3d3e9eb6b0d18dc93507388",
+            "quote": "Courses outside the major offered by any college, including the College of Fine Arts."
+          }
+        ]
+      },
+      {
+        "id": "elective-any",
+        "parent_id": "electives",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 26 elective credits in any field",
+        "minimum": 26,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses in any field, including Art History and Art Studio",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ce1eebb769789ae874e427fc",
+            "quote": "Earn at least 26 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-ec6aed7127ac52514c0b5a92",
+            "quote": "Courses in any field, including Art History and Art Studio."
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7b595d646b9e13556f2dcfa2",
+            "quote": "Grand Total Credits: 120"
+          },
+          {
+            "block_id": "b-0eab337ea4163ca6e720fb11",
+            "quote": "A minimum of 120 credit hours is required in all curricula."
+          },
+          {
+            "block_id": "b-b7de3a23fbb74cd782cc7904",
+            "quote": "\"120\""
+          }
+        ]
+      },
+      {
+        "id": "upper-division",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 42 credits in courses numbered at the 300 or 400 level",
+        "minimum": 42,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses numbered in the 300- or 400-level",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0eab337ea4163ca6e720fb11",
+            "quote": "at least 42 credit hours must be completed in courses numbered in the 300- or 400-level"
+          }
+        ],
+        "minimum_course_number": 300
+      },
+      {
+        "id": "unm-gpa",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "UNM grade point average of 2.00 or higher",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "UNM grade point average",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dd054c9160fe622b3bd0471d",
+            "quote": "a student must have a UNM grade point average of 2.00 or higher"
+          }
+        ]
+      },
+      {
+        "id": "cfa-gpa",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "Grade point average of 2.00 or higher on all credit hours attempted in the College of Fine Arts",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "All credit hours attempted while enrolled in the College of Fine Arts",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dd054c9160fe622b3bd0471d",
+            "quote": "grade point average of 2.00 or higher on all credit hours attempted while enrolled in the College of Fine Arts"
+          }
+        ]
+      },
+      {
+        "id": "major-gpa",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "Grade point average of at least 2.75 in the major",
+        "minimum": 2.75,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Grade point in the major. Some College of Fine Arts degrees require a higher one; the captured Art Studio text names none.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bbcad7e3add999ae5e529e2e",
+            "quote": "Students must graduate with a minimum 2.75 grade point in their major."
+          }
+        ]
+      },
+      {
+        "id": "cfa-resident-semester",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "At least one semester of resident enrollment after admission to the College of Fine Arts as a declared major",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "At least one semester of resident enrollment after admission to the College of Fine Arts as a declared major",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-81ab1ad8d56fa4633825a9d3",
+            "quote": "A minimum of one semester of resident enrollment is required after admission to the College of Fine Arts as a declared major"
+          }
+        ]
+      },
+      {
+        "id": "cfa-final-semester",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Enrolled in the College of Fine Arts as a declared major for the final semester at UNM",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Enrolled in the College of Fine Arts as a declared major for the final semester at the University of New Mexico",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-81ab1ad8d56fa4633825a9d3",
+            "quote": "the student must be enrolled in the College of Fine Arts as a declared major for their final semester"
+          }
+        ]
+      },
+      {
+        "id": "cfa-residency-credits",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 12 credits earned at UNM while a declared major in the College of Fine Arts",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Earned from UNM while enrolled as a declared major in the College of Fine Arts",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a0b3ada6263d251a4847bcfa",
+            "quote": "A minimum of 12 credit hours must be earned from UNM while enrolled as a declared major in the College of Fine Arts."
+          }
+        ]
+      },
+      {
+        "id": "pe-cap",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "At most 4 credits of nonprofessional physical education count toward the degree",
+        "minimum": null,
+        "maximum": 4,
+        "unit": "credits",
+        "comparison": "at_most",
+        "value": "Nonprofessional physical education courses counted toward a degree",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-53b0c8b18af2b0e7fe311183",
+            "quote": "No more than four credit hours of nonprofessional physical education courses may be counted toward a degree."
+          }
+        ]
+      },
+      {
+        "id": "degree-application",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Meet a College of Fine Arts advisor in the semester before graduation to complete an application for degree",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "In the semester before graduation, meet with a CFA advisor to complete an application for degree",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c250ee4d00fc8fb8fcd3f7f6",
+            "quote": "During the semester prior to graduation, students must meet with a CFA Advisor to complete an application for degree."
+          }
+        ]
+      },
+      {
+        "id": "university-minimum",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Meet the University minimum degree requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The University minimum degree requirements in the Undergraduate Program section of the Catalog",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-020be5c32a08480c74124f2e",
+            "quote": "A student must also meet the University minimum degree requirements"
+          }
+        ]
+      },
+      {
+        "id": "film-history",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Up to 6 credits of upper-division film history count toward the Art Studio major",
+        "minimum": null,
+        "maximum": 6,
+        "unit": "credits",
+        "comparison": "at_most",
+        "value": "Up to 6 credit hours of upper-division film history are accepted toward Art History and Art Studio major and minor requirements; the text does not say which requirement they fill",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1fe3ec4fa1b2eaf9fd650f60",
+            "quote": "The Department of Art accepts up to 6 credit hours of upper-division film history toward Art History and Art Studio major and minor requirements."
+          }
+        ]
+      },
+      {
+        "id": "fdma-390",
+        "parent_id": "",
+        "entity_id": "programs:BJxsXgmqj5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "3 credits of FDMA 390 count as studio credit",
+        "minimum": null,
+        "maximum": 3,
+        "unit": "credits",
+        "comparison": "at_most",
+        "value": "3 credit hours of FDMA 390 are accepted as studio credit; FDMA 390 is not in this capture's course registry",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1fe3ec4fa1b2eaf9fd650f60",
+            "quote": "The Department accepts 3 credit hours of FDMA 390 as studio credit."
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-08871fa8bda8c592bccb24bf",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description. It names seven studio areas, but the record requires no concentration and lists no concentration requirements."
+      },
+      {
+        "block_id": "b-df62f94289567e724877b76e",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-courses",
+          "admit-arts1220",
+          "admit-arts1230"
+        ],
+        "explanation": "Admission course work with its grade threshold and timing."
+      },
+      {
+        "block_id": "b-9b594b5f7e2f09f9d2b60304",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the College of Fine Arts graduation requirements; each is represented individually."
+      },
+      {
+        "block_id": "b-0eab337ea4163ca6e720fb11",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total",
+          "upper-division"
+        ],
+        "explanation": "The degree total and the upper-division credit minimum."
+      },
+      {
+        "block_id": "b-dd054c9160fe622b3bd0471d",
+        "disposition": "requirements",
+        "node_ids": [
+          "unm-gpa",
+          "cfa-gpa"
+        ],
+        "explanation": "Two grade point averages, each with its scope."
+      },
+      {
+        "block_id": "b-bbcad7e3add999ae5e529e2e",
+        "disposition": "requirements",
+        "node_ids": [
+          "major-gpa"
+        ],
+        "explanation": "The major grade point minimum; the scope of \"major\" is a question."
+      },
+      {
+        "block_id": "b-81ab1ad8d56fa4633825a9d3",
+        "disposition": "requirements",
+        "node_ids": [
+          "cfa-resident-semester",
+          "cfa-final-semester"
+        ],
+        "explanation": "Two residency conditions."
+      },
+      {
+        "block_id": "b-a0b3ada6263d251a4847bcfa",
+        "disposition": "requirements",
+        "node_ids": [
+          "cfa-residency-credits"
+        ],
+        "explanation": "Credits earned at UNM as a declared College of Fine Arts major."
+      },
+      {
+        "block_id": "b-53b0c8b18af2b0e7fe311183",
+        "disposition": "requirements",
+        "node_ids": [
+          "pe-cap"
+        ],
+        "explanation": "A limit on physical education credit."
+      },
+      {
+        "block_id": "b-c250ee4d00fc8fb8fcd3f7f6",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-application"
+        ],
+        "explanation": "The application for degree."
+      },
+      {
+        "block_id": "b-020be5c32a08480c74124f2e",
+        "disposition": "requirements",
+        "node_ids": [
+          "university-minimum"
+        ],
+        "explanation": "The University minimum requirements, linked rather than captured."
+      },
+      {
+        "block_id": "b-a8d85ccf0bc5f159bfed3ca3",
+        "disposition": "requirements",
+        "node_ids": [
+          "general-education"
+        ],
+        "explanation": "General Education for every College of Fine Arts degree."
+      },
+      {
+        "block_id": "b-8ba8cea3cbd3c716aeb5a742",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the Department of Art notes; each is represented or classified individually."
+      },
+      {
+        "block_id": "b-62401597e564df35bc4ba2db",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "A heading; the requirements under it are represented individually."
+      },
+      {
+        "block_id": "b-bef712582ed95929d82bdd95",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Course fee payment deadlines; no course, credit or eligibility condition of the degree."
+      },
+      {
+        "block_id": "b-1fe3ec4fa1b2eaf9fd650f60",
+        "disposition": "requirements",
+        "node_ids": [
+          "film-history",
+          "fdma-390"
+        ],
+        "explanation": "Course work the department accepts toward the major; where it counts is a question."
+      },
+      {
+        "block_id": "b-3536d6f5cb8b2f222922cab0",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Students furnish their own materials; no degree condition."
+      },
+      {
+        "block_id": "b-9e4ed42b21dac86539b501cb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The department keeps student work until its exhibitions; no degree condition."
+      },
+      {
+        "block_id": "b-2ae09ef93d1f96e37b5e5b86",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts (General Education, major, electives), each represented individually."
+      },
+      {
+        "block_id": "b-1e893aacc16b42cb76b75ac5",
+        "disposition": "requirements",
+        "node_ids": [
+          "gened-total"
+        ],
+        "explanation": "Heading of the General Education credits."
+      },
+      {
+        "block_id": "b-97dda723d1c1ef9b815682cd",
+        "disposition": "requirements",
+        "node_ids": [
+          "gened-total"
+        ],
+        "explanation": "The General Education credit minimum."
+      },
+      {
+        "block_id": "b-2cf984410b5ce3a8179e96da",
+        "disposition": "requirements",
+        "node_ids": [
+          "general-education"
+        ],
+        "explanation": "General Education applies to every undergraduate; program courses may count toward it."
+      },
+      {
+        "block_id": "b-31ce4db901c57c047398c75f",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "Heading of the major."
+      },
+      {
+        "block_id": "b-0fd9780d26704274d9f31efb",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "Every part of the major is required."
+      },
+      {
+        "block_id": "b-01131cc36352e485592c5103",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-lower"
+        ],
+        "explanation": "Lower-division ARTH credits by course number."
+      },
+      {
+        "block_id": "b-7c418b6b27d060864e540066",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-upper"
+        ],
+        "explanation": "Upper-division ARTH credits by course number."
+      },
+      {
+        "block_id": "b-04c1f6d991d36f19252c0166",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "Three named required courses."
+      },
+      {
+        "block_id": "b-dc5e2cf45b892f8f0ad23e6a",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1220"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-c8de13b779a9ffe77fcf348f",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1230"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-0170bc3db73a3417be78551d",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1610"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-ab8a48d15bb44c66cfc6d845",
+        "disposition": "requirements",
+        "node_ids": [
+          "intro-studios"
+        ],
+        "explanation": "Nine credits from the eight listed studio courses."
+      },
+      {
+        "block_id": "b-6e70ffd0a54512efe6de2c0c",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1310"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-bc9f5963c5a2d2ec3b606a43",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1143"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-a86d8fd951f0158457b1c915",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1410"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-c76ac1520709542e225b0a6d",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1510"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-9b0a4b217c5d2e701171d2c9",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1630"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-f072b809ae43b270e036af0b",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1710"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-b2c1c7083fefc59a86043ec9",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1810"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-1a7f223bb8fb06ef1b4342c9",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1840"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-a5f2dd4b020e2a94bd9f4def",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts-upper"
+        ],
+        "explanation": "Upper-division ARTS credits by course number."
+      },
+      {
+        "block_id": "b-a955ebf902a85f498464f34b",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Heading of the electives."
+      },
+      {
+        "block_id": "b-550a8918779332938a3e1be4",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Every elective pool is required."
+      },
+      {
+        "block_id": "b-2b4d9ac848780f477dd64673",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-cfa"
+        ],
+        "explanation": "The first elective pool's credits."
+      },
+      {
+        "block_id": "b-3bb6cb282777042f40064cae",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-cfa"
+        ],
+        "explanation": "The first elective pool's qualification."
+      },
+      {
+        "block_id": "b-d4f1d5fc2920671f11a44d9e",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-outside"
+        ],
+        "explanation": "The second elective pool's credits."
+      },
+      {
+        "block_id": "b-b3d3e9eb6b0d18dc93507388",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-outside"
+        ],
+        "explanation": "The second elective pool's qualification."
+      },
+      {
+        "block_id": "b-ce1eebb769789ae874e427fc",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-any"
+        ],
+        "explanation": "The third elective pool's credits."
+      },
+      {
+        "block_id": "b-ec6aed7127ac52514c0b5a92",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-any"
+        ],
+        "explanation": "The third elective pool's qualification."
+      },
+      {
+        "block_id": "b-7b595d646b9e13556f2dcfa2",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-8ee310f3c4f903ad293a768c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-319195130cde359660529f02",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-f40a3f4c496b3ca8aa56dcfd",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-76dfa463b192d78c9a713c68",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-a134678036bf4cb70cc0be09",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-d9aaad374b3c2fab4593ceb5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-c4161d159dd5db3af2f1885f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-f3652e4231cb19a6c24b6b91",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "The record's minimum major hours, 45, equal the major's parts: 6 + 6 + 9 + 9 + 15 credits."
+      },
+      {
+        "block_id": "b-b7de3a23fbb74cd782cc7904",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 120, agree with the stated total."
+      },
+      {
+        "block_id": "b-7062bd319d5f361e5ac2ba5a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-e4fd98fe71186db5a3c4859b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-1067ac2e73995bdd3f819a99",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-95488161391edd6500bc4150",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "No concentration is required; the studio areas in the description are not separate requirements here."
+      },
+      {
+        "block_id": "b-52336d808ac6cbb1394b4178",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-1fe3ec4fa1b2eaf9fd650f60",
+        "question": "Which Art Studio requirement do up to 6 credits of upper-division film history count toward: the 6 ARTH 300–499 credits, the 15 ARTS 300–499 credits, or electives? Which course numbers count as film history? Do FDMA 390's 3 studio credits count toward the ARTS 300–499 credits? FDMA 390 is not in this capture's course registry."
+      },
+      {
+        "block_id": "b-bbcad7e3add999ae5e529e2e",
+        "question": "Which courses make up the 2.75 grade point in the major: the 45 credits of the major's requirements, or every ARTS and ARTH course taken? The captured Art Studio text names no higher major grade point for the B.A."
+      }
+    ]
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "elective-any", "area": ""}
+  ]
+}

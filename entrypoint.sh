@@ -25,6 +25,17 @@ if [ -n "${CEDAR_DFW_PASSWORD:-}" ]; then
 else
   echo "[entrypoint.sh] CEDAR_DFW_PASSWORD is not set: instructor-level results stay closed."
 fi
+# How many of the most-analysed courses have Course Dynamics > Downstream built
+# ahead at start (global.R; ten when unset, 0 for none). Digits only, checked
+# here so a mistyped value stops the container and is not read as ten.
+if [ -n "${CEDAR_PRELOAD_COURSES:-}" ]; then
+  case "$CEDAR_PRELOAD_COURSES" in
+    *[!0-9]*)
+      echo "[entrypoint.sh] CEDAR_PRELOAD_COURSES must be a whole number, 0 or more; it is '$CEDAR_PRELOAD_COURSES'." >&2
+      exit 1 ;;
+  esac
+  printf "CEDAR_PRELOAD_COURSES=%s\n" "$CEDAR_PRELOAD_COURSES" >> "$worker_renviron"
+fi
 
 # Forward shiny-server R process logs to Docker stdout as they appear.
 # Shiny Server writes each session's R stderr to a new timestamped file in

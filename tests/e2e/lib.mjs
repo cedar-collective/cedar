@@ -9,6 +9,11 @@
 //            waitForSelector, readReactable, colIndex, sleep } from './lib.mjs';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 export const CHROME = process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -115,6 +120,10 @@ export async function launch({ width = 1440, height = 1000 } = {}) {
 // is a false signal here (it's only a real signal from the bare URL, which
 // ui.R stamps with ?tab=home after connecting). After this returns, the active
 // tab's outputs still need a beat to render — see the recipe.
+// Pages that already carry the session-start watcher below (an init script
+// runs again on every navigation, so one registration a page is enough).
+const startWatched = new WeakSet();
+
 export async function connect(page, opts = {}) {
   // Reject a URL string loudly. This signature destructures, so passing
   // `connect(page, 'http://localhost:3838/?tab=gen-ed')` used to leave `tab`
@@ -131,6 +140,42 @@ export async function connect(page, opts = {}) {
   } = opts;
 
   const query = search == null ? `tab=${encodeURIComponent(tab)}` : String(search).replace(/^\?/, '');
+  // Count the session's busy-to-idle cycles from the first moment of the
+  // document, so "the server has run this session's start" can be waited for.
+  if (!startWatched.has(page)) {
+    startWatched.add(page);
+    await page.evaluateOnNewDocument(() => {
+      window.__cedarStartCycles = 0;
+      // Milliseconds from the navigation: the websocket open, the server's
+      // first sign of work, and the end of the first cycle.
+      window.__cedarStart = { connected: null, busy: null, started: null };
+      const connecting = setInterval(() => {
+        const app = window.Shiny && window.Shiny.shinyapp;
+        if (app && app.isConnected && app.isConnected()) {
+          window.__cedarStart.connected = performance.now();
+          clearInterval(connecting);
+        }
+      }, 10);
+      const watch = () => {
+        const root = document.documentElement;
+        let busy = root.classList.contains('shiny-busy');
+        new MutationObserver(() => {
+          const now = root.classList.contains('shiny-busy');
+          const at = window.__cedarStart;
+          if (!busy && now && at.busy === null) at.busy = performance.now();
+          if (busy && !now) {
+            window.__cedarStartCycles += 1;
+            if (at.started === null) at.started = performance.now();
+          }
+          busy = now;
+        }).observe(root, { attributes: true, attributeFilter: ['class'] });
+      };
+      if (document.documentElement) watch();
+      else new MutationObserver((_, self) => {
+        if (document.documentElement) { self.disconnect(); watch(); }
+      }).observe(document, { childList: true });
+    });
+  }
   expectNavigation(page); // Declared, so it is not counted as an app self-reload.
   await page.goto(`${BASE}?${query}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const ok = await waitFor(page,
@@ -144,7 +189,21 @@ export async function connect(page, opts = {}) {
   // that window are overwritten when the app's own initialisation lands — the
   // symptom is a selectize that still reads "Type to search..." after setInput,
   // and a page stuck on its empty state while the toast says the analysis ran.
-  // The sleep is kept as a floor because Shiny reports idle between flushes.
+  //
+  // A quiet page is not a started session. A process compiles the server
+  // function as its second session starts, and the page shows no busy state
+  // until that is done: measured 2026-11-25, the session after the warm-up
+  // connected at 0.5 s, went busy at 3.7 s and had its course picker's choices
+  // at 5.7 s, so "connected, then quiet for 600 ms" passed at 3.6 s and the
+  // picker's set-up emptied a course the test had already set (ISSUES I85).
+  // Wait for the first busy-to-idle cycle, which is the server running the
+  // session's start; then the floor, because Shiny reports idle between flushes.
+  const started = await waitFor(page, () => window.__cedarStartCycles > 0, { timeout, interval: 100 });
+  if (!started) {
+    throw new Error(
+      `connect({ tab: '${tab}' }): Shiny connected but the session never finished ` +
+      `starting within ${timeout}ms (no busy-to-idle cycle seen).`);
+  }
   await sleep(settle);
   await waitForIdle(page, { timeout: 120000 }).catch(() => {});
 
@@ -165,6 +224,90 @@ export async function connect(page, opts = {}) {
 }
 
 // The label of the currently active top-level nav tab, or '(none)'.
+// How the session's start went, as connect() watched it, in seconds from the
+// navigation: `connected` (the websocket is open), `busy` (the server's first
+// sign of work) and `started` (the end of the first busy-to-idle cycle, which
+// is what a reader waits for before anything they do can be answered). The
+// stretch from connected to busy is the server not yet running the session at
+// all: on a process still compiling its server function it was 3 seconds
+// against a tenth of one.
+export function sessionStart(page) {
+  return page.evaluate(() => {
+    const at = window.__cedarStart;
+    const s = (ms) => (ms === null ? null : ms / 1000);
+    return { connected: s(at.connected), busy: s(at.busy), started: s(at.started) };
+  });
+}
+
+// ── What a start took last time ──────────────────────────────────────────────
+// fresh-start prints each session's whole start and holds none of it: sessions
+// of one process differ by a second and a half among themselves. What it can
+// do is put the numbers beside the last run on other code, so a start that got
+// slower is on the screen while the change is still in hand, and not first
+// seen by a reader after a deploy (ISSUES I81).
+//
+// A record is one run: { at, code, started: [...], began: [...] }, seconds per
+// session. `code` is the checkout's commit, with "+changes" when the tree had
+// uncommitted edits. The app runs the checkout's code only when its image was
+// rebuilt from it or the checkout is mounted, which a record cannot know: it
+// says what was checked out.
+
+// One history for every worktree of a checkout, beside the main checkout's
+// suites; CEDAR_START_HISTORY names another file.
+export function startHistoryFile() {
+  if (process.env.CEDAR_START_HISTORY) return process.env.CEDAR_START_HISTORY;
+  const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
+    { cwd: HERE, encoding: 'utf8' }).trim();
+  return path.join(path.dirname(common), 'tests', 'e2e', '.fresh-start-history.jsonl');
+}
+
+export function checkedOutCode() {
+  const git = (...args) => execFileSync('git', args, { cwd: HERE, encoding: 'utf8' }).trim();
+  return git('rev-parse', '--short', 'HEAD') + (git('status', '--porcelain') ? '+changes' : '');
+}
+
+export function readStartHistory(file) {
+  if (!fs.existsSync(file)) return [];
+  return fs.readFileSync(file, 'utf8').split('\n').filter((line) => line.trim()).map((line, i) => {
+    let record = null;
+    try { record = JSON.parse(line); } catch { /* said below */ }
+    if (!record || typeof record.code !== 'string' || typeof record.at !== 'string' ||
+        !Array.isArray(record.started)) {
+      throw new Error(`${file} line ${i + 1} is not a record of a run: delete the line, or the file`);
+    }
+    return record;
+  });
+}
+
+export function recordStarts(file, record) {
+  fs.appendFileSync(file, JSON.stringify(record) + '\n');
+}
+
+// The latest run on code other than `code` that timed as many sessions; null
+// when there is none.
+export function lastRunOnOtherCode(history, code, sessions) {
+  const others = history.filter((r) => r.code !== code && r.started.length === sessions);
+  return others.length ? others[others.length - 1] : null;
+}
+
+// The lines fresh-start prints under its sessions. `before` is a record or null.
+export function compareStarts(now, before) {
+  const secs = (xs) => xs.map((x) => x.toFixed(1)).join(' ');
+  const median = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return (s[Math.floor((s.length - 1) / 2)] + s[Math.ceil((s.length - 1) / 2)]) / 2;
+  };
+  const signed = (x) => `${x >= 0 ? '+' : '-'}${Math.abs(x).toFixed(1)} s`;
+  const lines = [`whole start, sessions 1 to ${now.started.length}: ${secs(now.started)} s  (${now.code})`];
+  if (!before) return [...lines, 'no run on other code is recorded yet, so there is nothing to put beside it'];
+  lines.push(`the last run on other code:   ${secs(before.started)} s  (${before.code}, ${before.at.slice(0, 10)})`);
+  lines.push(`since then: first session ${signed(now.started[0] - before.started[0])}, ` +
+    `second ${signed(now.started[1] - before.started[1])}, ` +
+    `the later ones ${signed(median(now.started.slice(2)) - median(before.started.slice(2)))} at the median`);
+  lines.push('printed, not held: sessions of one process differ by a second and a half among themselves');
+  return lines;
+}
+
 export function activeTab(page) {
   return page.evaluate(() => {
     const a = [...document.querySelectorAll('.navbar a')]

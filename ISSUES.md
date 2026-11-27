@@ -30,17 +30,21 @@ else**: other files link to the entry instead of restating where it stands.
 computed twice (I16, M1–M3, M24); then the architecture rules file by file
 (M11 silent fallbacks first, because they hide failures, then M13 logic in
 modules); then interface consistency one tab per PR (M17, M18); file size
-alongside other work (M14, M16).
+alongside other work (M14, M16). The open improvements sorted by the kind of
+fix each needs, and which of them are one piece of work, are under
+[by the kind of fix](#open-improvements-by-the-kind-of-fix) (2026-11-26).
 
 ## Open items
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
+| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
+| [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
 | [I61](#i61--summer-2025-holds-nr-grades-where-summer-2024-held-none-and-reads-as-a-dfw-spike) | Defect | Summer 2025 holds 1,479 NR grades in 336 sections (Summer 2024: none), so it reads 22.5% DFW against about 13% for other summers; suspected an early pull before grades rolled |
 | [I55](#i55--the-instructor-gate-password-stopped-reaching-the-app) | Defect | The instructor-gate password stopped reaching the app: since 2026-09-05 `.Renviron` is kept out of the image and nothing else passed `CEDAR_DFW_PASSWORD`, so every instructor gate on production reads "not configured" (fixed in code 2026-11-12; production needs the password in its `.env`) |
-| [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I45](#i45--the-class-list-and-the-schedule-name-the-same-section-with-different-course-codes) | Defect | The class list and the schedule name the same section with different course codes for renamed subjects (SOC to SOCI, PSY to PSYC): SOCI 371 had class-list history from Fall 2019 but no sections before Fall 2021 (fixed for every reader by keying the loaded tables on the course, 2026-11-07; open until the remaining successions are confirmed) |
 | [I43](#i43--every-scheduled-refresh-fails-because-the-default-asks-for-a-report-mrgather-never-fetches) | Defect | Every scheduled refresh failed from 2026-10-24 to 2026-11-03: the default asked for the applicants report, which production mrgather never fetches, and one missing report skipped every table (default fixed 2026-11-03, per-report rebuilds 2026-11-11; mrgather refuses a report it does not have since 2026-11-22; open until production's mrgather is rebuilt from that source) |
 | [I38](#i38--a-pathways-program-population-misses-pre-majors-whose-name-differs-from-their-major) | Defect | A Pathways program population misses pre-majors whose name differs from their major: "Film and Digital Arts" holds 1 of the 1,016 Film pre-majors who never declared the major, because `FFDA` is named "FDMA" (fixed 2026-11-11 through `leads_to`; open for the eleven names in `programs.csv`) |
@@ -52,7 +56,7 @@ alongside other work (M14, M16).
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M67 | Improvement | See [Improvements](#improvements) |
+| M1–M82 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -60,6 +64,19 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | Resolved 2026-11-27: A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
+| [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
+| [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
+| [I89](#i89--low-enrollment-ignored-the-enrollment-bars-subject) | Defect | Low Enrollment ran under the Enrollment bar but built its own scope without Subject: a Subject choice narrowed the Courses table and not the Low Enrollment list beside it. Found 2026-11-26; the page now has its own bar |
+| [I88](#i88--low-enrollments-cards-and-colours-judged-a-crosslisted-section-on-its-own-students-and-its-list-on-the-combined-class) | Defect | Low Enrollment kept or dropped a crosslisted section by its combined class but counted its cards and coloured its cells by the section's own students, so one section could be listed as over its threshold and counted as under it. Found 2026-11-26; one band a row now |
+| [I87](#i87--low-enrollment-showed-a-list-missing-rows-after-a-threshold-was-raised) | Defect | Raising a Low Enrollment threshold after a run re-filtered the rows already fetched: at 20 the page showed the classes of up to 15 a run at 12 had fetched and none of those of 16 to 25. Found 2026-11-26; the thresholds are part of a run now |
+| [I86](#i86--retentions-course-list-stopped-with-an-error-when-its-students-held-no-graded-course) | Defect | Retention's "Courses Where a DFW Costs the Most" stopped with `object 'pop_p_value' not found` when the students of the chosen level and home campus held no graded course in the terms it reads: an error notice where an empty list belongs. Not seen on a page; found on the fixtures 2026-11-25 |
+| [I85](#i85--at-a-glance-was-left-with-no-step-in-one-session-and-nothing-in-the-log-said-why) | Defect | Downstream's At a Glance was left empty in the session straight after the warm-up of a just-started process, four of four times on 2026-11-25. It was the browser-test driver: `connect()` took a quiet page for a started session, the test set the course, and the picker's one-time set-up then emptied it. A reader cannot do that. `connect()` now waits for the session's first busy-to-idle cycle (three of three fresh starts pass) |
+| [I84](#i84--the-admin-browser-suite-expected-the-math-starting-point-that-was-replaced) | Defect | The `admin` browser suite failed at its Catalog Review step on `main` from 2026-11-23: it expected the summary to read "Math: Calculus-ready" after Degree Explorer's opening starting point became College Algebra (a76ab5a), and `run-tests.sh` stops at the first failing suite, so the suites after it did not run (the step now expects the opening starting point's label; resolved 2026-11-25) |
+| [I83](#i83--a-deep-links-loading-notice-gave-no-estimate-and-no-running-count) | Defect | A link that runs a report on arrival (`autorun=true`) showed a bare "Loading…" until the report arrived: no estimate and no running count, because the overlay it opens before Shiny connects never went through the code that writes them (resolved 2026-11-25) |
+| [I82](#i82--downstreams-at-a-glance-showed-an-empty-page-while-it-ran-the-other-views) | Defect | Course Dynamics > Downstream opened on an empty page for as long as its analyses ran (two minutes for FYEX 1110 on production, 2026-11-25): At a Glance runs Against Non-Takers and Next Courses, and each showed its wait on its own subtab, which is hidden then (the waits now show on the page's overlay; the length of the run is [M68](#improvements)) |
+| [I81](#i81--the-first-sessions-after-a-restart-wait-while-the-server-code-is-compiled) | Defect | The first session after a restart waited about 10 seconds longer than any other while R compiled the server code (16 on production, 2026-11-25), and the second about 3 more. `global.R` now compiles the module servers and the server function at start, and `server.R`'s last line hands the compiled function to Shiny, which reads that file itself. In the development container the second session's server began 2.8 s after the connection before and 0.2 after. `./run-tests.sh --all --fresh` holds it. The first session's remaining 2 seconds are not compilation ([M75](#improvements)) |
+| [I80](#i80--every-session-began-by-recounting-headcounts-program-menu) | Defect | Every session spent about 8 seconds starting (10 on production) before it could respond, on whatever page it opened, 4.5 of them rebuilding Headcount's program menu with one read of the declarations table per program; a deep link to a cached dashboard that loads in 0.2 seconds took 12 to 30 (now 2.3 seconds locally: the rows are found in one pass and the opening choices are shared) |
 | [I79](#i79--a-report-whose-conversion-or-read-stopped-part-way-was-stored-as-a-smaller-report) | Defect | `parse-data.R` stored whatever part of an export its converter had written or its reader returned: on 2026-11-23 Fall 2025's Student Holds were stored as the first 211,142 of 300,138 rows (15,152 of 26,890 students) with no error. A converter that does not exit 0, or any warning from the read, now stops the parse (resolved 2026-11-23; what cut that conversion short is not established) |
 | [I77](#i77--the-parser-left-each-export-unhashed-beside-its-hashed-file) | Defect | `parse-data.R` left each export as a CSV, names and unhashed IDs included, beside the hashed file it had just written: five files in the local data directory, dated 2026-10-08 (the CSV is now removed once read; the files already written were deleted locally and on production on 2026-11-23) |
 | [I78](#i78--the-transforms-status-file-lists-only-the-tables-of-the-last-run) | Defect | `cedar-status.json` held only the tables the last transform run built, so a run of one stage (`--tables degrees`, or the holds catch-up) left `scripts/data-status.sh` listing one table (the file now keeps the entries of tables a run did not rebuild) |
@@ -89,6 +106,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 | [I53](#i53--declaring-the-major-a-pre-major-leads-to-was-counted-as-a-change-of-major) | Defect | Pathways > Major Changes counted a student moving from a pre-major to its own major as a change of major whenever the two names differ ("FDMA" to "Film and Digital Arts"): 1,414 of 23,388 change events (resolved 2026-11-11: a pre-major and the major it leads to are one program) |
 | [I51](#i51--a-classification-filter-matched-nobody-its-value-was-split-on-the-comma) | Defect | `filter_class_list()` split every filter value on commas, so a classification filter (`"Sophomore, 2nd Yr"`) became two values that match no row, and Regstats' sophomore screen never found a course (resolved 2026-11-07) |
 | [I47](#i47--the-class-lists-student_classification-is-stamped-at-pull-time-when-a-term-is-pulled-late) | Defect | A class list pulled months after its term carries each student's classification as of the pull (35% of ENGL 1120's Fall 2025 registered student-terms one step ahead); every reader now takes the student-term table's, and the loaded class list carries none (resolved 2026-11-07) |
+| [I46](#i46--a-deploy-that-must-rebuild-a-table-the-app-cannot-start-without-takes-the-site-down) | Defect | The deploy's table gate ran after the health check, so a deploy that added a column to `cedar_student_terms` failed its health check on the missing column and never reached the gate: production served the restart page from 17:07 UTC on 2026-11-04 (gate moved before the first request) |
 | [I49](#i49--ticking-break-out-by-instructor-errors-the-retention-tables-until-run) | Defect | Ticking "Break out by instructor" on Course Dynamics > Retention errored every retention table until Run, because the renderers read the checkbox rather than how the shown result was computed (resolved 2026-11-07) |
 | [I44](#i44--roadblocks-and-retention-disagree-on-whether-a-late-withdrawal-returned) | Defect | Roadblocks and Retention disagreed on whether a student who withdrew late next term returned: Fall 2025 to Spring 2026 read 82.7% on one and 81.7% on the other (284 students) (resolved 2026-11-04) |
 | [I42](#i42--a-saturated-course-whose-fall-changes-lower-its-forecast-is-still-called-a-floor) | Defect | A saturated course whose Fall changes lower its forecast was still called "a floor": ENGL 1120's Spring 2027 forecast is 2,164, below last Spring's 2,179, and the page said "so this is a floor" (resolved 2026-11-03) |
@@ -108,6 +126,893 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I100 — A compiled board's catalog note is shown nowhere for a program with no hand-built board
+
+**Status:** resolved 2026-11-26 (branch `degree/catalog-questions`). Degree
+Explorer's "Rules behind this plan" shows the board's note, for every board.
+Admin > Catalog Review > Catalog questions lists each compiled board with its
+reading's status and its note. The Visualization rules tab keeps the
+hand-built boards, the compiler's baseline, and now says so.
+**Found:** 2026-11-26, looking at the Secondary Education B.S.Ed. board
+(branch `degree/compiler-i98-i99`).
+**Severity:** low, Degree Explorer only. Nothing wrong is drawn, but a
+caveat the board depends on is hidden. Examples: "The board does not include
+the concentration-teaching fields", and Journalism's concentration that is
+not drawn.
+**Cause:** a catalog row's `notes` is rendered in one place only: the rules
+summary of Admin > Catalog Review > Visualization rules
+(`degreePlanRulesServer()`, `R/modules/degree-explorer.R`). That tab reads
+the hand-built boards (`CEDAR_DEGREE_CATALOG`; `global.R` keeps them as the
+compiler's baseline), so it does not list the eight programs whose board
+comes only from a row in `degree_reading_catalogs.csv`. Degree Explorer reads
+the published boards (`CEDAR_DEGREE_BOARDS`). Its footer shows the generic
+"Illustrative plan" note and its "Rules behind this plan" dialog shows the
+rules table, neither the row's `notes`. PR #432 said each note "shows under
+the program on the rules summary"; that is true only for a program with a
+hand-built board.
+**Reproduction:** open Degree Explorer on Secondary Education B.S.Ed. and
+search the page and the rules dialog for "concentration-teaching fields". Then
+open Admin > Data & Usage > Catalog Review > Visualization rules: its degree
+list holds 24 boards and none of the eight.
+**Fix:** show the published board's `notes` with the board (its footer or
+the rules dialog), and decide whether the Visualization rules tab lists the
+published boards or keeps the baseline and says so.
+
+## I99 — Degree hours stated in words stop a compiled board: "A minimum of 128 hours" is read as NA
+
+**Status:** resolved 2026-11-26 (branch `degree/compiler-i98-i99`). The board
+plans to the reading's total: `degree_reading_degree_hours()` takes the one
+top-level credit rule that cites the record's Degree Hours field, and stops
+with the program and the record's text when there is not exactly one, or when
+a bare number in the record disagrees with it. Secondary Education B.S.Ed. has
+its row and a draft board that plans to 128 credits.
+**Found:** 2026-11-26, compiling the readings for the largest unmapped
+programs (branch `degree/largest-unmapped-readings`).
+**Severity:** low, Degree Explorer only. Secondary Education B.S.Ed.'s board
+cannot be built, so its row is held out of `degree_reading_catalogs.csv`.
+Nothing wrong is shown.
+**Cause:** `degree_packet_program_facts()` (`R/branches/degree-compiler-board.R`)
+reads the record's `degreeHours` with `as.numeric()`. The B.S.Ed. record gives
+"A minimum of 128 hours", which becomes NA with only a coercion warning. The
+board's "Minimum degree credits" rule then stops `validate_degree_catalog()`
+with "Degree rules has NA fields", which names neither the program nor the
+field. The coercion is silent, against the no-fallback rule; the reading's own
+`degree-total` node already says 128.
+**Reproduction:** add a row for program HJeOjy_ji9
+(`secondary-education-bsed-2026`, `BSED`,
+`BSED-SED-EH|BSED-FSEC-EH|BSED-SED-ED|BSED-FSEC-ED`) to
+`institution/unm/degree_reading_catalogs.csv` and run
+`scripts/compile-degree-interpretations.R --root … --analysis …`.
+**Fix:** take the degree total from the reading's `degree-total` node, or stop
+at the read with the program and the text.
+
+## I98 — One reading whose choice has an option with no listed course stops the compile script for every program
+
+**Status:** resolved 2026-11-26 (branch `degree/compiler-i98-i99`). A choice
+with an option that names no course is drawn as elective space: k of its
+smallest option's credits, or k tiles of unknown credits when an option does
+not say. Its options are not listed again as credit rules. The Elementary
+Education reading is on `main` and compiles ("One Diversity/Specialty Strand",
+3 tiles, 9 credits). Its board is held for I97.
+**Found:** 2026-11-26, as I99.
+**Severity:** moderate, Degree Explorer only. Such a reading in
+`catalog_interpretations/` stops `compile-degree-interpretations.R` before any
+board is written, with or without a catalog row. The Elementary Education
+reading is therefore kept off `main`, on branch
+`degree/elementary-education-reading`. It requires one Diversity/Specialty
+strand, and three of the four strands are "at least 9 credits of endorsement
+courses" that the record does not list.
+**Cause:** `degree_compiler_descendant_codes()` (`R/branches/degree-compiler.R`)
+stops with "Option strand-bilingual lists no course". The schema allows such
+an option (a `credits` node with no courses), and staging accepts it.
+**Reproduction:** on that branch, run the compile script.
+**Fix:** draw the choice as elective space of its smallest option's credits,
+naming the options in its detail. Failing that, list it for the reviewer. In
+neither case may one reading stop the others.
+
+## I102 — Every refresh of Draft interpretations restages every reading, and the admin browser suite times out waiting
+
+**Status:** open.
+**Found:** 2026-11-27, running `./run-tests.sh --e2e admin` for I97 (branch
+`degree/gen-ed-choices`). The same suite on `origin/main`'s source (d20627c)
+fails in the same place, so it is not that branch's; it passed in #434's run.
+**Severity:** low for readers (a slow Refresh on an Admin tab); the admin
+suite cannot pass on this Mac.
+
+The tab's Refresh, like opening it, runs
+`stage_catalog_normalization_drafts()` over every reading before it lists the
+proposals: each reading's packet is loaded and its source bytes verified
+again, although nothing is imported when its bytes were already staged. On
+this Mac that is 14.5 s for the 17 readings on either branch (timed against a
+copy of the store). The suite imports a throwaway proposal, clicks Refresh and
+waits 30 s for it to be listed; in the container it does not arrive:
+
+```
+TimeoutError: Waiting failed: 30000ms exceeded
+    at tests/e2e/admin.test.mjs:246
+```
+
+The session log holds no error, and the store kept no leftover proposal (the
+suite's `finally` removed it).
+
+**Reproduction:** `./run-tests.sh --e2e admin` with `data` linked to the
+store, on a fresh container: 30 checks pass, then the timeout above.
+
+**Done when:** Refresh verifies only readings it has not staged (or whose
+bytes changed) and the suite passes; the staging pass is the same as I101's.
+
+## I101 — One reading without its source packet on a server empties Catalog Review's Draft interpretations tab
+
+**Status:** open.
+**Found:** 2026-11-27, by the user on production, after #434 deployed.
+**Severity:** moderate, Admin only. No program can be opened in Draft
+interpretations; Degree Explorer is unaffected (its compiled boards are
+committed files).
+
+Opening the tab stages every reading in
+`institution/<id>/catalog_interpretations/` (`stage_catalog_normalization_drafts()`,
+`R/features/catalog-normalization.R`). Each needs its prepared packet under the
+server's `data/catalog-normalizations/<id>/programs/`, which is Git-ignored and
+reaches a server only by hand. The first reading without one stops the whole
+pass, before the program list is filled:
+
+```
+[catalog-normalization.R] Prepare the matching source packet before loading draft:
+/srv/shiny-server/cedar/institution/unm/catalog_interpretations/2026-2027/art-studio-ba.v1.json
+```
+
+The readings added in #431–#434 (Art Studio B.A. and B.F.A., Chemical, Civil
+and Computer Engineering, Elementary Education, Journalism, Liberal Arts and
+Integrative Studies, Secondary Education B.A.Ed. and B.S.Ed.) were prepared on
+the development Mac only; all 17 readings on `main` match a packet there.
+
+**Reproduction:** on a checkout whose `data/catalog-normalizations/unm/programs/`
+lacks one reading's packet, open Admin > Catalog Review > Draft
+interpretations: an error notification, and an empty program list.
+`test-degree-explorer.R` pins the stop itself ("matching source packet").
+
+**Done when:** the packets are on production, and a reading whose packet is
+missing is named on the tab without stopping the others, or the deploy
+refuses a reading whose packet the server does not hold.
+
+## I97 — A compiled board counts a reading's Gen Ed credits twice: as elective tiles and as the starting routes' courses
+
+**Status:** resolved 2026-11-27 (branch `degree/gen-ed-choices`), for math and
+the Gen Ed pools; the English routes' tiles are I68's. The decision (the user,
+2026-11-26): a course tile means the program names that course or a set of
+options; every other Gen Ed credit is a Gen Ed card
+([degree-explorer-rules.md](docs/developers/degree-explorer-rules.md#what-students-should-see)).
+- A reading names its Gen Ed and remainder pools (`gen_ed_pools`); they draw no
+  tiles, and its area pools set the plan's `gen_ed_area_minimums`, which raise
+  that area's Gen Ed cards. Civil Engineering and Elementary Education compile.
+- A program with no course on the shared math route plans each start's
+  preparation only; the example MATH 1350 is gone from the 10 hand-built
+  boards, the demo's History board and the compiled boards, and the program's
+  own courses or a Gen Ed card meet the area.
+- The compiled boards have shared-rules profiles, except Liberal Arts and
+  Integrative Studies (M82), so they get Gen Ed cards at all. A lecture and its
+  own lab drawn as two tiles now meet a science area together, as a bundle does;
+  without that, the engineering boards showed a Science card beside CHEM 1215.
+
+**Found:** 2026-11-26, as I99.
+**Severity:** moderate, Degree Explorer only.
+- **Civil Engineering and Elementary Education:** the boards cannot be built.
+  The compile stops with "Shown degree courses exceed the planning credit
+  target", so their rows are held out of `degree_reading_catalogs.csv`.
+  Elementary Education's own tiles, its Gen Ed areas among them, add to exactly
+  its 120 credits before the starting routes' tiles are added.
+- **Where the total leaves room:** the area is planned twice. Secondary
+  Education B.A.Ed. shows a Mathematics and Statistics Gen Ed tile beside the
+  math route's MATH 1350.
+
+**Cause:** the compiler makes an unlisted credit pool inside a group into
+elective space. That includes a pool that is the record's own Gen Ed
+remainder:
+- **Civil Engineering:** "Additional coursework to meet remaining University
+  requirements", 9 credits, under the record's Electives heading.
+- **Secondary Education B.A.Ed.:** its four Gen Ed area pools.
+
+Every board also shows the starting routes' tiles (ENGL 1110, ENGL 1120,
+MATH 1350, …). These are illustrative Gen Ed that the reading does not
+require (`assemble_compiled_degree_board()`, basis `general`).
+`allocate_degree_semester_credits()` counts both against
+`degree_credit_target`. CE's own tiles reach its 122 credits before ENGL 1110
+is added. Composition I counted twice (I68) is the same mismatch, for one
+course.
+
+**Reproduction:** add a row for program SypQxQ9j5
+(`civil-engineering-bs-2026`, `BSCE`, `BSCE-CE-EN|BSCE-FCE-EN`), or for
+program HJxPjJOii9 (`elementary-education-bsed-2026`, `BSED`,
+`BSED-ELED-EH|BSED-FELE-EH|BSED-ELED-ED|BSED-FELE-ED`), to
+`institution/unm/degree_reading_catalogs.csv` and compile.
+**Fix:** needs a decision about which stands for the area. Either a reading's
+Gen Ed pool takes the place of the route's illustrative tiles for that area,
+or such a pool stays a listed credit rule and the plan's Gen Ed space covers
+it, as on the hand-built boards.
+
+## I92 — Classification changed meaning from Summer 2025: a student now sits a step lower, and every reading by classification crosses the change unmarked
+
+**Status:** open. The change is in the data; what CEDAR lacks is the record
+of it and a mark on the readings that cross it.
+**Found:** 2026-11-26, drawing the Retention page's return rate at each
+classification (branch `retention/stage-headline`, held for it).
+**Affects:** every comparison by `student_classification` across Summer 2025:
+Retention's By Classification table (removed with the semester lines), Pathways Course
+Timing (classification is its default axis), Regstats' fall sophomore
+courses (`classification = "Sophomore, 2nd Yr"`), the entering-class reading
+by classification, the course demographics by classification, and the
+projections' cohort composition. About two dozen files read the column.
+
+### What was seen
+
+`cedar_student_terms` takes classification from academic studies where it
+has a row and from the class list otherwise (`.prefer_programs()`,
+`R/branches/student-terms.R`). For every undergraduate student-term present
+in both, the two agree on 99.3% to 100% of rows in every term from Fall 2019
+to Fall 2026, except two:
+
+| Term | Agree | Academic studies a step lower |
+|---|---|---|
+| Spring 2025 | 100.0% | 0.0% |
+| Summer 2025 | 90.3% | 9.7% |
+| Fall 2025 | 76.0% | 23.9% |
+| Spring 2026 | 100.0% | 0.0% |
+| Fall 2026 | 99.6% | 0.0% |
+
+Enrolled undergraduates each fall, as stored against the class list's own
+value: through Fall 2024 the two counts of each classification agree within
+1%. In Fall 2025 the stored first-semester freshmen are 1.7 times the class
+list's, the second-semester freshmen 42% fewer and the seniors 18% fewer. In
+Fall 2026 the two agree again, and both look like Fall 2025 as stored: about
+as many first-semester freshmen, and as few seniors.
+
+### What it most likely is
+
+A change in how a student is classified, in effect by late May 2025, that
+places a student a step lower; and a class list that carries the
+classification a student had when they registered. Fall 2025's registrations
+were made in Spring 2025, under the earlier rule; academic studies' Fall 2025
+rows (pulled 2025-11-06) carry the new one; by Spring 2026 both are under the
+new rule. Earned credits fit it: in Fall 2024 the middle second-semester
+freshman had earned about 6 credits; in Fall 2025, as stored, about 21. One
+reading is that the earlier rule counted hours in progress and the new one
+counts earned hours only. **Not confirmed with the registrar.**
+
+What it does to a reading: on Retention, first-semester freshmen came back
+next term at 77.8% in Fall 2024 and 87.6% in Fall 2025, and second-semester
+freshmen at 90.1% and 85.6%. Most or all of both moves is who the
+classification holds, not whether students came back. A trend fitted across
+the change reads it as one.
+
+### Reproduction
+
+```r
+source("scripts/cedar-repl.R")
+cl <- qs2::qs_read(file.path(cedar_data_dir, "cedar_registrations.qs"))
+ugc <- c("Freshman, 1st Yr, 1st Sem", "Freshman, 1st Yr, 2nd Sem", "Sophomore, 2nd Yr",
+         "Junior, 3rd Yr", "Senior, 4th Yr")
+a <- dplyr::distinct(cedar_programs, student_id, term, as_cls = student_classification)
+b <- dplyr::distinct(cl, student_id, term, cl_cls = student_classification)
+dplyr::inner_join(a, b, by = c("student_id", "term")) |>
+  dplyr::filter(as_cls %in% ugc, cl_cls %in% ugc) |>
+  dplyr::mutate(d = match(as_cls, ugc) - match(cl_cls, ugc)) |>
+  dplyr::group_by(term) |>
+  dplyr::summarize(agree = mean(d == 0), as_lower = mean(d < 0))
+```
+
+### Done when
+
+The change is confirmed (its first term and what it counts) and recorded as
+an entry in `CEDAR_DATA_SEMANTICS` (`R/lists/data_semantics.R`), annotated,
+never recoded; and every reading that follows classification across terms
+either marks the break on its chart and fits no trend across it, or reads a
+measure the change does not touch (credits earned, semesters here).
+Retention has done the second: its first section reads each semester since
+arrival (`student_term_semesters()`), and its By Classification table is
+gone. Pathways Course Timing and Regstats' fall sophomores remain.
+
+## I91 — The running credit total counts attempted credits, and read as earned it disagrees with classification
+
+**Status:** resolved 2026-11-26 as not a defect: explained, no code changed
+(branch `issues/credit-total-vs-classification`). Kept so it is not diagnosed
+again.
+**Found:** 2026-11-26, checking whether a credit line (75 or 90 credits) could
+divide the Retention page from the Graduation page.
+**Affects:** nothing shown. Anyone who reads `build_credit_timeline()`'s
+`total_credits_entering` / `total_credits_after` as credits *earned*.
+
+### What was seen
+
+Undergraduates enrolled in Fall 2025, home campus ABQ, with a readable total
+(`timeline_valid` and `transfer_credits_known`: 92% of them). By the
+registrar's rule a junior has 60 to 89 earned hours and a senior 90 or more.
+Banded on `total_credits_entering`:
+
+| Classification | under 60 | 60–89 | 90 or more |
+|---|---|---|---|
+| Junior | 3% | 70% | 27% |
+| Senior | 3% | 3% | 94% |
+| Sophomore | 85% | 15% | 1% |
+
+### Cause
+
+The timeline is on the **attempted** basis throughout, and says so in its
+code: attempted credits here before the term (`unm_credits_entering`) plus the
+attempted block brought from elsewhere (`overall_credits_attempted -
+inst_credits_attempted`). Classification is set on **earned** hours. A student
+who has attempted 93 credits and earned 84 is a junior, correctly, and at "90
+or more" on the timeline, correctly.
+
+The same students on earned credits (`cumulative_completed_unm_credits` less
+the term's own, plus `overall_credits_earned - inst_credits_earned`, the
+earned block by the same difference of two stamped columns):
+
+| Classification | under 60 | 60–89 | 90 or more |
+|---|---|---|---|
+| Junior | 9% | 84% | 7% |
+| Senior | 3% | 5% | 92% |
+| Sophomore | 98% | 2% | 0% |
+
+What is left (a junior under 60, a senior under 90) is one student in ten or
+fewer, and is not explained here: when in a term classification is set, and
+credit brought in mid-career and counted from the first term, are the two
+places to look.
+
+### What to take from it
+
+- **`total_credits_entering` is attempted credits.** It is the right figure
+  for the 160-credit ceiling (`get_credit_ceiling_crossings()`), which is set
+  on attempted credits. It is the wrong figure to set against a degree's 120
+  credits or against classification: on it 51% of Fall 2025 seniors are at
+  120 or more, on earned credits 34%.
+- **The earned position is `build_credit_timeline(opt$earned = TRUE)`**
+  (added 2026-11-26, branch `credits/earned-position`): the reading above,
+  with the same two guards (`timeline_valid`, a recorded pair of totals,
+  `transfer_earned_known`).
+
+### Reproduce
+
+```r
+source("scripts/cedar-repl.R")
+st <- cedar_read("cedar_student_terms"); pr <- cedar_read("cedar_programs")
+pop <- st %>% filter(term == 202580, enrolled, student_level == "UG", student_campus == "ABQ")
+tl <- build_credit_timeline(st, pr, list(student_ids = unique(pop$student_id)))
+earned_block <- pr %>%
+  filter(!is.na(inst_credits_earned), !is.na(overall_credits_earned)) %>%
+  distinct(student_id, inst_credits_earned, overall_credits_earned) %>%
+  group_by(student_id) %>%
+  summarize(brought = max(median(overall_credits_earned - inst_credits_earned), 0))
+pop %>%
+  inner_join(tl %>% filter(timeline_valid, transfer_credits_known), by = c("student_id", "term")) %>%
+  inner_join(earned_block, by = "student_id") %>%
+  mutate(earned = cumulative_completed_unm_credits - coalesce(completed_unm_credits, 0) + brought) %>%
+  count(student_classification,
+        attempted = cut(total_credits_entering, c(-Inf, 60, 90, Inf), right = FALSE),
+        earned = cut(earned, c(-Inf, 60, 90, Inf), right = FALSE))
+```
+
+## I90 — Low Enrollment read as not yet run when nothing was low, and dropped history from a long list without saying
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** low. No number was wrong; the page gave a reader the wrong
+account of what it had done.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+- `build_low_enrollment_alerts()` returns `NULL` when no section is at or near
+  its threshold. The page took `NULL` to mean it had not run, so a run that
+  found nothing showed "Click Gather Enrollments above to load data, then open
+  this tab", and its "No Courses Found" message could not be reached.
+- History lines are added only to a list of 500 rows or fewer
+  (`history_limit`). A longer list showed a dash in every Prior History cell,
+  the same as a section with no history, and nothing said the lookup had been
+  skipped.
+
+### Reproduce (before the fix)
+
+On the fixtures: `build_low_enrollment_alerts(test_sections, list(term =
+"202010", level = "lower"))` is `NULL`; and
+`build_low_enrollment_alerts(test_sections, list(term = "202010"),
+history_limit = 2L)$history_text` is `NA` for all four sections.
+
+### Fix
+
+`build_low_enrollment_page()` returns a payload for every run: a run that
+lists nothing says "Nothing to review" with what was looked for, and one too
+long for history says so above the list (`history_skipped`).
+`test-low-enrollment-page.R` holds both ("a scope with nothing small lists
+nothing…", "a list too long for history lines says so…").
+
+---
+
+## I89 — Low Enrollment ignored the Enrollment bar's Subject
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. With a Subject chosen, the list held sections the bar
+above it said were out of scope.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+Low Enrollment was a sub-tab under the Enrollment bar and ran on its Gather
+Enrollments button, but built its own options from the bar's inputs. It read
+campus, college, department, term, part of term, course, instructor, level
+and the exclude-list box, and left out Subject. It also read `enrl_im` and
+`enrl_gen_ed`, two inputs the page no longer has. A reader who chose one
+Subject of a department saw that subject in the Courses table and every
+subject of the department under Low Enrollment.
+
+### Reproduce (before the fix)
+
+`git show 60df9ad:server.R`: the `opt` list in `low_enrl_data` has no `subj`,
+while the Courses table's has (`opt[["subj"]] <- input$enrl_subj`). On the
+page: a department with two subjects, one of them chosen in Subject, Gather
+Enrollments, then the Low Enrollment sub-tab.
+
+### Fix
+
+Low Enrollment is its own page (Courses > Low Enrollment,
+`R/modules/low-enrollment.R`) with its own bar, the seven scope inputs every
+section page shares (`cedar_section_scope_inputs()`), and its run reads every
+one of them.
+
+---
+
+## I88 — Low Enrollment's cards and colours judged a crosslisted section on its own students, and its list on the combined class
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. The rows listed were right; a card count and a cell
+colour were wrong for crosslisted sections.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix. The Dept Dashboard's Low Enrollment Review was not affected:
+it reads the stored band.
+
+### What was wrong
+
+Since adc3de4 (2026-07-27) a section is kept or dropped on its combined class
+(`.alert_enrl`, the crosslist total where there is one), and
+`build_low_enrollment_alerts()` stores its band from that number
+(`severity`). The page's summary cards recomputed the band from `enrolled`,
+the section's own students, and coloured the Enrolled column the same way,
+while "How to read this table" said Course Total was the column coloured. So
+a crosslisted section could be listed as just over its threshold and counted
+on a card as under it. The cell colour also turned green at exactly the
+threshold, where the cards called the same class a watch.
+
+### Reproduce (before the fix)
+
+On the fixtures, Spring 2020: HIST 484-001 has 8 students of its own in a
+combined class of 11, against a split-level threshold of 10.
+`build_low_enrollment_alerts(test_sections, list(term = "202010"))` gives it
+`severity == "buffer"`; `low_enrollment_severity(8, 10)`, which is what the
+cards counted, is `"watch"`.
+
+### Fix
+
+One band a row. The page reads the stored band
+(`R/features/low-enrollment.R`), its cards count it, and its table colours XL
+Total, the number judged, by it. `test-low-enrollment-page.R` holds it ("a
+section's band is its class against its own threshold…").
+
+---
+
+## I87 — Low Enrollment showed a list missing rows after a threshold was raised
+
+**Status:** resolved 2026-11-26 (branch `courses/low-enrollment-page`).
+**Found:** 2026-11-26, reading the page's server code to move it out of
+`server.R`.
+**Severity:** medium. A reader who raised a threshold saw a shorter list than
+the threshold describes, with nothing to say so.
+**Affects:** Bird's Eye > Enrollment > Low Enrollment, inline in `server.R`
+until this fix.
+
+### What was wrong
+
+A run fetched its sections once, under the thresholds at the click: a section
+is kept when its class is within a quarter above its level's threshold. The
+threshold inputs then re-filtered that fetch as they changed. Lowering one
+narrowed the list correctly. Raising one could only keep what had been
+fetched: a run at the standard 12 holds classes of up to 15, so raising the
+threshold to 20 showed those classes judged against 20, and none of the
+classes of 16 to 25 that a threshold of 20 lists.
+
+### Reproduce (before the fix)
+
+On the fixtures: `build_low_enrollment_alerts(test_sections, list(term =
+"202010"))` returns 4 sections. `collect_low_enrollment_threshold_rows()` of
+those rows at thresholds of 20, which is what the page showed after the
+inputs were raised, still returns 4. A run at 20 returns 15.
+
+### Fix
+
+The thresholds are part of a run, like its terms: they sit folded under
+"Adjust thresholds" in the page's filter bar, are read at the click, and the
+scope bar states the ones the list on screen was run with.
+`test-low-enrollment-page.R` holds it ("the thresholds are the run's…").
+
+---
+
+## I86 — Retention's course list stopped with an error when its students held no graded course
+
+**Status:** resolved 2026-11-25 (branch `retention/band-courses-page-scope`).
+**Found:** 2026-11-25, writing a test that the section reads the students'
+home campus (M67).
+**Severity:** low. No number was wrong: an error notice where an empty list
+belongs, in a scope not seen on a page.
+**Affects:** `retention_dashboard_course_list()`
+(`R/features/retention-dashboard.R`), the Retention page's "Courses Where a
+DFW Costs the Most".
+
+### What was wrong
+
+`get_stopout()` returns a table with no columns when the students it is given
+hold no graded attempt in the terms. `retention_dashboard_course_list()` took
+only `NULL` as nothing to list and filtered that table on `pop_p_value`, so
+the page showed "Courses: object 'pop_p_value' not found". It takes a level
+and home campus whose students have a settled next term and no graded course
+in the latest three graded terms of the page's term type; none is known in
+the data.
+
+### Reproduce (before the fix)
+
+On the fixtures, where RR01's EA-home students take no course:
+`retention_dashboard_course_list(rr01$student_terms, rr01$attempts, NULL,
+rr01$dashboard$series, list(student_level = "UG", campus = "EA", data_edges =
+rr01_edges, course_min_n = 10L, course_min_dfw_n = 5L))`.
+
+### Fix
+
+A table with no rows is nothing to list, and the section shows no table, as
+it does when no term is graded. `test-return-rates.R` ("RR01: the courses
+read the latest graded falls' students") holds it.
+
+## I85 — At a Glance was left with no step in one session, and nothing in the log said why
+
+**Status:** resolved 2026-11-25 (branch `test/first-suite-session`). It was
+the browser-test driver, in the second session of a just-started process; a
+reader cannot take this path. `connect()` now waits for the session to have
+started.
+**Found:** 2026-11-25, timing Downstream in the local container for M72; seen
+three more times the same day, checking the courses built ahead.
+**Severity:** low for readers (none can reach it); medium for the test gate: a
+first suite run after a restart can fail on an empty page.
+**Affects:** `tests/e2e/lib.mjs` (`connect()`, `runAndWait()`),
+`tests/e2e/warmup.mjs`.
+
+### What was seen
+
+The first time: Course Dynamics for FYEX 1110 on ABQ and EA, Analyze Course,
+then Downstream, as the first session after the warm-up on a container just
+started. "Reading the course's outcomes…" ran and the overlay closed;
+"Comparing takers with non-takers…" ran (20 seconds); Next Courses and the
+sequence comparison never ran, and the page went idle with no step drawn. The
+log held no error. Thirteen later sessions opened the same way ran every step.
+
+It came back on each of the next three fresh starts, each time in the session
+straight after the warm-up, and never in a later session of the same process.
+One of them was traced in the browser:
+
+- the report ran for FYEX 1110 (7.1 seconds in the log) and its outcomes were
+  read (1.4 seconds);
+- when the page went idle the browser's value for the course picker
+  (`cr_course`) was the empty string, and At a Glance held "Select a course
+  and click Analyze Course first, then open this tab.";
+- in another, `runAndWait()` returned before the report had drawn its tabs,
+  and the click on Downstream found no such tab.
+
+### Cause
+
+The course picker gets its choices once a session, from the server
+(`cedar_linked_server_selectize()`, when the link bootstrap arrives), and that
+message leaves the picker empty whatever it held. A reader cannot pick a
+course before it lands: until then the picker has no choices. The driver can,
+because `setInput()` writes the value itself.
+
+A process compiles the server function as its second session starts (about 3
+seconds, M70). The browser shows no busy state while the server has not begun
+to answer, `connect()` reads the quiet page as settled (its own comment names
+the symptom: a picker that still reads "Type to search" and a page on its
+empty state after the analysis ran), and `runAndWait()` gives the server 400 ms
+to say it is busy. Timed on the session straight after the warm-up: connected
+at 0.5 seconds, busy at 3.7, idle with the picker's choices at 5.7; the two
+sessions after it went busy 0.1 seconds after connecting. `connect()` slept
+2.5 seconds, saw 600 ms of quiet and returned at about 3.6. So the driver sets
+the course and clicks Analyze, the report runs for that course, and the set-up
+message then lands and empties the picker. The page answers as it does when a reader picks another course
+without analysing it: it asks for a course. Against Non-Takers reads the
+analysed course and so ran the first time; Next Courses and the sequence
+comparison read the picker and did not.
+
+The suite warm-up opens one session (the home page), so the first session of
+any suite run after a restart is that second session. The four occurrences
+were scratch scripts built on `connect()`, `setInput()` and `runAndWait()` as
+the suites are; the committed suites are exposed in the same way.
+
+The earlier guess, two caught errors on a VM out of memory, is withdrawn: the
+traced occurrences had 1.3 GiB free and no `[caught]` line.
+
+### What changed, so the next one can be read
+
+- The caught errors on this path are written to the log as
+  `[caught] <what>: <message>` (`cedar_notify_caught()`,
+  `R/modules/ui-helpers.R`).
+- At a Glance says on the page that it could not be put together, with the
+  message, instead of showing a heading over nothing; a summary that is only
+  not ready yet waits, as before.
+
+Neither is the fix: no error is raised.
+
+### Reproduce
+
+Start the app and wait for the `[preload]` lines to stop. Run
+`node tests/e2e/warmup.mjs`, then at once a script that connects to Course
+Dynamics, sets `cr_course`, clicks Analyze Course with `runAndWait()` and
+opens Downstream. Read `Shiny.shinyapp.$inputValues.cr_course` when the page
+is idle: it is empty and At a Glance asks for a course. Run the same script
+again on the same process: five steps.
+
+### Fix
+
+In the driver. `connect()` (`tests/e2e/lib.mjs`) counts the page's
+busy-to-idle cycles from the first moment of the document and waits for the
+first one, which is the server running the session's start, before its floor
+and its wait for idle; a session that never starts fails with that message.
+On three fresh starts, the session straight after the warm-up kept its course
+and drew its five steps each time (it had failed four of four). The harness
+suite checks that `connect()` returns with a cycle seen. Not changed:
+`runAndWait()`'s 400 ms beat, which a started session answers in 0.1 seconds,
+and the warm-up, which still opens one session.
+
+## I84 — The admin browser suite expected the math starting point that was replaced
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, running `./run-tests.sh --changed` for I80 to I83: the
+gate stopped at `e2e: admin`.
+**Severity:** low for the app (nothing on a page is wrong); medium for the
+gate, which stops at the first failing suite and so ran none of the suites
+listed after `admin`.
+**Affects:** `tests/e2e/admin.test.mjs`.
+
+### What was wrong
+
+Commit a76ab5a (2026-11-23) made College Algebra the starting point Degree
+Explorer opens on (`opens` in `degree_roadmap_starts.csv`) and updated
+`degree-explorer.test.mjs`. Admin > Catalog Review opens on the same starting
+point, and `admin.test.mjs` still expected "Math: Calculus-ready" in its
+summary.
+
+### Reproduce (before the fix)
+
+`./run-tests.sh --e2e admin` against the institutional app:
+`AssertionError: selected planning scenario shows the math starting-point
+label`. The summary reads "Math: College-algebra-ready".
+
+### Fix
+
+The step expects the label of the starting point the page opens on.
+
+## I83 — A deep link's loading notice gave no estimate and no running count
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, on production, opening
+`?tab=dept-dashboard&autorun=true&campus=ABQ,EA&dept=HIST&term=202680`: the
+loading notice read "Loading…" for the 30 seconds the page took (I80, I81).
+**Severity:** low: nothing is wrong on the page, but a long wait said nothing.
+**Affects:** `cedar_loading_overlay()` in `R/modules/ui-helpers.R`, for every
+page reached by a link with `autorun=true` and every `show_at_start` page.
+
+### What was wrong
+
+An autorun link's overlay is opened by the script in the page's `<head>`,
+before Shiny connects. The overlay's own script then adopted it by starting its
+clock and nothing else. The label with its estimate ("cached ~2s; fresh ~20s")
+and the count of seconds ("Working for 12s") were written only by
+`showOverlay()`, which runs on a button press or a message from the server. A
+linked run sends neither: it starts on the server.
+
+### Reproduce (before the fix)
+
+Open any link with `autorun=true` and read `#<id>-loading-label` and
+`#<id>-timing-msg` while the overlay is up: "Loading…" and nothing.
+
+### Fix
+
+The adopted overlay writes the same label and starts the same count
+(`startWaiting()`, shared with `showOverlay()`). Its estimate is the one
+embedded when the app started: a request for current values would be answered
+only as the wait ends. `waitlist-deeplink.test.mjs` reads the label as the page
+arrives.
+
+## I82 — Downstream's At a Glance showed an empty page while it ran the other views
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`) for what the page
+shows. How long the run takes is M68.
+**Found:** 2026-11-25, on production: Course Dynamics for FYEX 1110, then
+Downstream. "None of the subtabs display anything."
+**Severity:** medium: the page reads as broken for as long as the run takes,
+and so does every other page of every other session, since R answers one
+request at a time.
+**Affects:** `R/modules/course-cohort.R`, `R/modules/later-course.R`,
+`server.R` (Course Dynamics), the overlay script in `R/modules/ui-helpers.R`.
+
+### What was wrong
+
+Downstream opens on At a Glance, which runs Next Courses, Against Non-Takers
+and Prepared for It on their defaults. Each module showed its wait on the
+overlay inside its own subtab. With At a Glance open those subtabs are hidden,
+and so were their overlays: the page was empty, with no notice, until the last
+of the three began (the only one that used the page's overlay). Clicking
+another subtab meanwhile showed that one empty too, because its outputs were
+queued behind the run.
+
+### Evidence
+
+Production, 2026-11-25 (UTC), `report_timing.csv`, one session:
+
+| Started | Step | Seconds | Overlay it used |
+|---|---|---|---|
+| 14:36:51 | `later_course` | 5.4 | Next Courses' own (hidden) |
+| 14:36:57 | `course_cohort` | 91.2 | Against Non-Takers' own (hidden) |
+| 14:38:33 | `course_sequence` | 19.5 | the page's |
+
+Nothing was on screen from 14:36:51 to 14:38:33. No error was logged and the
+results did arrive.
+
+### Reproduce (before the fix)
+
+Course Dynamics, a large course, Analyze Course, Downstream. Until the
+sequence comparison starts, `#cr-loading-overlay` is hidden and
+`#cr_cohort-load-loading-overlay` is open inside a hidden tab pane.
+
+### Fix
+
+Each module takes the page's overlay (`page_overlay = "cr"`) and opens it, with
+its own label, when At a Glance is the open view; on its own subtab it opens
+its own as before. The overlay script keeps one overlay open across runs that
+follow one another: a run that starts as the one before ends records the
+finished run at once, where its pending finish used to hide the overlay under
+the new run a moment later. `downstream-glance.test.mjs` records every label
+the page's overlay is given and expects both modules' waits among them.
+
+## I81 — The first sessions after a restart wait while the server code is compiled
+
+**Status:** resolved 2026-11-25: the module servers are compiled at start
+(branch `perf/session-start`), and so is the server function, which is handed
+to Shiny (branch `perf/first-sessions`). What the first session still adds is
+not compilation and is M75.
+**Found:** 2026-11-25, on production: the first visit of the day, by a link to
+a cached dashboard, took 29.6 seconds.
+**Severity:** medium: once per restart, so every morning's first reader.
+**Affects:** `global.R`; `server.R` and how Shiny reads it.
+
+### What is wrong
+
+R compiles a function the first time it is called (a function not defined at
+top level, the second time). The restart's warm-up request fetches the page
+and opens no session, so the first person's session compiled every module's
+server function, and the second session the server function.
+
+### Evidence
+
+Production, 2026-11-25, one session, from `client_render_timing.csv`
+and the usage log: the page was there about 13:33:29; the session's first
+observer ran at 13:33:48 (19 seconds, against 2.5 for a session on 2026-11-23
+in a process already used); the run began at 13:33:58 (I80); the dashboard
+came from cache in 0.17 seconds.
+
+Locally, the same link three times in a fresh process, with a profiler around
+the server function: 19.2 seconds, then 8.5 and 9.1. The first session's
+server function body took 11.0 seconds against 1.1, and the samples are the
+compiler's (`findCenvVar`, `cmpCall`, `putconst`). Compiling the module servers
+alone takes 4.5 seconds, the server function 2.5.
+
+### Reproduce
+
+Restart the app, wait for the preload lines to stop, open any page: the gap
+between the websocket opening and the first output is several seconds longer
+than on the third session.
+
+### Fix, and what remains
+
+`global.R` compiles every module server (`ls(pattern = "Server$")`) after
+loading them: 4.5 seconds added to the start, taken off the first session.
+With I80 fixed too, the first session's deep link is ready in 5.4 seconds
+locally (was 19.2) and later ones in 3.5 (was about 9).
+
+The server function could not be compiled the same way: Shiny reads
+`server.R` itself for the first session and runs what that read returns, not
+the function `global.R` made from the same file (M70). It was compiled on its
+second call, so the second session waited about 3 seconds.
+
+Since `perf/first-sessions`: `global.R` compiles its copy
+(`cedar_compile_server()`, `R/trunk/utils.R`; 2 of the 6.3 seconds the start
+now spends compiling) and the last line of `server.R` returns it
+(`cedar_server_to_run()`), so the function Shiny runs is the compiled one. A
+`server.R` changed since the start is run as it now reads. On fresh starts in
+the development container, from the connection to the server's first sign of
+work: 2.8 seconds for the second session before, 0.2 after, against 0.1 to
+0.2 for later sessions; the second session's whole start went from 6.7 to 8.1
+seconds to 4.5. `tests/e2e/fresh-start.test.mjs` holds that wait for the
+first two sessions of a new process (`./run-tests.sh --all --fresh`), and
+fails with the hand-over taken out. `test-utils.R` holds the two functions and
+`test-ci.R` both ends of the wiring.
+
+## I80 — Every session began by recounting Headcount's program menu
+
+**Status:** resolved 2026-11-25 (branch `perf/session-start`).
+**Found:** 2026-11-25, on production: a link to a Dept Dashboard that was in
+the cache took 29.6 seconds; the dashboard's own load was 0.17.
+**Severity:** high in effect: every session, on every page, waited about 10
+seconds on production before the server answered anything, and a deep link's
+run could not start until then.
+**Affects:** `program_choices()` in `R/branches/population.R`,
+`R/modules/headcount.R`, `R/modules/pathways.R`.
+
+### What was wrong
+
+Headcount's server fills its Major and Minor menus when a session starts,
+whatever page the session opened (`observeEvent(input$college, …, ignoreInit =
+FALSE)`). The labels say each program's degrees, campuses and years, and
+`program_choices()` found each program's declaration rows with
+`profile[major_code %in% covered, ]` inside a loop over about 250 programs: one
+read of the whole declarations table per program. Pathways' server likewise
+read the subject off every class-list row to list the subjects.
+
+R answers one request at a time, so nothing else in the session ran until this
+finished: not the page's own outputs, and not a link's restore and run.
+
+### Evidence
+
+Production, the same link (cache hit each time, 0.07 to 0.17 seconds of
+calculation), `client_render_timing.csv` against the usage log:
+
+| Session | Page there to ready | Session's first observer to the run |
+|---|---|---|
+| 2026-11-20 18:25 | 20.5 s | 12 s |
+| 2026-11-23 12:39 | 12.8 s | 10 s |
+| 2026-11-25 13:33 (first of the day, I81) | 29.6 s | 10 s |
+
+Locally, a profile of one session's start (not the first of its process), 7.6
+seconds sampled:
+
+| Seconds | Where |
+|---|---|
+| 4.5 | Headcount's menus: 3.4 in `program_choices()`'s per-program lookup |
+| 1.1 | the server function's own body (every module's set-up) |
+| 0.6 | Pathways' subject list (`sub()` over every class-list row) |
+| 0.3 | `course_picker_choices()` for a course picker |
+| 1.1 | everything else |
+
+### Reproduce (before the fix)
+
+Open any page in a fresh browser session and time the websocket's `busy` to
+`idle`: 7.6 to 8.3 seconds locally. Or change College on Headcount: about 4
+seconds before the menus refill.
+
+### Fix
+
+`program_choices()` finds every program's rows in one pass (each code belongs
+to one program, so the rows are split by it once); the labels are unchanged
+(`test-pathways-helpers.R`, and the same labels on the full table before and
+after). Headcount's choices for a scope are built once and shared by every
+session (`cedar_shared_result()`). Pathways reads each course code's subject
+once. A session's start is 2.3 seconds locally, and the link above is ready in
+3.5 (was about 9).
+
+What a session's start still costs, for a later pass: the server function's
+body (1.0 s), Headcount's department list (0.2 s, a `distinct()` in the
+module), a course picker's choices (0.3 s, `course_picker_choices()` over the
+class list per session).
 
 ## I79 — A report whose conversion or read stopped part-way was stored as a smaller report
 
@@ -4243,8 +5148,27 @@ then its schedule row; with the old `case_when` both read `undated`.
 # Improvements
 
 Short entries: **what**, **where**, **done when**. Counts measured 2026-10-07;
-rechecked 2026-10-14, when only `server.R` had moved (6,356 lines).
+rechecked 2026-10-14, when only `server.R` had moved (6,356 lines); an entry
+that says 2026-11-26 was measured again that day.
 The recommended order before new features is in `ROADMAP.md`.
+
+### Open improvements, by the kind of fix
+
+Sorted 2026-11-26. Each entry stays below under its topic, with its status;
+this table says which entries are one piece of work, and of what kind.
+
+| Kind of fix | Entries | How |
+|---|---|---|
+| A person, a source owner or a production step: no code | M9, M10, M21, M32, M50 (and defects I18, I20, I23, I37, I38, I55, I61) | A re-pull of the Fall 2024, Spring 2025 and Summer 2025 class lists closes M32 and is the check I61 asks for: both name the Summer 2025 pull. One sitting with the mapping files decides I37, I38 and M50. |
+| mrgather on production | M65 (and defects I32, I33, I43) | Production's mrgather becomes a checkout of its repository (`ROADMAP.md`, Platform). What is left of the four closes with it. |
+| One count written more than once | Rates: M1, M34, M54, M60. Who is counted: M39, M41, M61, M76. Which source: M2, M3, M30, M53 | For each family, one helper a layer up and a ratchet in `test-architecture.R`, the way M11 and M12 were done. Fixed one at a time, nothing stops the next copy. Ratchets hold M3, M53, M54 and M76 since 2026-11-26; the helpers are still to write. |
+| Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58, M80 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
+| How the app loads and starts | M59, M70, M75, M77 | One function that loads the tables as the app holds them, for `global.R`, the cache-warming scripts and the REPL (M59). M77's second half edits model source and goes with the projections below. |
+| The fixture and production disagree | M38, M40, M57 | One migration: each changes the counts pinned in the fixture's header. |
+| Tests, one at a time | M7, M8, M20, M42, M79 | Discrete. |
+| A dimension not yet attached at load | M23, M37 (and defect I45) | A design decision of the kind ADR-001 made for units and course ids: campus with one vocabulary, the degree program as a grain. |
+| Projections | M31, M35, M36 | Discrete, in one model version: each edits model source, and one rebuild serves them all (M77). M2's census sum is in model source too. |
+| Stand-alone | M6 (and defects I67, I68) | Discrete. I67 and I68 are both a choice tile the degree compiler relates to no named course: no prerequisite in one, no match with the English route in the other. |
 
 ### Counting and definitions
 
@@ -4256,14 +5180,29 @@ A/B/C/D/F/W buckets are inline in `R/branches/course-attempts.R`
 **M2 — Census and term type derived by hand.** `registered + dr_late` in
 `R/branches/enrollment-projections.R`; `substr(term, 5, 6)` in
 `R/branches/enrl.R` (2) and `R/branches/relative-terms.R`. *Done when:* they use
-`add_census_enrl()` and `add_term_type_col()`.
+`add_census_enrl()` and `add_term_type_col()`. On 2026-11-26 three are left:
+the census sum in `R/branches/enrollment-projection-inputs.R` (projection
+model source, so it changes with a model version), and the term's last two
+digits read by hand in `R/branches/relative-terms.R` and
+`R/cones/course-adjacency.R`.
 
 **M3 — `max(term)` uses to review against the right-edge policy.** 29 uses:
 `R/branches/population.R` 8, `R/branches/enrollment-projections.R` 5,
 `R/features/dept-dashboard.R` 2, `R/features/course-report.R` 2,
 `R/cones/gen-ed-conversion.R` 2, `R/branches/enrl.R` 2, and singles. Many are a
 legitimate per-student latest term. *Done when:* each is either that, with a
-comment, or replaced by `cedar_data_edges()`.
+comment, or replaced by `cedar_data_edges()`. On 2026-11-26 `max(term` is
+written 46 times in `R/` (`R/branches/population.R` 7, `courses.R` 4,
+`enrollment-projection-context.R` 3, `enrl.R` 3): the files have been split
+and added to since the first count, and nothing held the number. *Held since
+2026-11-26* by `tests/testthat/test-architecture.R` ("a max(term) is a stated
+latest term, or it does not grow"): a line taking `max(term)` or
+`slice_max(term)` counts unless it carries `MAX-TERM-OK:` and its reason, on
+the line or within three above, and each file's count is an allowance that
+may only go down. 54 lines in 23 files, `R/branches/data-edges.R` left out as
+where the edges are computed. None is marked yet: the review this entry asks
+for is each one marked or replaced by an edge, until the allowances are
+empty.
 
 **M4 — Duplicated metric explanations.** *Done when:* each reconciled analysis's
 explanation lives in the shared definition records (`docs/_data/definitions.yml`),
@@ -4326,7 +5265,10 @@ hand, which `outcome_category` already stores. Stop-out (`get_stopout()`,
 stop-out read `cedar_attempts` through `prepare_course_attempts()` and
 `attempt_outcome_flags()`, the class-list path and `classify_grades()` are
 gone, their tests run on `test_attempts`, and the two remaining callers are
-the only ones, each with a comment saying why.
+the only ones, each with a comment saying why. *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("readers that classify the class list
+themselves do not grow"): the four files above are allowed their one call of
+`classify_enrollment_outcomes()` each, and no other file any.
 
 **M54 — A DFW rate is computed by hand in about eight places, each with its
 own floor and rounding.** `100 * n_dfw / n` with a small-cell guard is
@@ -4343,7 +5285,19 @@ Bottleneck, Population Course Pressure) display them as they come. Reading
 drifts. Found 2026-11-15. *Done when:* one trunk helper (a rate with a
 floor, NA under it, never rounded) computes every one of them, each display
 rounds for itself, and `get_course_outcome_rates()` returns
-`summarize_attempt_outcomes()`' rates unrounded.
+`summarize_attempt_outcomes()`' rates unrounded. *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("a DFW count divided by hand does not
+grow"): a line that divides a name holding `dfw` counts (turning a percent
+into a share, `/ 100`, does not), 26 lines in 14 files, each file's count an
+allowance that may only go down. That is more places than the eight above:
+`R/cones/dfw-section-spread.R` (4), `dfw-course-board.R`,
+`downstream-outcomes.R`, `R/features/gen-ed.R`, `dfw-dashboard-view.R`,
+`course-report.R` and two projection branches write one too. The pattern is
+blunt both ways. Six of the 26 are a share or a statistic built on a rate
+(said beside their allowances), and the local helpers (`rate_or_na()`,
+`ratio()`, `safe_pct()`) are not seen. It stops the next
+`100 * n_dfw / n`; the helper is still this entry's fix, and a rate over
+counts that are not attempts rows has nowhere shared to go until it exists.
 
 **M55 — Headcount selects a department's programs by name.** **Done
 2026-11-16.** The module filtered minors and concentrations with
@@ -4480,10 +5434,15 @@ mrgather removes that lock when it starts, because a fetch stopped part-way
 leaves one behind. So a refresh started by hand while the scheduled one is
 fetching (or twice by hand) puts two browsers in one profile and writes two
 sets of exports to one folder. Found 2026-11-23 reading mrgather's code; not
-seen to happen. *Done when:* the fetch step fails with "another fetch is
-running" when a `cedar-mrgather-fetch-*` container is already up, checked
-through `docker ps` so that a fetch that died leaves nothing to clear, and
-`test-data-update-pipeline.R` covers it.
+seen to happen. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): before it starts a fetch the script
+asks `docker ps` for a `cedar-mrgather-fetch-*` container, and with one up the
+step fails as "another fetch is running (<its name>)" without starting
+mrgather. Nothing is parsed from that run, a file from today included, since
+the other fetch may still be writing it. A fetch that died leaves no
+container, so there is nothing to clear; and a run that finds every file
+already from today needs no fetch and does not ask. `test-data-update-pipeline.R`
+covers the three.
 
 ### Architecture rules (`AGENTS.md`)
 
@@ -4559,13 +5518,23 @@ the global `major_code_to_name` went with `cedar_lookups` (2026-11-06).
 **M13 — Business logic in modules.** `R/modules/pathways.R` 38
 `group_by`/`summarize` pipelines, `R/modules/cancellations.R` 10,
 `R/modules/gen-ed.R` 2. *Done when:* each calculation lives in the cone or
-branch that owns the question.
+branch that owns the question. On 2026-11-26: `pathways.R` 33 calls of
+`group_by()` or `summarize()`, `cancellations.R` 10, `gen-ed.R` 2, and none
+in `server.R`.
 
 **M14 — Inline surfaces in `server.R`.** 6,356 lines. *Done when:* the remaining
 inline tabs are modules (templates: `R/modules/headcount.R`,
-`R/modules/dept-trends.R`), with logic in branches/cones/features.
+`R/modules/dept-trends.R`), with logic in branches/cones/features. On
+2026-11-26: 6,049 lines and 19 module servers mounted. The pages still
+written in it, by their outputs: Course Dynamics (`cr_`, 59), the Dept
+Dashboard (`dashboard_`, 18), Enrollment (`enrl_`, 7) and Admin's mappings
+(`mapping_`, 7). Low Enrollment left it the same day
+(`R/modules/low-enrollment.R`, with `R/features/low-enrollment.R`): 5,445
+lines and 20 module servers.
 
 **M15 — `ggplot` charts.** Six remain. *Done when:* each is native `plot_ly()`.
+On 2026-11-26 three remain: `R/cones/pathway.R`, `R/cones/population-trend.R`
+and `R/modules/cancellations.R`.
 
 **M16 — Oversized files.** Cones over the 500-line budget: `pathway.R` 904,
 `course-demographics.R` 679, `stopout.R` 577, `gen-ed-conversion.R` 542,
@@ -4577,17 +5546,35 @@ text, and `R/modules/enrollment-projections.R` 1,711, of which the server is
 about 430 against a 300-line budget. The view file is deliberately off the
 model-source list, so splitting it costs no bundle rebuild, but a split file
 must stay off that list too. *Done when:* each is split by sub-question or
-its repeated code extracted — alongside other work on the file.
+its repeated code extracted — alongside other work on the file. On
+2026-11-26 the cones over budget are `pathway.R` 929, `major-course-units.R`
+693, `course-demographics.R` 665, `stopout.R` 563, `gen-ed-conversion.R` 542
+and `seatfinder.R` 513; the longest files are `R/modules/pathways.R` 4,071,
+`R/branches/enrl.R` 3,226, `R/features/enrollment-projection-view.R` 2,919
+and `R/modules/enrollment-projections.R` 1,999.
 
 ### Interface consistency
 
 **M17 — Inline styles.** 153 `style =` attributes in module and UI code
 (133 lines on 2026-11-14, 91 of them in `server.R`). *Done when:* replaced by shared helpers and CSS classes
-(`R/modules/ui-helpers.R`), one tab per PR.
+(`R/modules/ui-helpers.R`), one tab per PR. On 2026-11-26: 101 in the modules,
+`server.R` and `ui.R`; 61 of them in `server.R`, most under the Dept
+Dashboard's outputs, then Low Enrollment's (54 in `server.R` and none in
+`ui.R` once Low Enrollment became a module). *Held since 2026-11-26* by
+`tests/testthat/test-architecture.R` ("inline styles given a fixed string do
+not grow"): 102 `style =` given a fixed string, in 10 files, each file's
+count an allowance that may only go down. A style built from a value (24
+`style = paste0(` or `sprintf(`, a bar's width among them) is not counted.
 
 **M18 — Bare headings.** 53 `h3()`–`h6()`. *Done when:* each is
 `subtab_header()`, `dashboard_section()`, `dashboard_subsection()`, or
-`section_heading()` with its one-sentence description.
+`section_heading()` with its one-sentence description. On 2026-11-26: 38; 22
+of them in `server.R`, 16 of those Low Enrollment's (8 in `server.R` once
+Low Enrollment became a module). *Held since 2026-11-26*
+by `tests/testthat/test-architecture.R` ("bare headings do not grow"): 37 in
+7 files, each file's count an allowance that may only go down
+(`R/modules/ui-helpers.R` is left out: the section helpers write their own
+heading tag there).
 
 **M19 — Pathways heatmap legibility.** Long course labels and dense
 course-to-major views. *Done when:* labels are readable at the default size.
@@ -4610,7 +5597,11 @@ dropdown takes a department's programs from `cedar_lookups$program_name_lookup`
 (each program name's most common department), so a name two departments share
 lists under one. Counting is by each row's own department (I15); only the
 choices are affected. *Done when:* the choices come from the rows'
-`dept_code`, or from `unit_mapping_rows()`.
+`dept_code`, or from `unit_mapping_rows()`. Resolved 2026-11-16, with M55,
+and marked here on 2026-11-26 when the entry was found still open: the
+choices are `headcount_filter_choices()`'s (`R/branches/headcount.R`), which
+takes a department's programs through `filter_programs_to_dept()`, the rows
+whose own `dept_code` it is, and `cedar_lookups` is gone from the code.
 
 The entries below come from the 2026-11-14 page audit (HIST and HIST 1110 on
 the institutional app). Order: M43 first, on the dean-facing pages, then one
@@ -4678,7 +5669,14 @@ campus "Albuquerque/Main" where the rest say ABQ; the Waitlists campus box
 wraps to one chip per line; empty states say "Select X, then click Y" except
 Pathways', which says what each subtab will show. *Done when:* labels, campus
 values and empty states follow one pattern (Pathways' start card for the
-empty state).
+empty state). *2026-11-26:* the scope inputs of Regstats, Open Seats,
+Waitlists, Low Enrollment, Cancellations and Enrollment come from one builder
+(`cedar_section_scope_inputs()`, `R/modules/ui-helpers.R`): one label, order,
+width and default for each, and a page states only where it differs.
+Headcount's labels, Pathways' campus names and the empty states remain. So
+does a narrow window: at 1,024 pixels wide the section pages' bar does not
+wrap, its link menu ends past the right edge (24 pixels on Cancellations, 39
+on Low Enrollment, measured in the app) and the page scrolls sideways.
 
 **M48 — Dept Dashboard lists run unbounded.** "Missing vs. two years ago" listed
 32 HIST courses with no cap or collapse, and the Low Enrollment table clips
@@ -4746,7 +5744,14 @@ inline styles. Trace colours chosen for a white page (a near-black line or
 label) and the sparkline strokes in `R/modules/ui-helpers.R` are not checked.
 *Reproduce:* switch to dark mode and open Regstats, a Dept Trends degree
 table or Pathways' warning line. *Done when:* each is a CSS class reading a
-token, and a dark screenshot of each page shows no light-mode colour.
+token, and a dark screenshot of each page shows no light-mode colour. *Held
+since 2026-11-26* by `tests/testthat/test-architecture.R` ("colours written
+into R code do not grow"): every hex value written outside
+`R/trunk/utils.R`, where the palette is, counts, and each file's count is an
+allowance that may only go down. 123 in 19 files, far more than the nine
+inline styles above: `R/modules/regstats.R` 29, `pathways.R` 21, `server.R`
+13, `cancellations.R` 12, `retention.R` 12, `ui-helpers.R` 5, and 29 trace
+and line colours in eleven branch, cone and feature files.
 
 **M59 — Each cache-warming script copies global.R's load sequence.**
 `scripts/warm-dept-dashboard-cache.R`, `warm-dept-trends-cache.R` and
@@ -4802,8 +5807,11 @@ With an empty `students` table, `max(as.integer(students$exit_term))`
 app's log for a scope with no far-along leaver, such as a small level on one
 campus. Found 2026-11-22 while testing the Graduation preload. *Reproduce:*
 `build_graduation_dashboard()` on XC01 with `attempts` and `boards`, given
-`parts` whose `exit$students` has no rows. *Done when:* the cone returns its
-empty result before it reads the last term, and a test covers the empty scope.
+`parts` whose `exit$students` has no rows. Resolved 2026-11-25 (branch
+`fix/exit-progress-empty-and-one-fetch`): with no student the cone reads no
+last term and no course is readable; the result is the same empty one, without
+the warning. `test-exit-requirements.R` runs XC01 with no student who left and
+expects no warning.
 
 **M65 — The list of MyReports reports is kept in three places.** Until
 2026-11-22 a report's code, file signature or stage was typed in about a
@@ -4831,11 +5839,424 @@ it read the same control as the student's home campus. The section's method
 note has said the second since it shipped and says the first since
 2026-11-23; neither is a wrong number, but one control means two things on
 one page. Found 2026-11-23 writing down who each Retention section counts
-(read from the code; how many attempts it moves was not measured). *Done
-when:* the section reads the students of the page's level (their level that
-term, from `cedar_student_terms`), or the choice to read everyone is recorded
-here as deliberate; and the campus control means one thing on the page, or
-the section has its own.
+(read from the code). Resolved 2026-11-25 (branch
+`retention/band-courses-page-scope`): the section reads the students enrolled
+that term at the page's level and home campus, a student's whole term in or
+out (`get_course_band_dfw()`'s `opt$student_level` and `opt$student_campus`,
+through `scope_student_terms()`), and each of their courses on the campus
+that taught it, as "Courses Where a DFW Costs the Most" does. Both controls
+now mean one thing on the page. Measured on the development machine's own
+copy of the tables (older than the app's), Fall 2021 to Fall 2025,
+undergraduates of the main campus:
+
+- 24.3% of the student-terms the old reading held were not undergraduates
+  (16.6% of its graded attempts); 0.1% had another home campus.
+- 31.1% of these students' graded attempts were taught on another campus
+  (online, mostly), and the old reading held none of them.
+- Courses read went from 103 to 168, 65 of them taught on another campus;
+  harder from 7 to 10 and easier from 10 to 13. Every course on a list before
+  is still on it. (The app's copy reads 168 too, 9 of them harder, and each
+  list holds two courses taught on another campus.)
+- Every level the page offers builds, by either GPA, in 0.4 to 4.8 seconds;
+  graduate students have no course with 30 attempts in the lowest band.
+
+Fixed with it: the cone took the lowest high-school GPA band from the
+students present, so with nobody in the lowest band the next one up was
+called the lowest (read from the code), and with nobody banded it stopped
+("subscript out of bounds"), which a level choice makes reachable (graduate
+students by high-school GPA). The lowest band is now the scale's, whoever is
+in it, and a scope with no student reads as "No course had 30 graded
+attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
+of another home campus, and one student whose level changes between terms,
+in one course); 14 deliberate breaks of the change each failed a test. I86
+and M76 came out of the same work.
+
+**M82 — The compiled Liberal Arts and Integrative Studies board has no
+shared-rules profile, so it shows no Gen Ed cards.** Open; found 2026-11-27
+giving the compiled boards profiles (I97). A profile names exactly one college
+rule set matching the program's college (`read_shared_requirement_bundle()`),
+and the 2026–2027 rules have none for University College, which awards the
+B.A. in LAIS (`BA-LAIS-US`). So its 60 open credits read as electives, and its
+reading may name no Gen Ed pools. *Done when:* the edition's rules hold a
+University College set (its requirements, or a captured page saying it has
+none), and the board has a profile.
+
+**M81 — A choice whose every option is in one Gen Ed area still leaves that
+area's card.** Open; found 2026-11-27 checking the compiled Civil Engineering
+board (I97). Its choice of ECON 2110 or ECON 2120 meets Area IV whichever the
+student takes, but an open choice never counts toward an area
+(`degree_shared_coverage()`), so the board also plans a Social and Behavioral
+Sciences card. Its 6 open credits then cannot hold all four remaining areas
+(IV, Humanities, Second Language, Arts and Design), and the page says 6 Gen Ed
+credits could not fit. The same holds for the hand-built Business board's
+PSYC/SOCI choice. *Done when:* a choice whose options all belong to one area,
+each with the area's credits, counts toward it once, and a choice with any
+option outside the area still only says it may meet it.
+
+**M80 — Retention follows an entering class in two sections that each choose
+their own students.** Open; found 2026-11-26 folding the First Year page into
+Retention (branch `retention/fold-first-year`). "Each Entering Class, Semester
+by Semester" (`R/modules/retention-entering-classes.R`) and "Still Here, and
+Moving Forward?" (`R/modules/retention-dashboard.R`) both read
+`get_entering_class_retention()`, and now sit one after the other. The first
+has **Entering students** (first-time; first-time, full-time; new transfer;
+everyone new), reads fall or spring classes by the page's term type, and
+follows four semesters. The second has **Students who started as**
+(first-time; transfer by credits brought), reads fall classes only, and
+follows eight. For a first-time fall class the 3rd and 5th semesters of the
+first are the start of the second and third years of the second: the same
+share, drawn twice (the browser suite holds that the two agree). *Not merged
+in the fold* because one control cannot serve both as they stand: the pace
+split has no meaning for "everyone new", needs the credits a transfer student
+brought, and is built for fall classes. *Done when:* one choice of who a class
+holds drives both, with the pace section saying plainly which choices it
+cannot split by pace, or the first section's lines become the totals of the
+second's bars in one figure.
+
+**M79 — The pull-request check failed once on a change to `ISSUES.md`
+alone, and what the page showed was not kept.** Open. #416 changed one
+Markdown file. Its first "Synthetic checks" run (2026-11-26, run 45768839743,
+attempt 1) passed the R suite (9,203 passed, 0 failed) and the demo suite's
+first six browser steps, then failed "Regstats runs": "timed out waiting for
+fixture enrollment bump", 93 seconds after the step began. The step had read
+the Worth a Look chart and table, clicked the Enrollment Bumps sub-tab
+(`clickSubTabIn()`, `tests/e2e/reports-smoke.test.mjs`: one `link.click()`,
+with no look at whether the tab opened) and waited for rows in
+`regstats-rs_bumps_table`. The app's log shows the report computed in 0.42
+seconds and nothing after it; the runner's own account (#409) found the same
+R process, no kill for memory, 477 MiB in use and the app answering. The
+second attempt, same commit, passed in 8m29s. The step's screenshot
+(`/tmp/cedar-smoke-regstats-runs.png`) is not among the files the workflow
+uploads (`.github/workflows/pr-checks.yml` keeps the compose log and
+`/tmp/cedar-synthetic-demo.png`), so whether the sub-tab never opened or
+opened empty is not known. **A second failure, on another step (2026-11-26, run 45884238534,
+attempt 1).** #422 changed `ISSUES.md` and `ROADMAP.md`. The R suite passed
+(9,351) and so did eight browser steps, then "Pathways Roadblocks reads the
+attempt table" timed out waiting for the attempt outcomes, 90 seconds after
+"Pathways population builds" passed. The re-run of the same commit passed in
+7m52s. So it is not one step: two steps that each open a sub-tab and wait for
+its output, on runs that change no code. *Reproduce:* not on demand; two
+failures seen.
+*Done when:* the workflow uploads every `/tmp/cedar-smoke-*.png` a failed
+step saves, and either the cause is found from one or `clickSubTabIn()`
+waits for the tab it clicked to be the active one before the step reads it.
+
+**M78 — `./run-tests.sh --changed` compared a branch with the local `main`,
+however old.** Resolved 2026-11-26 (branch `test/model-source-warning`). The
+change analysis took its diff from `git merge-base HEAD main`. A clone worked
+in branches and worktrees rarely pulls its local `main`: on the development
+machine that day it stood 25 merges behind `origin/main`, and the analysis of
+a branch that changed 13 files listed 104, selected nine browser suites and
+the first-sessions run, and would have called `R/trunk/utils.R` model source
+in a branch that had not touched it. It now takes the later of the two points where
+the branch left `origin/main` (as of the last fetch) and the local `main`.
+`test-ci.R` holds both orders against a stand-in `git`.
+
+**M77 — Nothing says a change touches projection model source until the
+deploy takes an hour.** Open; the first half of *Done when* is done
+(2026-11-26, branch `test/model-source-warning`):
+`scripts/projection-model-source.sh` reads the list from the function's own
+text (`test-ci.R` holds that the two are one list), `./run-tests.sh --changed`
+marks a listed file and says what the deploy will do, and the pull-request
+checks carry it as the name of a check, `Deploy: rebuilds both projection
+bundles (about 45 minutes)` or `Deploy: no projection rebuild`, which never
+fails. What is left is the second half: `utils.R` is still on the list whole.
+`enrollment_projection_model_source_files()`
+(`R/features/enrollment-projections.R`) lists 22 files, and an edit to any of
+them, a comment included, makes the next deploy rebuild both projection
+bundles, about 20 minutes each, inside a deploy step that is stopped at 60
+(I6 is what a rebuild stopped there leaves behind). `R/trunk/utils.R` is on
+the list, and it is also where a general helper goes by habit. On 2026-11-25,
+#405 added `cedar_compile_server()` and `cedar_server_to_run()` there. No
+projection reads either, nothing in the pull request or its checks said what
+the file was, and the deploy of #404 to #407 spent 45 minutes in "Deploy
+over SSH", 43 of them rebuilding the two bundles ("model source changed:
+R/trunk/utils.R"), where a deploy that rebuilds nothing takes about six. M62 had met the
+same thing on 2026-11-22 and put `fmt_count()` in `display-format.R` for that
+reason: the lesson was written in that entry and stood in nobody's way.
+Moving the two functions out now would be one more edit to the file and one
+more rebuild, so they stay. *Done when:* `./run-tests.sh --changed` and the
+pull-request check say when a diff touches a file on the list and what the
+deploy will then do, reading the list from the function itself; and what
+projections read of `utils.R` is a file of its own, or the list is of
+functions and not of files, so that a helper beside them costs nothing.
+
+**M76 — A page's student scope (level that term, home campus) is written out
+in five more places.** `scope_student_terms()` (`R/branches/student-terms.R`,
+added 2026-11-25 for M67) is the enrolled student-terms of a level and a home
+campus, and the Retention page's two course sections read through it. The
+same filters are still written inline, each with its own handling of
+`enrolled`, of a missing level and of the order they apply in:
+`get_credit_ceiling_crossings()` (`R/cones/credit-ceiling.R`),
+`get_course_cohort_effect()` (`R/cones/course-cohort-effect.R`, home campus
+with a classification), `course_cohort_gen_ed_candidates()` and
+`course_cohort_context_defaults()` (`R/features/course-cohort-context.R`),
+`entering_students()` (`R/branches/retention-context.R`, the level on the
+enrolled rows and the campus on the entering term) and
+`retention_scope_facts()` (`R/features/retention-dashboard.R`, which also
+counts the rows at another level). M67 was one such copy missing. Found
+2026-11-25 looking for a helper before writing one; none was changed. *Done
+when:* each reads through `scope_student_terms()`, or its header says why its
+scope differs. On 2026-11-26 the count taken for a ratchet found the same two
+filters in four more cones: `R/cones/exit-credits.R` (4 lines, in
+`.exit_later_return()` and `get_exit_credits()`), `return-rates.R` (2),
+`summer-finishers.R` (2) and `course-similar-students.R` (1). *Held since
+2026-11-26* by `tests/testthat/test-architecture.R` ("a student scope written
+by hand does not grow"): a line in a branch, a cone or a feature that tests
+`student_level` or `student_campus` against an option counts, 24 lines in 12
+files, each file's count an allowance that may only go down. Six of the 24,
+in `R/branches/population.R`, `headcount.R` and `major-change-detection.R`,
+scope declarations (`cedar_programs`, which carries the same two columns) and
+stay, said beside their allowances.
+
+**M68 — Against Non-Takers took one to two minutes for a large course, and
+runs when Downstream opens.** Resolved 2026-11-25 (branch
+`perf/non-takers-run`) for the length of the run: 12.5 seconds locally for
+FYEX 1110, where it was 46 to 50; on production after the deploy, 17.4 and
+20.6 seconds in two sessions. FYEX 1110 on production before it,
+2026-11-25: `course_cohort` 91.2 seconds, between `later_course` (5.4) and
+`course_sequence` (19.5), during which R answers no other session (I82 is the
+empty page it showed meanwhile). A profile of the local run gave 20 seconds in
+`student_term_aid()` (`R/branches/comparison.R`: a `summarize(max(…))` per
+student-term over the whole declarations table, the same for every course and
+every call, wrapped in `suppressWarnings()` per group), 12 in the `touched`
+table of `get_course_similar_students()` (a `summarize()` per member and
+course), both rebuilt on each of the three readings the payload makes, and 6
+in the balance table. What changed: `student_term_aid()` counts over the whole
+table at once (4.6 seconds to 0.1 on the development machine, the same
+426,241 rows); `prepare_course_similar_students()` builds the members, their
+cells and each course's non-takers once and the payload reads it three times
+(`prepared =`); each member's courses are counted over the rows at once. The
+payloads for FYEX 1110 and ENGL 1110, with everyone else and with Gen Ed
+non-takers, are `identical()` to the code before on the full tables. What the
+run still costs, on the development machine outside the container: 5.6
+seconds, of which the balance table 1.7, similar students 2.6, the raw
+comparison 1.0. At a Glance starts all three runs on opening (decided
+2026-11-25); M72 is what keeps a course's results for the sessions after the
+first.
+
+**M71 — The sequence comparison asked each student in turn.** Resolved
+2026-11-25 (branch `perf/sequence-first-attempt`): 5.7 seconds locally for
+FYEX 1110's default pair, where it was 8.4 to 11.6; 2.2 seconds for a large
+pair on the development machine outside the container, where it was 4.4. At a
+Glance's last step ("Did passing it first help?") took 19.5 seconds for FYEX
+1110 on production on 2026-11-25, where the page's estimate for it reads
+"usually ~2–5s"; after the deploy, 8.5 and 10.0 seconds in two sessions.
+`get_course_sequence_effect()`
+(`R/cones/course-sequence-effect.R`) picked each student's first attempt of
+the later course with a `summarize()` per student-term and a `slice_head()`
+per student, then each student's first pass of the earlier course with a
+`min(term)` per student; and `build_comparison()`
+(`R/branches/comparison.R`) picked each student's declaration record with a
+`slice()` per student. Each is now one sort and the first row a student has.
+The results for three large pairs, and the Against Non-Takers balance tables
+that read the same builder, are `identical()` to the code before on the full
+tables. Two picks had no test that held them: `.sequence_repeat_fixture` adds
+a student with an A and an F in the later course in one term (the DFW is
+kept) and one who passed the earlier course before and again after the later
+one (the first pass counts). What the step still costs is the comparison
+builder's as-of joins for entering GPA and credits (about half of the 2.2
+seconds).
+
+**M75 — The first session of a process starts about 2 seconds slower than
+later ones, and it is not compilation.** The shared result it traced to is
+built ahead since 2026-11-26; open for the slow later session. On fresh starts of the
+development container (2026-11-25, `tests/e2e/fresh-start.test.mjs`, home
+page, from opening the page to the end of the session's first busy-to-idle
+cycle), the first session took 6.1 and 6.5 seconds with the server function
+compiled at start, and 6.1 to 7.6 before; sessions three to six took 4.2 to
+5.0, apart from the one below. Its server begins 0.2 to 0.4 seconds after the
+connection, like any other, so the time is inside the session's own start.
+Compiling every function in the global environment at start (33 seconds
+against 6.3) left it at 5.9, so it is not R compiling CEDAR's functions. Not
+traced: what a process does once on its first session (Shiny's own first
+read of `server.R`, files read on first use, the first render of the home
+page) is where to look, by profiling the server function on a new process
+(`Rprof()` started before it and stopped in `session$onFlushed()`), first
+session against second. Seen beside it and also not traced:
+about one later session in four takes 1.2 to 1.6 seconds longer than its
+neighbours (5.6 to 6.2 against 4.2 to 4.5), most often the fourth. It is not
+garbage collection either: with `gcinfo(TRUE)` on, no full collection fell
+inside any of seven sessions' starts (the first at 6.7 seconds, the fourth at
+5.7), and each start saw one level-1 collection at most. Production's morning restart
+is followed by a request that fetches the page and opens no session, so the
+first reader of the day is this first session. **Traced 2026-11-25**, by the
+profile this entry asked for
+([a session's start](docs/developers/performance-monitoring.md#a-sessions-start)):
+three sessions in turn on a new process of the development container, the
+build-ahead finished. The lines the first session had and the others had not
+were the Headcount module's set-up (`R/modules/headcount.R`) reading its
+filter choices through `cedar_shared_result()`, which the first session of a
+process built and every later one read. The reading written here that day
+was wrong in two ways. It gave 0.7 seconds to "the first render of
+Headcount's download control" and 0.4 to program labels as costs of their
+own: the profile names a file by its base name, two files are `headcount.R`,
+and line 195 is in `R/branches/headcount.R`, inside
+`headcount_filter_choices()`; the labels (`population.R:1297` to `1323`) are
+under it too, so all of it was the one build. And its 4.3 seconds against
+2.0 came from a process that had also built ten courses ahead, which no
+later run here did.
+
+**The shared result, fixed 2026-11-26** (branch
+`headcount/choices-built-ahead`): the choices are the first job of the
+build-ahead (`headcount_choices_job()`, `headcount_preload_jobs()`,
+`R/modules/headcount.R`), and the module's server reads the same job, so the
+key built ahead is the key asked for. Like for like (the development
+container, no course built ahead, the profile recipe, three sessions on each
+of three new processes before and three after): the first session sampled
+3.36, 3.30 and 3.34 seconds before, 1.04, 1.00 and 0.92 of it building the
+choices, and 3.12, 2.94 and 2.90 after, none of it. The build's second is
+gone from the first session, and the session is shorter by about a third of
+one: the rest of it took a little longer in many places, none of them one
+line. Later sessions sampled 1.9 to 2.7 either way, but for the two below.
+In a browser (`./run-tests.sh --e2e --fresh headcount`, which holds none of
+it) six starts took 5.5 4.8 4.9 5.8 4.7 4.8 seconds on the branch against
+5.6 4.1 4.3 5.6 3.6 3.7 the day before on other code: one start differs from
+the next by more than the fix moves the first. So this entry's two seconds
+were never there to save. What the fix settles is the rule: a result every
+session reads as it starts is built ahead.
+
+**What is left of the first session is R compiling functions on their first
+call.** In all six first sessions profiled, before the fix and after, 0.60
+to 0.72 seconds of the samples have `compiler:::tryCmpfun` on the stack; the
+second session has 0.04 to 0.12 and the third none. The largest are the Gen
+Ed module's server function (0.26, `R/modules/gen-ed.R:1211`) and the
+projections module's (0.06 to 0.16). `cedar_compile_server()` compiles
+`server` at start; the module functions it calls are compiled when a session
+first calls them. "It is not compilation", in this entry's title, was true
+of the build and is not true of the rest. It stays: compiling the module
+functions at start adds to every start to save the day's first reader about
+half a second, and `cedar_compile_server()` is in `R/trunk/utils.R`,
+projection model source (M77), so the change costs a rebuild of both
+bundles. It belongs with the next model version if anywhere.
+
+**The slow later session: two profiled, not traced.** Two of the twelve
+later sessions sampled 3.12 and 3.90 seconds where their neighbours sampled
+1.9 to 2.7. In each the extra sat in one place, and not the same place. In
+one, 1.5 seconds were in `paste0()` under Shiny's hashing of the names of
+the calls on the stack (`saveCallStackDigest()`, `getCallNames()`, Shiny
+1.10.0), which it does whenever a condition is raised: here the `req()` of
+`output$gen_ed-instructor_dfw_plot` (`R/modules/gen-ed.R:913`), failing as
+it should with nothing asked for. Every profiled session has such digests,
+0.02 to 0.34 seconds of them in all. In the other, 1.1 seconds were inside
+the creation of one observer (`cedar_copy_url_observer()`, `observeEvent()`),
+which takes 0.02 in the session before it. Two unrelated lines each stalling
+for over a second is what a garbage collection looks like in a profile that
+does not record collections, as these do not (`gc.profiling` off): the time
+is given to whatever was running. The `gcinfo(TRUE)` check above found no
+full collection inside seven starts, none of them one of these. *Done when:*
+a slow later session is profiled with `Rprof(gc.profiling = TRUE)` and the
+stall is a collection or is not, and the unprofiled one-in-four (5.6 to 6.2
+seconds against 4.2 to 4.5) is shown to be the same thing or another.
+
+**M74 — The projection lock test fails when the machine is busy.**
+Resolved 2026-11-25 (branch `test/first-suite-session`): the test no longer
+holds a one-second loop to a three-second limit. `test-projection-refresh.R`
+(the test that a live build keeps its lock and a killed one loses it) started
+a second R process that holds the lock with a heartbeat every second, slept 4
+seconds, and expected the lock to be refused under a stale limit of 3
+seconds; then killed the holder, slept 5, and expected a takeover. On
+2026-11-25 a full `./run-tests.sh` started right after a container was
+removed gave 9,077 passed and 2 failed, both there (line 319, "Expected ...
+to throw a error"; line 328, "Rebuild already running", the mirror image).
+The file alone, minutes later: 82 passed, 0 failed. A heartbeat that arrives
+a second or two late was enough to flip either expectation. The limit is now
+600 seconds throughout and the test moves the heartbeat's date itself: set
+back an hour, a live holder's next beat brings it forward (waited for, not
+timed) and the lock is refused; after the kill, set back until it stays back
+(`set_file_time_back()`, `helper-projection-refresh.R`, which the takeover
+test beside it uses too) and the lock is taken over. Ten runs of the file with
+every core busy (ten `yes` processes on eight cores), ten passed, the last
+five as the test now stands; and each of
+four deliberate breaks of the lock fails it (no heartbeat, a live lock taken,
+a dead lock never taken, a heartbeat that outlives its holder). Found on the
+way: the test above it ("automatic runs share the manual lock…") called the
+refresh with its real build behind the lock, so a lock that did not hold
+started a real projections build and the file hung; it now passes a build
+that only records the call, and fails in a minute.
+
+**M73 — The development container has about 400 MB to spare, and building courses ahead takes it.**
+Resolved 2026-11-25 (branch `test/first-suite-session`): a development
+machine builds no course ahead. The app image runs emulated in a Docker VM of
+3.8 GiB on the development Mac. On 2026-11-25, seven browser suites in a row
+(the five Course Dynamics suites, Graduation, DFW Rates) against a process
+that built no course ahead passed, with the container at 3.2 GiB after the
+first suite and 3.42 at the most. The same suites against a process that had
+built two courses ahead (2.7 GiB once the build-ahead finished): the R process
+was killed for memory during the DFW Rates suite, at its spring build, the
+page reloaded, and the suite failed with "Execution context was destroyed"
+(`docker inspect --format '{{.State.OOMKilled}}'` gave `true`, and the log
+shows a second start). One run each, so the build-ahead is not shown to be
+the cause; the margin is what is shown. Production's host has 8 GB and is not
+close. The developer's `.env` sets `CEDAR_PRELOAD_COURSES=0` (decided
+2026-11-25), `.env.example` carries the line, and
+`docs/developers/e2e-testing.md` says why beside the other memory limits.
+
+**M72 — Downstream's three comparisons were built again by every session.**
+Resolved 2026-11-25 (branch `perf/downstream-shared-results`). At a Glance
+runs Next Courses, Against Non-Takers and Prepared for It as Downstream opens,
+and each session built all three for itself. On production after M68 and M71,
+two sessions one after the other opened Downstream for FYEX 1110: ready in 46
+and 38 seconds (the comparison with non-takers 20.6 and 17.4, the sequence
+comparison 10.0 and 8.5, the later course 5.6 and 4.1), during which R
+answers no other session. Each result is now read through
+`cedar_shared_result()`, keyed by the course, the campuses and every setting:
+the first session to ask builds it, behind the overlay as before, and every
+later session on that process reads it. In the local container, three
+sessions in turn for FYEX 1110: 47 seconds for the one that built, then 11.8
+and 7.3. The later-course list and the settings Against Non-Takers opens on,
+which every session also worked out for itself, are shared the same way. A
+result that lost a part to a caught error is shown to its session and not
+kept (`keep =`). What it
+saves, from production's timing log for the 30 days to 2026-11-25: of 156
+course analyses over 83 courses, 27 (17%) were of a course already analysed
+that day. A course's three results are about 1.1 MB (0.95, 0.12 to 0.25 and
+0.04) of the app's 200 MB cache, which drops the least recently read first.
+Still paid by every session: reading the course's own outcomes (about 2
+seconds, behind the overlay) and drawing At a Glance (about 4, with no wait
+shown: the course's return rates and the page itself). The ten courses
+analysed most are built ahead at start since 2026-11-25, so their first reader
+does not wait for the three comparisons either
+([built ahead](docs/developers/shiny-modules.md#downstream-for-the-courses-analysed-most)).
+
+**M69 — A soft restart leaves the previous R process running.** Resolved
+2026-11-26 on production, and in the install page's cron line.
+`restart-cedar.sh` touches `restart.txt`; Shiny Server starts a new R process
+for new sessions and, with `app_idle_timeout 0`, never ends the old one. On
+production on 2026-11-25 the process started after the 10:00 UTC container
+restart was still there at 14:19 beside the one the 11:00 soft restart started:
+1.2 GB resident and 1.4 GB in swap on an 8 GB host, until the next day's
+container restart. Done when the morning job ends with one R process (a hard
+restart there, or the soft restart ends the old worker), checked with `ps` in
+the container. Production's 11:00 UTC job was changed to
+`restart-cedar.sh --hard-restart` on 2026-11-25. Its first run, 2026-11-26:
+at 13:34 UTC the container had started at 11:00:02 and held one R process,
+started at 11:00:12, 2.6 GB resident, with 72 MB of swap in use on the host
+where the day before two processes had 1.4 GB there.
+`docs/developers/droplet-installation.md` and `scripts/README.md` gave a new
+host one job with a soft restart; both now end the line with
+`--hard-restart` and say why.
+
+**M70 — Shiny reads `ui.R` and `server.R` itself; `global.R` reads them too
+and `app.R` was never used.** With a `server.R` in the directory Shiny ignores
+an `app.R`: it sources `ui.R` on the first request and `server.R` on the first
+session, each into its own environment, and uses what those reads return. So
+the UI is built twice at start (the "Navigation containers" warning appears
+twice in every log), and the server function Shiny runs is not the one
+`global.R` made. Partly resolved 2026-11-25 (branch `perf/first-sessions`):
+`server.R`'s last line now returns the function `global.R` compiled, which is
+what I81 needed, and `docs/developers/index.md` and `AGENTS.md` say which file
+does what. What remains costs the start and no reader: the UI is still built
+twice, 2.1 seconds each in the development container, once in `global.R` and
+once at the first request (the restart's own warm-up request); and `server.R`
+is still read twice. `app.R`, which nothing read, was deleted on 2026-11-25
+with its mount in `compose.dev.yml`. `global.R`'s read of
+`ui.R` is also what puts `cedar_sections`, `cedar_registrations`,
+`cedar_programs` and `cedar_degrees` in the global environment, where
+`server.R` reads them as bare names (on 42 lines), so that read cannot simply go.
+*Done when:* the UI is built once (`ui.R` returning what `global.R` built, the
+way `server.R` now does) and `server.R` no longer depends on names `ui.R`
+defines.
 
 ### Documentation and naming
 

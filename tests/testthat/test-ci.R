@@ -10,7 +10,7 @@ test_that("PR checks are read-only, secret-free, and independent of deployment",
   expect_null(workflow$on$pull_request[["paths-ignore"]])
   expect_identical(workflow$permissions, list(contents = "read"))
   expect_false(grepl("secrets\\.|pull_request_target|self-hosted|ssh-action|docker-compose.yml", text))
-  expect_setequal(names(workflow$jobs), "synthetic-checks")
+  expect_setequal(names(workflow$jobs), c("synthetic-checks", "model-source", "deploy-cost"))
 
   job <- workflow$jobs[["synthetic-checks"]]
   expect_identical(job$name, "Synthetic checks")
@@ -45,6 +45,102 @@ test_that("PR checks run the full standard gate against an isolated synthetic ap
   upload <- Filter(function(step) identical(step$uses, "actions/upload-artifact@v4"), steps)[[1]]
   expect_identical(upload[["if"]], "always()")
   expect_equal(upload$with[["retention-days"]], 7)
+})
+
+# ISSUES M77: an edit to a file the projection model is hashed from makes the
+# next deploy rebuild both bundles, and nothing said so before the merge. Three
+# places now do, from one reading of the list: this script, the runner's
+# change analysis, and a pull-request check that carries the answer in its name.
+test_that("a shell reads the projection model-source list the deploy hashes", {
+  script <- file.path(cedar_base_dir, "scripts", "projection-model-source.sh")
+  expect_identical(system2("bash", shQuote(script), stdout = TRUE),
+                   enrollment_projection_model_source_files())
+
+  touched <- function(paths) {
+    system2("bash", c(shQuote(script), "--touched"), input = paths, stdout = TRUE)
+  }
+  expect_identical(
+    touched(c("R/trunk/utils.R", "R/trunk/display-format.R", "docs/developers/testing.md",
+              "scripts/build-enrollment-projections.R")),
+    c("R/trunk/utils.R", "scripts/build-enrollment-projections.R"))
+  # A path that only begins or ends like a listed one is not on the list.
+  expect_length(touched(c("R/trunk/display-format.R", "ISSUES.md", "tests/R/trunk/utils.R",
+                          "R/trunk/utils.R.orig")), 0)
+  expect_equal(system2("bash", c(shQuote(script), "--nope"), stdout = FALSE, stderr = FALSE), 2)
+})
+
+test_that("the change analysis says when a diff touches projection model source", {
+  testthat::local_edition(3)
+  # The real runner; git answers with diffs of our choosing, and the stages it
+  # then selects are stand-ins. HEAD left origin/main at 1111111 and the local
+  # main at 0000000, and which of the two is the later is the case's to say.
+  bin <- withr::local_tempdir()
+  stub <- c("#!/bin/bash",
+            'case "${0##*/} $*" in',
+            '  "git merge-base HEAD origin/main") echo 1111111 ;;',
+            '  "git merge-base HEAD main") echo 0000000 ;;',
+            '  "git merge-base --is-ancestor 1111111 0000000") [ "$CEDAR_FAKE_LATER" = main ] || exit 1 ;;',
+            '  "git diff --name-only 1111111 HEAD") printf "%s\\n" $CEDAR_FAKE_SINCE_ORIGIN ;;',
+            '  "git diff --name-only 0000000 HEAD") printf "%s\\n" $CEDAR_FAKE_SINCE_MAIN ;;',
+            "esac",
+            "exit 0")
+  for (command in c("git", "node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep)))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  analysis <- function(since_origin, since_main = since_origin, later = "origin") {
+    withr::local_envvar(c(CEDAR_FAKE_SINCE_ORIGIN = paste(since_origin, collapse = " "),
+                          CEDAR_FAKE_SINCE_MAIN = paste(since_main, collapse = " "),
+                          CEDAR_FAKE_LATER = later))
+    said <- system2("bash", c(shQuote(runner), "--changed"), stdout = TRUE, stderr = FALSE)
+    expect_null(attr(said, "status"))
+    from <- match("change analysis:", said)
+    said[from:(from + match("", said[-seq_len(from)]) - 1L)]
+  }
+  helper <- "R/trunk/display-format.R"
+  with_model_source <- c(helper, "R/trunk/utils.R")
+
+  expect_snapshot(writeLines(c(
+    "== A helper beside the model's files, and one of the model's files",
+    analysis(with_model_source),
+    "", "== The helper alone",
+    analysis(helper)
+  )))
+
+  # ISSUES M78. A local main left weeks behind holds everyone's work since in
+  # its diff, the model's files among it: the branch is compared with where it
+  # left origin/main. And a local main that is the later of the two is the one
+  # compared with.
+  expect_identical(analysis(helper, since_main = with_model_source), analysis(helper))
+  expect_identical(analysis(with_model_source, since_main = helper, later = "main"), analysis(helper))
+})
+
+test_that("the pull-request checks name a merge that will rebuild the projection bundles", {
+  testthat::local_edition(3)
+  workflow <- yaml::read_yaml(file.path(cedar_base_dir, ".github", "workflows", "pr-checks.yml"))
+  detect <- workflow$jobs[["model-source"]]
+  cost <- workflow$jobs[["deploy-cost"]]
+
+  # The diff read is the proposed merge against main: the merge commit and its
+  # first parent, which a checkout of depth 2 holds.
+  checkout <- detect$steps[[1]]
+  expect_identical(checkout$uses, "actions/checkout@v4")
+  expect_identical(checkout$with[["persist-credentials"]], FALSE)
+  expect_null(checkout$with$ref)
+  expect_equal(checkout$with[["fetch-depth"]], 2)
+  commands <- vapply(detect$steps, function(step) step$run %||% "", character(1))
+  expect_length(grep("git diff --name-only HEAD^1 HEAD | bash scripts/projection-model-source.sh --touched",
+                     commands, fixed = TRUE), 1)
+  expect_identical(detect$outputs$touched, "${{ steps.diff.outputs.touched }}")
+
+  # The answer is the second job's name, where the list of checks shows it,
+  # and it is a name either way: the job itself never fails a pull request.
+  expect_identical(cost$needs, "model-source")
+  expect_false(any(grepl("exit [1-9]", vapply(cost$steps, function(step) step$run %||% "", character(1)))))
+  expect_snapshot(writeLines(cost$name))
 })
 
 test_that("the Docker R option preserves the standard runner and rejects malformed arguments", {
@@ -169,6 +265,155 @@ test_that("the runner refuses a suite aimed at the wrong data surface", {
   expect_equal(browser_calls(run(c("--e2e", "nav"))), "node tests/e2e/nav.test.mjs")
 })
 
+test_that("a fresh run restarts the app, waits for its build-ahead and times its first sessions first", {
+  # Executable doubles, as above. docker answers the two questions the runner
+  # asks of it: which container publishes the app's port, and what its log
+  # says. Every other browser run meets a process already in use, which is how
+  # a test driver that raced a new one went unseen (ISSUES I85).
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  app_log <- file.path(bin, "app.log")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            'if [ "${0##*/}" = docker ] && [ "$1" = ps ]; then echo "$CEDAR_FAKE_CONTAINER"; fi',
+            'if [ "${0##*/}" = docker ] && [ "$1" = logs ]; then cat "$CEDAR_FAKE_APP_LOG"; fi',
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                        CEDAR_RUNNER_LOG = log, CEDAR_FAKE_APP_LOG = app_log,
+                        CEDAR_FAKE_CONTAINER = "cedar-test-app",
+                        CEDAR_BUILD_AHEAD_TIMEOUT = "1"))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  run <- function(args) {
+    writeLines(character(), log)
+    status <- system2("bash", c(shQuote(runner), args), stdout = FALSE, stderr = FALSE)
+    list(status = status, calls = readLines(log))
+  }
+  browser_calls <- function(result) grep("^node .*test.mjs", result$calls, value = TRUE)
+  first_sessions <- "node tests/e2e/fresh-start.test.mjs"
+  built <- c("[global.R] Downstream built ahead for: no course",
+             "[preload] 1 of 5: graduation_dashboard, ABQ: built (15.6s)",
+             "2026-11-25T21:55:40Z [preload] 5 of 5: dfw_dashboard, ABQ, EA: built (16.2s)")
+
+  writeLines(built, app_log)
+  fresh <- run(c("--e2e", "--fresh"))
+  expect_equal(fresh$status, 0)
+  expect_equal(browser_calls(fresh), first_sessions)
+  expect_true("docker restart cedar-test-app" %in% fresh$calls)
+  expect_lt(match("docker restart cedar-test-app", fresh$calls), match(first_sessions, fresh$calls))
+  expect_false("node tests/e2e/warmup.mjs" %in% fresh$calls)
+
+  # A suite named with it runs after the first sessions, never before.
+  expect_equal(browser_calls(run(c("--e2e", "--fresh", "nav"))),
+               c(first_sessions, "node tests/e2e/nav.test.mjs"))
+
+  # A rebuilt container is already a new process: no restart on top of it.
+  rebuilt <- run(c("--all", "--fresh"))
+  expect_equal(browser_calls(rebuilt), first_sessions)
+  expect_false("docker restart cedar-test-app" %in% rebuilt$calls)
+
+  # It is no part of a tour, and means nothing on a process already in use.
+  expect_false(first_sessions %in% browser_calls(run("--all")))
+  unasked <- run(c("--e2e", "fresh-start"))
+  expect_equal(unasked$status, 2)
+  expect_length(unasked$calls, 0)
+
+  # The build-ahead has not logged its last job: a session opened now would
+  # wait behind the job running, so nothing is timed.
+  writeLines(built[1:2], app_log)
+  building <- run(c("--e2e", "--fresh"))
+  expect_equal(building$status, 1)
+  expect_length(browser_calls(building), 0)
+
+  # No container publishes the app's port: nothing to restart, and it says so
+  # before any browser starts.
+  writeLines(built, app_log)
+  withr::local_envvar(c(CEDAR_FAKE_CONTAINER = ""))
+  absent <- run(c("--e2e", "--fresh"))
+  expect_equal(absent$status, 1)
+  expect_false(any(grepl("^docker restart", absent$calls)))
+  expect_length(browser_calls(absent), 0)
+})
+
+test_that("after a failed browser stage the runner says what the app's container shows", {
+  # Executable doubles, as above. A suite that fails names the step that was
+  # running, and the cause is often elsewhere: the app's R process killed for
+  # memory and another started, the container restarted or gone, the disk
+  # full (docs/developers/e2e-testing.md). docker, df and curl answer here
+  # what they would in each case; the failing suite is what changes the app.
+  testthat::local_edition(3)
+  bin <- withr::local_tempdir()
+  log <- file.path(bin, "calls")
+  state <- file.path(bin, "state")
+  stub <- c("#!/bin/bash",
+            'printf "%s %s\\n" "${0##*/}" "$*" >> "$CEDAR_RUNNER_LOG"',
+            'did="$(cat "$CEDAR_FAKE_STATE" 2>/dev/null)"',
+            'if [ "${0##*/}" = node ] && [ -n "$CEDAR_RUNNER_FAIL" ] && [[ "$*" = *"$CEDAR_RUNNER_FAIL"* ]]; then',
+            '  printf "%s" "$CEDAR_FAKE_HAPPENS" > "$CEDAR_FAKE_STATE"; exit 1',
+            "fi",
+            'case "${0##*/} $*" in',
+            '  "docker ps"*) [ "$did" = gone ] || echo cedar-test-app ;;',
+            # shiny-server's R process is the one running its SockJSAdapter.R.
+            '  "docker exec"*"pgrep -f SockJSAdapter"*) case "$did" in killed) echo 3120 ;; dead) ;; *) echo 275 ;; esac ;;',
+            '  "docker inspect"*OOMKilled*) if [ "$did" = killed ]; then echo true; else echo false; fi ;;',
+            '  "docker inspect"*StartedAt*) if [ "$did" = restarted ]; then echo 2026-11-25T10:20:00Z; else echo 2026-11-25T10:00:00Z; fi ;;',
+            '  "docker stats --no-stream --format {{.Name}}  {{.MemUsage}} "*) echo "cedar-test-app  3.41GiB / 3.83GiB" ;;',
+            '  "df "*) printf "Filesystem 1024-blocks Used Available Capacity Mounted\\n/dev/disk 9 9 %s 50%% /\\n" "$CEDAR_FAKE_FREE_KB" ;;',
+            '  curl*http_code*) printf "%s" "$CEDAR_FAKE_HTTP" ;;',
+            "esac",
+            "exit 0")
+  for (command in c("node", "Rscript", "docker", "curl", "sleep", "df")) {
+    path <- file.path(bin, command)
+    writeLines(stub, path)
+    Sys.chmod(path, "0755")
+  }
+  withr::local_envvar(c(PATH = paste(bin, Sys.getenv("PATH"), sep = .Platform$path.sep),
+                        CEDAR_RUNNER_LOG = log, CEDAR_FAKE_STATE = state))
+  runner <- file.path(cedar_base_dir, "run-tests.sh")
+  # What the runner printed about the container: from its heading to the next
+  # empty line.
+  run <- function(fail = "nav.test.mjs", happens = "", free_kb = "10485760", http = "200") {
+    unlink(state)
+    withr::local_envvar(c(CEDAR_RUNNER_FAIL = fail, CEDAR_FAKE_HAPPENS = happens,
+                          CEDAR_FAKE_FREE_KB = free_kb, CEDAR_FAKE_HTTP = http))
+    printed <- suppressWarnings(system2("bash", c(shQuote(runner), "--e2e", "nav"), stdout = TRUE, stderr = FALSE))
+    from <- grep("^What the app's container says", printed)
+    said <- if (length(from) == 0L) character(0) else {
+      rest <- printed[from[1]:length(printed)]
+      rest[seq_len(match("", rest, nomatch = length(rest) + 1L) - 1L)]
+    }
+    list(status = attr(printed, "status") %||% 0L, said = said)
+  }
+
+  killed <- run(happens = "killed")
+  dead <- run(happens = "dead")
+  restarted <- run(happens = "restarted")
+  nothing <- run()
+  gone <- run(happens = "gone")
+  full <- run(free_kb = "204800", http = "500")
+  # Explaining a failure never changes it.
+  expect_equal(c(killed$status, dead$status, restarted$status, nothing$status, gone$status, full$status),
+               rep(1L, 6))
+
+  expect_snapshot(writeLines(c(
+    "== The R process was killed for memory and another has started", killed$said,
+    "", "== The R process is gone and none has started yet", dead$said,
+    "", "== The container restarted", restarted$said,
+    "", "== Nothing happened to the container", nothing$said,
+    "", "== The container stopped", gone$said,
+    "", "== The disk is nearly full and the app answers 500", full$said
+  )))
+
+  # A run that passes says nothing about the container.
+  passed <- run(fail = "")
+  expect_equal(passed$status, 0L)
+  expect_length(passed$said, 0L)
+})
+
 test_that("the instructor-gate password is handed from .env to the Shiny worker", {
   # ISSUES.md I55: .env and .Renviron are kept out of the image, and
   # shiny-server starts its R worker with a clean environment. The password
@@ -185,4 +430,37 @@ test_that("the instructor-gate password is handed from .env to the Shiny worker"
   expect_length(writes, 1L)
   expect_true(any(grepl('worker_renviron="$HOME/.Renviron"', entrypoint, fixed = TRUE)))
   expect_lt(writes, starts)
+})
+
+test_that("the count of courses built ahead is handed from the environment to the Shiny worker", {
+  # As the password above: a variable Compose passes to the container reaches
+  # global.R only if the entrypoint writes it where the worker's R reads it.
+  # Without that the app builds ten ahead whatever the environment says.
+  compose <- readLines(file.path(cedar_base_dir, "docker-compose.yml"))
+  expect_length(grep("^      CEDAR_PRELOAD_COURSES: \\$\\{CEDAR_PRELOAD_COURSES:-10\\}$", compose), 1L)
+  entrypoint <- readLines(file.path(cedar_base_dir, "entrypoint.sh"))
+  writes <- grep('printf "CEDAR_PRELOAD_COURSES=%s\\n"', entrypoint, fixed = TRUE)
+  starts <- grep("^exec /usr/bin/shiny-server", entrypoint)
+  expect_length(writes, 1L)
+  expect_lt(writes, starts)
+  global <- readLines(file.path(cedar_base_dir, "global.R"))
+  expect_length(grep('Sys.getenv("CEDAR_PRELOAD_COURSES", "10")', global, fixed = TRUE), 1L)
+})
+
+# ISSUES I81, M70. The R suite cannot start the app, so both ends of the
+# hand-over are read: Shiny runs the value of server.R's last line.
+test_that("global.R compiles the server function and server.R's last line hands it to Shiny", {
+  server_file <- parse(file.path(cedar_base_dir, "server.R"))
+  expect_identical(deparse(server_file[[length(server_file)]]),
+                   'cedar_server_to_run(server, cedar_compiled_server, "server.R")')
+
+  global <- readLines(file.path(cedar_base_dir, "global.R"), warn = FALSE)
+  nothing_yet <- which(global == "cedar_compiled_server <- NULL")
+  read <- which(global == 'source("server.R")')
+  compiled <- which(global == 'cedar_compiled_server <- cedar_compile_server(server, "server.R")')
+  expect_length(nothing_yet, 1L)
+  expect_length(read, 1L)
+  expect_length(compiled, 1L)
+  expect_lt(nothing_yet, read)
+  expect_lt(read, compiled)
 })

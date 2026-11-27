@@ -226,12 +226,15 @@ For daily automated updates:
 
 ```cron
 # Daily at 10:02 AM - refresh data, any requested projections, then reload
-2 10 * * * /root/cedar/scripts/restart-cedar.sh --mode production --update -s 202680 -e 202710 >> /var/log/cedar-update.log 2>&1
+2 10 * * * /root/cedar/scripts/restart-cedar.sh --mode production --update -s 202680 -e 202710 --hard-restart >> /var/log/cedar-update.log 2>&1
 ```
 
 This replaces the old multi-step crontab with a single command.
 Keep the term window current. `update-data.sh` updates files and report caches;
 `restart-cedar.sh --update` also reloads the running app after success.
+`--hard-restart` restarts the container: the default soft reload starts a new
+R process and leaves the old one running beside it until the container next
+restarts (ISSUES M69).
 
 ### Sharing with collaborators
 

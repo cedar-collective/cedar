@@ -56,6 +56,16 @@ CEDAR_SHARE_SPECS <- list(
     fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
     overlay = "cancellations-loading-overlay"
   ),
+  "Low Enrollment" = list(
+    slug = "low-enrollment", prefix = "low_enrollment-le", sep = "_", run = "button",
+    fields = c("campus", "college", "dept", "term", "pt", "im", "level",
+               "threshold_lower", "threshold_upper", "threshold_split", "threshold_grad",
+               "min_enrl"),
+    overlay = "low_enrollment-loading-overlay",
+    types = list(threshold_lower = "numeric", threshold_upper = "numeric",
+                 threshold_split = "numeric", threshold_grad = "numeric",
+                 min_enrl = "numeric")
+  ),
   "Waitlists" = list(
     slug = "waitlists", prefix = "waitlist-wl", sep = "_", run = "button",
     fields = c("campus", "college", "dept", "level", "term", "pt", "course"),
@@ -149,9 +159,9 @@ CEDAR_TAB_SLUGS <- c(
   "open-seats"         = "Open Seats",
   "waitlists"          = "Waitlists",
   "projections"        = "Projections",
+  "low-enrollment"     = "Low Enrollment",  # its own page since 2026-11; was a sub-tab of Enrollment
   "cancellations"      = "Cancellations",
   "dfw-rates"          = "DFW Rates",
-  "first-year"         = "First Year",
   "retention"          = "Retention",
   "graduation"         = "Graduation",
   "data-usage"         = "Data & Usage",
@@ -161,8 +171,8 @@ CEDAR_TAB_SLUGS <- c(
   "cedar"              = "Home",            # original landing slug
   "dashboard"          = "Dept Dashboard",
   "data"               = "Data & Usage",
-  "low-enrollment"     = "Enrollment",      # an Enrollment sub-tab, not its own tab
-  "department-profile" = "Dept Trends"      # pre-2026-07 name for Dept Trends
+  "department-profile" = "Dept Trends",     # pre-2026-07 name for Dept Trends
+  "first-year"         = "Retention"        # its own page for four days in 2026-11; its sections are on Retention
 )
 
 # Slug a tab's own copy-URL button should emit. Derived from CEDAR_SHARE_SPECS

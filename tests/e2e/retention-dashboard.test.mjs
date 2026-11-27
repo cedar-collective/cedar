@@ -4,12 +4,25 @@
 // Asserts the tab opens on fall terms and undergraduates and builds without a
 // run button: the data scope bar saying who is counted (the level's students
 // in the latest term, first-time, transfer and start-not-on-record students
-// adding to them, and the levels left out); the return line with a label a term and the dashed trend line
-// labelled with its slope and verdict (no cards), the warning-sign table (a late withdrawal and a DFW grade, each with
-// and without), the classification and college tables with a trend line and
-// no word, the course table, every method slot filled; a re-read when the
-// term type or the student level changes; and the home card's
-// link.
+// adding to them, and the levels left out); the return rate a line a semester
+// since arrival for first-time students, every student together dotted
+// behind, each point its hover's counts and no number on any, a semester whose
+// students started in a spring marked, the lead sentence naming the semester
+// lowest over the terms (no cards), transfer students on the control, and a
+// level with no start on record drawn as one line that says so;
+// the warning-sign table (a late withdrawal and a DFW grade, each with and
+// without), the college table with a trend line and no word, the course
+// table, every method slot filled; a re-read when the
+// term type or the student level changes, the courses-by-GPA section with
+// the rest of the page (ISSUES M67); and the home card's link.
+//
+// The two entering-class sections (R/modules/retention-entering-classes.R, the
+// First Year page until 2026-11): a line for each of four semesters with a
+// point a class, its lead sentence and its "How this is counted" dialog; the
+// summer after the first spring; a re-read when who a class holds changes;
+// their place on the page (the classes before the year-by-year pace section,
+// each summer section beside the other); and the old ?tab=first-year link
+// opening this page, with no First Year page or card left.
 //
 //   node tests/e2e/retention-dashboard.test.mjs
 
@@ -19,6 +32,7 @@ import { launch, connect, setInput, waitFor, waitForIdle, requireIds, waitForSel
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); console.log(`${cond ? 'ok  ' : 'FAIL'} ${msg}`); };
 const NS = 'retention_dashboard-';
+const CL = `${NS}classes-`;  // the entering-class sections, a module inside the page
 
 const { browser, page, jsErrors } = await launch({ width: 1500, height: 1100 });
 
@@ -44,8 +58,8 @@ const waitBuilt = async () => {
 try {
   await connect(page, { tab: 'retention', expect: 'Retention' });
   await waitBuilt();
-  await requireIds(page, [`${NS}term_type`, `${NS}level`, `${NS}campus`, `${NS}overall_plot`, `${NS}signs_table`,
-                          `${NS}classification_table`, `${NS}college_table`, `${NS}courses_table`]);
+  await requireIds(page, [`${NS}term_type`, `${NS}level`, `${NS}campus`, `${NS}stage_entry`, `${NS}overall_plot`, `${NS}signs_table`,
+                          `${NS}college_table`, `${NS}courses_table`]);
   const termType = await page.$eval(`input[name="${NS}term_type"]:checked`, (el) => el.value);
   ok(termType === 'fall', `the page opens on fall terms (${termType})`);
   const level = await page.$eval(`#${NS}level`, (el) => el.value);
@@ -72,32 +86,76 @@ try {
   const noCards = await page.evaluate(() => !document.querySelector('#retention_dashboard-overall_finding .finding-card'));
   ok(noCards, 'the chart carries the finding: no cards');
   const lead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
-  ok(/^The share of fall students who came back the next regular term is (rising|falling|not clearly rising or falling): /.test(lead),
-     `the section opens on the verdict over the terms (${lead.slice(0, 60)}…)`);
+  const leadRe = (who, type) => new RegExp(`^${who} students came back least often after their \\d+(st|nd|rd|th) semester` +
+    `( \\(those who started in a spring\\))?: in (every one of the \\d+|\\d+ of the \\d+) ${type} terms read\\. ` +
+    `(Their share coming back is|Too few)`);
+  ok(leadRe('First-time', 'fall').test(lead),
+     `the section opens on the semester lowest over the terms, then the semesters moving (${lead.slice(0, 120)}…)`);
   const ln = await line();
-  // Each point is its own counts: the rate drawn is came back over students read, as the hover states them.
-  const drawn = await page.evaluate((el) => {
+  // One line a stage, every student together dotted first; each point is its
+  // own counts: came back over students read, as the hover states them.
+  const stages = await page.evaluate((el) => {
     const r = document.getElementById(el);
     const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
-    const d = p?.data?.[0];
-    return (d?.hovertext || []).map((h, i) => {
-      const m = String(h).replace(/,/g, '').match(/([0-9]+) of ([0-9]+) came back/);
-      return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
-    });
+    return (p?.data || []).map((d) => ({
+      name: d.name, dash: d.line?.dash || null, mode: d.mode, n: (d.y || []).filter((v) => v !== null).length,
+      total: (d.y || []).length,
+      last: (d.y || [])[(d.y || []).length - 1],
+      // A term not read between a line's first and last breaks it: no point there.
+      gaps: (d.hovertext || []).map((h, i) => {
+        if (d.y[i] === null) return 'gap';
+        const m = String(h).replace(/,/g, '').match(/([0-9]+) of ([0-9]+) came back/);
+        return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
+      }) }));
   }, `${NS}overall_plot`);
-  ok(drawn.length >= 3 && drawn.every((gap) => gap !== null && gap < 0.05),
-     `every term's rate is its hover's counts divided (${drawn.length} terms)`);
-  ok(ln && ln.n >= 3 && ln.text.length === ln.n, `the return line labels each of its ${ln?.n} terms`);
-  ok(ln?.trend && ln.trend.x.length === 2 && ln.trend.line?.dash === 'dash',
-     'the trend is a dashed line from the first term to the last');
-  ok(/points a year/.test(ln?.label || '') && /(rising|falling|steady)/.test(ln?.label || ''),
-     `the trend line is labelled with its slope and verdict (${ln?.label})`);
+  ok(stages[0]?.name === 'Every student together' && stages[0]?.dash === 'dot',
+     `every student together is the dotted line (${stages[0]?.name})`);
+  const semesterName = /^\d+(st|nd|rd|th) semester( \(spring start\))?$/;
+  ok(stages.length >= 5 && stages.length <= 9 && stages.slice(1).every((t) => semesterName.test(t.name) && t.dash === null),
+     `a solid line a semester, eight at most (${stages.slice(1).map((t) => t.name).join(' | ')})`);
+  // In a fall, the even semesters started in a spring and say so; the odd do not.
+  ok(stages.slice(1).every((t) => /spring start/.test(t.name) === (parseInt(t.name, 10) % 2 === 0)),
+     'in a fall, the even semesters are marked as spring starts');
+  ok(stages.every((t) => t.n >= 1 && t.gaps.length === t.total && t.gaps.every((g) => g === 'gap' || (g !== null && g < 0.05))),
+     `every point is its hover's counts divided (${stages.map((t) => `${t.n}${t.total > t.n ? ` and ${t.total - t.n} gap` : ''}`).join(', ')} terms)`);
+  ok(stages.every((t) => !/text/.test(t.mode)), 'no number on any point');
+  const lasts = stages.slice(1).map((t) => t.last);
+  ok(Math.max(...lasts) - Math.min(...lasts) > 1,
+     `the semesters differ where the overall rate does not show it (${lasts.map((v) => v.toFixed(1)).join(', ')})`);
+  const stageMethod = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
+  ok(/with no start on record/.test(stageMethod) && /after their 8th semester/.test(stageMethod) &&
+     /before the arrival records begin in (Fall|Spring) \d{4}/.test(stageMethod),
+     'the method note counts the students in no line');
+
+  // Transfer students: their own semesters, the dotted line as it was.
+  const traces = () => page.evaluate((el) => {
+    const r = document.getElementById(el);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return (p?.data || []).map((d) => ({ name: d.name, y: JSON.stringify(d.y) }));
+  }, `${NS}overall_plot`);
+  const firstLines = await traces();
+  await setInput(page, `${NS}stage_entry`, 'transfer');
+  const transferLead = await waitFor(page, (ns) => /^Transfer students /.test(
+    document.getElementById(`${ns}overall_finding`)?.innerText.trim() || ''), { timeout: 120000, args: [NS] });
+  await waitForIdle(page, { timeout: 120000 });
+  const tLead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
+  ok(transferLead && leadRe('Transfer', 'fall').test(tLead), `transfer students get their own sentence (${tLead.slice(0, 100)}…)`);
+  const tLines = await traces();
+  ok(tLines[0]?.name === 'Every student together' && tLines[0]?.y === firstLines[0]?.y && tLines.length >= 5 &&
+     JSON.stringify(tLines.slice(1)) !== JSON.stringify(firstLines.slice(1)),
+     `transfer students' own semesters, every student together unchanged (${tLines.length - 1} lines)`);
+  ok((await outputsInError(page, NS)).length === 0, `no output in error for transfer students (${(await outputsInError(page, NS)).join('; ')})`);
+  await setInput(page, `${NS}stage_entry`, 'first_time');
+  await waitFor(page, (ns) => /^First-time students /.test(
+    document.getElementById(`${ns}overall_finding`)?.innerText.trim() || ''), { timeout: 120000, args: [NS] });
+  await waitForIdle(page, { timeout: 120000 });
+  ok(JSON.stringify(await traces()) === JSON.stringify(firstLines), 'back on first-time students, the same lines');
 
   const signs = await readReactable(page, `${NS}signs_table`, { limit: 5 });
   ok(signs.rows?.map((r) => r[0]).join('|') === 'A late withdrawal|A DFW grade', `the two warning signs (${signs.rows?.map((r) => r[0])})`);
   ok(signs.rows?.every((r) => parseFloat(r[3]) < parseFloat(r[4])), `each sign comes back less often than without it (${signs.rows?.map((r) => `${r[3]} vs ${r[4]}`)})`);
 
-  for (const id of ['classification_table', 'college_table']) {
+  for (const id of ['college_table']) {
     const t = await readReactable(page, `${NS}${id}`, { limit: 5 });
     ok(t.rows?.length > 0 && t.rows.every((r) => r.length === 5), `${id} lists groups with a trend cell (${t.rows?.length})`);
     const words = await page.evaluate((el) => [...document.querySelectorAll(`#${el} .rt-tbody .rt-tr`)]
@@ -175,6 +233,118 @@ try {
   ok(behindCourses.rows.length > 0 && behindCourses.rows[0].length === 5, `their summer courses are listed with titles (${behindCourses.rows.length})`);
   const catchUpMethod = await page.$eval(`#${NS}method_pace_summer`, (el) => el.textContent.trim().length);
   ok(catchUpMethod > 80, 'the summer and pace section says how it is counted');
+
+  // Each entering class, semester by semester (was the First Year page).
+  const classLines = () => page.evaluate((el) => {
+    const root = document.getElementById(el);
+    const p = root?.classList.contains('js-plotly-plot') ? root : root?.querySelector('.js-plotly-plot');
+    if (!p || !p.data || !p.data.length) return null;
+    return { names: p.data.map((d) => d.name), x: p.data[0].x || [], y: JSON.stringify(p.data.map((d) => d.y)) };
+  }, `${CL}milestones_plot`);
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${CL}milestones_plot`] });
+  await requireIds(page, [`${CL}entry`, `${CL}milestones_plot`, `${CL}summer_plot`, `${CL}summer_courses`]);
+  const entry = await page.$eval(`input[name="${CL}entry"]:checked`, (el) => el.value);
+  ok(entry === 'first_time', `the entering classes open on first-time students (${entry})`);
+  const firstClasses = await classLines();
+  ok(firstClasses && firstClasses.names.length === 4 && /2nd semester/.test(firstClasses.names[0]),
+     `a line for each of four semesters (${firstClasses?.names.join(', ')})`);
+  ok(firstClasses?.x.length >= 2 && firstClasses.x.every((x) => /^Fall /.test(x)),
+     `a point for each fall entering class (${firstClasses?.x.length})`);
+  // Each point is its own counts: still here over the class, as the hover states them.
+  const classPoints = await page.evaluate((el) => {
+    const r = document.getElementById(el);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return (p?.data || []).flatMap((d) => (d.hovertext || []).map((h, i) => {
+      const m = String(h).replace(/,/g, '').match(/: ([0-9]+) of ([0-9]+) \(/);
+      return m ? Math.abs(100 * Number(m[1]) / Number(m[2]) - d.y[i]) : null;
+    }));
+  }, `${CL}milestones_plot`);
+  ok(classPoints.length >= 4 && classPoints.every((gap) => gap !== null && gap < 0.05),
+     `every class point is its hover's counts divided (${classPoints.length} points)`);
+  const classLead = await page.$eval(`#${CL}milestones_finding`, (el) => el.innerText.trim());
+  ok(/^A year on/.test(classLead) && /in each of the \d+ classes from/.test(classLead) && /between [0-9.]+% and [0-9.]+%/.test(classLead),
+     `the entering classes open on the range over every class (${classLead.slice(0, 60)}…)`);
+  // The third semester of a first-time fall class and the start of its second
+  // year are one moment, read by one function: the two sections agree on it.
+  await setInput(page, `${NS}pace_step`, '2');
+  await waitFor(page, (id) => /At the start of their second year/.test(document.getElementById(id)?.textContent || ''),
+                { timeout: 120000, args: [`${NS}pace_lead`] });
+  const sameMoment = await page.evaluate((classesId, paceId) => {
+    const plot = (id) => { const r = document.getElementById(id); return r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot'); };
+    const third = plot(classesId)?.data?.find((d) => /^3rd semester/.test(d.name));
+    const bars = plot(paceId)?.data || [];
+    if (!third || !bars.length) return null;
+    // Still enrolled or with a degree: every part of a bar but the last ("Not enrolled").
+    return bars[0].x.map((cls, i) => {
+      const here = bars.slice(0, -1).reduce((sum, part) => sum + part.y[i], 0);
+      const at = third.x.indexOf(cls);
+      return at < 0 ? null : Math.abs(here - third.y[at]);
+    }).filter((gap) => gap !== null);
+  }, `${CL}milestones_plot`, `${NS}pace_plot`);
+  ok(sameMoment && sameMoment.length >= 2 && sameMoment.every((gap) => gap < 0.05),
+     `a class's 3rd semester is its second year's bar less those not enrolled (${sameMoment?.length} classes)`);
+  await setInput(page, `${NS}pace_step`, '4');
+  // How this is counted is a link after the section's sentence that opens a dialog: the idea first, then this view's counts.
+  const classMethod = await page.$eval(`#${CL}method_milestones`, (el) => el.textContent.trim().length);
+  ok(classMethod > 80, 'the entering-class section says how it is counted');
+  const panel = `details.cedar-method-panel:has(#${CL}method_milestones)`;
+  const shown = () => page.$eval(panel, (el) => {
+    const body = el.querySelector('.panel-body');
+    const box = body.getBoundingClientRect();
+    return { open: el.open, visible: body.checkVisibility(), fixed: getComputedStyle(body).position === 'fixed',
+             centred: Math.abs((box.left + box.right) / 2 - window.innerWidth / 2) < 4,
+             idea: el.querySelector('.cedar-method-idea')?.innerText || '', link: el.querySelector('summary').innerText.trim(),
+             size: parseFloat(getComputedStyle(body).fontSize) };
+  });
+  const closed = await shown();
+  ok(!closed.open && !closed.visible && closed.link === 'How this is counted', 'how it is counted is a closed link beside the sentence');
+  await page.click(`${panel} > summary`);
+  await waitFor(page, (sel) => document.querySelector(sel).open, { args: [panel] });
+  const opened = await shown();
+  ok(opened.visible && opened.fixed && opened.centred && opened.size >= 16, `the link opens a centred dialog in readable type (${opened.size}px)`);
+  ok(/follow them as one class/.test(opened.idea), 'the dialog opens on the section\'s idea in plain words');
+  await page.keyboard.press('Escape');
+  await waitFor(page, (sel) => !document.querySelector(sel).open, { args: [panel] });
+  ok(!(await shown()).visible, 'Escape closes it');
+
+  // The summer after the first spring: back in the fall, by taking a summer course or not.
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${CL}summer_plot`] });
+  const summerLines = await page.evaluate(plotTraces, `${CL}summer_plot`);
+  ok(JSON.stringify(summerLines) === '["Took a summer course","Did not"]', `the first-summer chart has a line for each group (${summerLines})`);
+  const summerLead = await page.$eval(`#${CL}summer_finding`, (el) => el.innerText.trim());
+  ok(/back in the fall/.test(summerLead) && /not what it causes\.$/.test(summerLead),
+     `the first-summer section opens on the classes read, with its warning (${summerLead.slice(0, 50)}…)`);
+  await waitForSelector(page, `#${CL}summer_courses .rt-tbody`);
+  const summerCourses = await readReactable(page, `${CL}summer_courses`, { limit: 5 });
+  ok(summerCourses.rows.length > 0 && summerCourses.rows[0].length === 5, `the first-summer courses are listed with titles (${summerCourses.rows.length})`);
+  const summerMethod = await page.$eval(`#${CL}method_summer`, (el) => el.textContent.trim().length);
+  ok(summerMethod > 80, 'the first-summer section says how it is counted');
+
+  // Where the sections sit: the classes semester by semester, then year by
+  // year; the two summer sections together; every heading once.
+  // This page's own pane: another page's open sub-tab is an active pane too.
+  const headings = await page.evaluate((id) => [...document.getElementById(id).closest('.tab-pane')
+    .querySelectorAll('.cedar-dashboard-section-title')].map((h) => h.innerText.trim()), `${NS}overall_plot`);
+  const at = (title) => headings.indexOf(title);
+  ok(at('Each Entering Class, Semester by Semester') >= 0 &&
+     at('Still Here, and Moving Forward?') === at('Each Entering Class, Semester by Semester') + 1,
+     `the classes are read semester by semester, then year by year (${headings.join(' | ')})`);
+  ok(at('Summer and Staying on Pace') === at('The Summer After the First Spring') + 1, 'the two summer sections sit together');
+  ok(new Set(headings).size === headings.length && headings.length === 9, `nine sections, each heading once (${headings.length})`);
+
+  await setInput(page, `${CL}entry`, 'transfer');
+  const classesReread = await waitFor(page, (id, before) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    return !!p?.data?.length && JSON.stringify(p.data.map((d) => d.y)) !== before;
+  }, { timeout: 300000, args: [`${CL}milestones_plot`, firstClasses?.y] });
+  ok(classesReread, 'new transfer students re-read the entering classes');
+  await waitForIdle(page, { timeout: 300000 });
+  const overallAfter = await line();
+  ok(JSON.stringify(overallAfter?.y) === JSON.stringify(ln?.y), 'who a class holds changes the entering classes only: the return line is as it was');
+  ok((await outputsInError(page, NS)).length === 0, `no output in error for transfer classes (${(await outputsInError(page, NS)).join('; ')})`);
+  await setInput(page, `${CL}entry`, 'first_time');
+  await waitForIdle(page, { timeout: 300000 });
   ok((await outputsInError(page, NS)).length === 0, `no output in error on fall terms (${(await outputsInError(page, NS)).join('; ')})`);
   await setInput(page, `${NS}term_type`, 'spring');
   const reread = await waitFor(page, () => {
@@ -184,12 +354,24 @@ try {
   }, { timeout: 300000 });
   ok(reread, 'spring re-reads the page on spring terms');
   await waitBuilt();
+  // The entering classes read the page's term type: spring classes now.
+  const springClasses = await waitFor(page, (id) => {
+    const r = document.getElementById(id);
+    const p = r?.classList.contains('js-plotly-plot') ? r : r?.querySelector('.js-plotly-plot');
+    const x = p?.data?.[0]?.x || [];
+    return x.length > 0 && x.every((cls) => /^Spring /.test(cls));
+  }, { timeout: 300000, args: [`${CL}milestones_plot`] });
+  ok(springClasses, 'spring re-reads the entering classes as spring classes');
 
   const leftOut = await page.$eval(`#${NS}method_overall`, (el) => el.textContent);
   ok(/in the summer after it/.test(leftOut), 'the method note counts summer finishers as finished');
   ok((await outputsInError(page, NS)).length === 0, `no output in error on spring terms (${(await outputsInError(page, NS)).join('; ')})`);
 
   const undergrad = await page.evaluate(plotX);
+  // The courses-by-GPA sentence for undergraduates, to set beside the next level's.
+  const bandText = () => document.getElementById('retention_dashboard-bands_finding')?.innerText.trim() || '';
+  await waitFor(page, bandText, { timeout: 240000 });
+  const undergradBands = await page.evaluate(bandText);
   // The second level in student_levels.csv (graduate at UNM). A home campus
   // changes little at the undergraduate level: nearly all are ABQ students.
   const second = await page.$eval(`#${NS}level`, (el) => Object.values(el.selectize?.options || {})
@@ -202,6 +384,10 @@ try {
     return now && now !== f;
   }, { timeout: 300000, args: [undergrad] });
   ok(narrowed, `another student level (${second}) re-reads the page`);
+  // No student at that level has a start on record: one line, and it says so.
+  const oneLine = await waitFor(page, (ns) => /No first-time students at this level have a start on record/
+    .test(document.getElementById(`${ns}overall_finding`)?.innerText || ''), { timeout: 120000, args: [NS] });
+  ok(oneLine, `a level with no start on record is drawn together and says so (${second})`);
   await waitFor(page, (ns, before) => {
     const val = document.querySelector(`#${ns}scope .scope-chip-val`);
     return !!val && val.textContent.trim() !== before;
@@ -209,10 +395,24 @@ try {
   const [counted] = await readScope();
   ok(/^Counted, Spring \d{4}$/.test(counted?.key || '') && counted.val !== scope[0]?.val,
      `the scope bar re-reads with the level and term type (${counted?.key}: ${counted?.val})`);
+  // The section reads the page's students: another level is another reading.
+  const bandsReread = await waitFor(page, (before) => {
+    const now = document.getElementById('retention_dashboard-bands_finding')?.innerText.trim() || '';
+    return !!now && now !== before;
+  }, { timeout: 240000, args: [undergradBands] });
+  ok(bandsReread, `the courses-by-GPA section re-reads with the student level (was: ${undergradBands.slice(0, 40)})`);
 
   await connect(page, { tab: 'home' });
   const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=retention'));
   ok(card, 'the home page links to Retention');
+  // First Year is no longer a page: no card, no menu item, and its link opens Retention.
+  const gone = await page.evaluate(() => ({
+    card: [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=first-year'),
+    menu: !!document.querySelector('.navbar [data-value="First Year"]') }));
+  ok(!gone.card && !gone.menu, 'no First Year card or menu item');
+  await connect(page, { tab: 'first-year', expect: 'Retention' });
+  await waitFor(page, plotTraces, { timeout: 300000, args: [`${CL}milestones_plot`] });
+  ok(true, 'the old First Year link opens Retention, with the entering classes on it');
 
   ok(jsErrors.length === 0, `no page errors (${jsErrors.join('; ')})`);
 } catch (e) {

@@ -74,20 +74,158 @@ test_that("RR01: the dashboard's signs compare with and without, and share the n
   expect_equal(dfw$share_of_nonreturners_pct, 100 * 5 / 12)
 })
 
-test_that("RR01: each classification and college is its own series", {
+test_that("RR01: each college is its own series, and without the declarations there are no semesters", {
   g <- rr01$dashboard$groups
-  expect_setequal(paste(g$dimension, g$group),
-                  c("classification Freshman, 1st Yr, 1st Sem", "classification Sophomore, 2nd Yr",
-                    "college AS", "college EN"))
-  fresh <- g[g$group == "Freshman, 1st Yr, 1st Sem", ]
-  expect_equal(fresh$rates[[1]], 100 * c(28, 30, 32, 34) / 40)
-  expect_equal(fresh$n_terms, 4L)
+  expect_setequal(paste(g$dimension, g$group), c("college AS", "college EN"))
+  expect_null(rr01$dashboard$stages)
+  expect_equal(rr01$dashboard$meta$n_groups_past, 0L)
 })
 
-test_that("RR01: a classification not read in the latest term is left out, counted", {
-  p <- rr01$dashboard
-  expect_false("Junior, 3rd Yr" %in% p$groups$group)
-  expect_equal(p$meta$n_groups_past, 1L)
+test_that("RT02: a semester counts the regular terms since the latest arrival, enrolled or not", {
+  s <- student_term_semesters(rt02$student_terms, rt02$programs)
+  got <- stats::setNames(s$semester_here, paste(s$student_id, s$term))
+  expect_equal(got[c("A 202080", "A 202110", "A 202180")], c(`A 202080` = 1L, `A 202110` = 2L, `A 202180` = 3L))
+  # A summer start: the summer has no semester; the fall after is the 1st.
+  expect_true(is.na(got[["B 202060"]]))
+  expect_equal(got[c("B 202080", "B 202110")], c(`B 202080` = 1L, `B 202110` = 2L))
+  # Away for a year and back: terms passed count.
+  expect_equal(got[["C 202280"]], 5L)
+  # Left and came back as a new transfer: the count starts again.
+  expect_equal(s$entry_type[s$student_id == "D"], c("first_time", "transfer"))
+  expect_equal(got[c("D 202110", "D 202280")], c(`D 202110` = 4L, `D 202280` = 1L))
+  # No arrival on record, or a row before the arrival: no row.
+  expect_false(any(c("E 202080", "G 202010") %in% names(got)))
+  expect_equal(got[["G 202080"]], 1L)
+  # Recorded both ways in one term: first-time.
+  expect_equal(s$entry_type[s$student_id == "F"], "first_time")
+  expect_equal(got[c("H 202110", "H 202180")], c(`H 202110` = 1L, `H 202180` = 2L))
+  # An arrival counts only at its own level.
+  expect_equal(got[["I 202180"]], 3L)
+  expect_false("I 202480" %in% names(got))
+  expect_equal(got[["J 202310"]], 2L)
+  expect_equal(s$entry_type[s$student_id == "J"], "transfer")
+  expect_error(student_term_semesters(dplyr::select(rt02$student_terms, -term), rt02$programs), "term")
+  expect_error(student_term_semesters(rt02$student_terms, dplyr::select(rt02$programs, -student_level)), "student_level")
+  expect_error(student_term_semesters(rt02$student_terms, dplyr::mutate(rt02$programs, student_level = "Postdoctoral")),
+               "Postdoctoral")
+})
+
+test_that("RT02: a semester's earliest start is that many regular terms back, a fall's summer before it", {
+  expect_equal(semester_earliest_arrival(c(202080L, 202110L, 202110L, 202180L, 202380L, 202280L), c(1L, 1L, 2L, 3L, 8L, 5L)),
+               c(202060L, 202110L, 202060L, 202060L, 202010L, 202060L))
+  # Every RT02 row's arrival is on or after its semester's earliest start.
+  s <- student_term_semesters(rt02$student_terms, rt02$programs) %>% dplyr::filter(!is.na(semester_here))
+  expect_true(all(s$arrived_term >= semester_earliest_arrival(s$term, s$semester_here)))
+  expect_equal(retention_semester_label(1:2, 202110L), c("1st semester (spring start)", "2nd semester"))
+  expect_equal(retention_semester_label(1:2, 202180L), c("1st semester", "2nd semester (spring start)"))
+  expect_error(semester_earliest_arrival(202060L, 1L), "falls or springs")
+  expect_error(semester_earliest_arrival(202080L, 0L), "semesters 1 or more")
+})
+
+test_that("RT01: each semester since arrival to the 8th is a line, each term read at min_n", {
+  st <- rt01$dashboard$stages
+  first <- st$series[st$series$entry_type == "first_time", ]
+  # The 2nd semester never reaches min_n; the 7th is not read in the latest
+  # fall; the 10th is after the last drawn.
+  expect_equal(sort(unique(first$stage)), c(1L, 3L, 5L, 8L))
+  # A fall's 8th semester started in a spring, and says so.
+  expect_equal(unique(first$stage_label[first$stage == 8L]), "8th semester (spring start)")
+  expect_equal(unique(first$stage_label[first$stage == 1L]), "1st semester")
+  expect_equal(first$n_returned[first$stage == 8L], rep(5L, 4))
+  expect_equal(st$arrivals_from, 201610L)
+  expect_equal(first$return_pct[first$stage == 1L], c(70, 74, 78, 82))
+  expect_equal(first$return_pct[first$stage == 5L], c(92, 86, 80, 74))
+  ft <- st$trend[st$trend$entry_type == "first_time", ]
+  expect_equal(stats::setNames(ft$direction, ft$stage),
+               c(`1` = "rising", `3` = "steady", `5` = "falling", `8` = "steady"))
+  expect_equal(st$n_past$n_past[st$n_past$entry_type == "first_time"], 1L)
+  # Transfer students are their own lines.
+  tr <- st$series[st$series$entry_type == "transfer", ]
+  expect_equal(unique(tr$stage), 1L)
+  expect_equal(tr$return_pct, rep(75, 4))
+  # The overall series still counts every student, those with no start on record included.
+  expect_equal(rt01$dashboard$series$n_observable, c(469L, 469L, 459L, 459L))
+})
+
+test_that("RT01: a semester's term is read only when the arrival records reach back to its earliest start", {
+  st <- retention_stage_series(rt01$by_semester, 5L, 202380L, arrivals_from = 202160L)
+  first <- st$series[st$series$entry_type == "first_time", ]
+  # Records from Summer 2021: Fall 2020 reaches no semester; Fall 2021 the 1st
+  # (its summer starters are recorded); the 3rd from Fall 2022, the 5th in
+  # Fall 2023; the 8th never.
+  expect_equal(first$term[first$stage == 1L], c(202180L, 202280L, 202380L))
+  expect_equal(first$term[first$stage == 3L], c(202280L, 202380L))
+  expect_equal(first$term[first$stage == 5L], 202380L)
+  expect_false(8L %in% first$stage)
+  # Fall 2020's 459, then Fall 2021's 3rd, 5th, 7th, 8th and 2nd (219), Fall
+  # 2022's 5th and 8th (106), Fall 2023's 8th (6).
+  expect_equal(st$unplaced$n_before_records, 790L)
+  expect_equal(st$unplaced$n_beyond, 24L)
+  expect_error(retention_stage_series(rt01$by_semester, 5L, 202380L, arrivals_from = Inf), "one term code")
+  expect_error(retention_stage_series(dplyr::mutate(rt01$by_semester, term = dplyr::if_else(term == 202080L, 202110L, term)),
+                                      5L, 202380L, 201610L), "one term type")
+})
+
+test_that("RT01: students with no start on record are counted apart, never dropped unsaid", {
+  st <- rt01$dashboard$stages
+  expect_equal(st$unplaced$n_no_start, 16L)
+  expect_equal(st$unplaced$n_beyond, 24L)
+  expect_equal(st$unplaced$n_before_records, 0L)
+  # Every student is in a line, the 7th's and 2nd's left out (20 and 12),
+  # after the 8th, or has no start.
+  expect_equal(st$unplaced$n_no_start + st$unplaced$n_beyond + sum(st$series$n_observable) + 20L + 12L,
+               sum(rt01$dashboard$series$n_observable))
+  expect_error(retention_stage_series(rt01$dashboard$series, 5L, 202380L, 201610L), "entry_type")
+  expect_error(plot_return_stages(rr01$dashboard, "first_time"), "no semester is read")
+})
+
+test_that("RT01: the sentence names the semester students come back least often after, and the semesters moving", {
+  testthat::local_edition(3)
+  st <- rt01$dashboard$stages
+  steady <- st
+  steady$trend$direction <- "steady"
+  few <- st
+  few$trend$direction <- "too_few_terms"
+  # The 8th semester lowest every fall: its students started in a spring.
+  spring_low <- st
+  spring_low$series$return_pct[spring_low$series$stage == 8L] <- 10
+  expect_snapshot(cat(retention_stage_sentence(st, "first_time", "fall"), retention_stage_sentence(st, "transfer", "fall"),
+                      retention_stage_sentence(steady, "first_time", "fall"),
+                      retention_stage_sentence(few, "first_time", "fall"),
+                      retention_stage_sentence(spring_low, "first_time", "fall"), sep = "\n"))
+  expect_identical(retention_stage_sentence(NULL, "first_time", "fall"), character(0))
+})
+
+test_that("RT01: the chart draws a semester a line, breaking it at a term not read", {
+  # The 3rd semester not read in Fall 2021.
+  p <- rt01$dashboard
+  p$stages$series <- p$stages$series[!(p$stages$series$stage == 3L & p$stages$series$term == 202180L), ]
+  traces <- plotly::plotly_build(plot_return_stages(p, "first_time"))$x$data
+  names <- vapply(traces, function(t) t$name, character(1))
+  expect_equal(names, c("Every student together", "1st semester", "3rd semester", "5th semester", "8th semester (spring start)"))
+  third <- traces[[which(names == "3rd semester")]]
+  # A missing point between Fall 2020 and Fall 2022: the line does not join them.
+  x <- unname(as.character(unlist(third$x)))
+  y <- unlist(lapply(third$y, function(v) if (is.null(v)) NA else v))
+  expect_equal(x[!is.na(x)], c("Fall 2020", "Fall 2022", "Fall 2023"))
+  expect_equal(is.na(y), c(FALSE, TRUE, FALSE, FALSE))
+  expect_false(isTRUE(third$connectgaps))
+  # A count narrower than the others in its line is not padded on hover.
+  p$stages$series$n_returned[p$stages$series$stage == 1L & p$stages$series$term == 202080L] <- 9L
+  first <- plotly::plotly_build(plot_return_stages(p, "first_time"))$x$data[[2]]
+  expect_false(any(grepl("  ", unlist(first$hovertext))))
+  p$series$n_returned[[1]] <- 9L
+  overall <- plotly::plotly_build(plot_return_series(p))$x$data[[1]]
+  expect_false(any(grepl("  ", unlist(overall$hovertext))))
+  # Transfer students' chart is their own semesters.
+  transfer <- plotly::plotly_build(plot_return_stages(rt01$dashboard, "transfer"))$x$data
+  expect_equal(vapply(transfer, function(t) t$name, character(1)), c("Every student together", "1st semester"))
+})
+
+test_that("RT01: the dashboard as text carries each semester's line and who has none", {
+  testthat::local_edition(3)
+  lines <- format_retention_dashboard(rt01$dashboard)
+  expect_snapshot(cat(lines[grepl("semester|no start", lines)], sep = "\n"))
 })
 
 test_that("RR01: a scope with no student to read is an empty payload, not an error", {
@@ -168,10 +306,17 @@ test_that("RR01: the courses read the latest graded falls' students", {
   expect_equal(courses$terms, c(202080L, 202180L, 202280L))
   expect_equal(courses$listed$subject_course, "MATH 101")
   expect_equal(courses$listed$campus, "ABQ")
+  # The page's students only: the five graduate students a fall who got a
+  # DFW in MATH 101 are not among the 21.
   expect_equal(c(courses$listed$pop_n_dfw, courses$listed$pop_n_pass), c(21L, 96L))
   expect_equal(courses$listed$pop_dfw_stopout_rate, 19 / 21)
   # 21 DFW students, 19 not back, against the passers' 8 of 96 not back.
   expect_equal(courses$listed$excess_not_back, 21 * (19 / 21 - 8 / 96))
+  # The page's campus is the students' home campus: MATH 101 is taught on ABQ,
+  # and no student whose home campus is EA took it.
+  ea <- retention_dashboard_course_list(rr01$student_terms, rr01$attempts, NULL, rr01$dashboard$series, list(
+    student_level = "UG", campus = "EA", data_edges = rr01_edges, course_min_n = 10L, course_min_dfw_n = 5L))
+  expect_equal(NROW(ea$listed), 0L)
 })
 
 test_that("RR01: the trend carries its fitted line's ends, the least-squares line through the terms", {

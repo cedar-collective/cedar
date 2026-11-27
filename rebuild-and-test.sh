@@ -24,7 +24,9 @@ echo "[rebuild] waiting for app at ${URL} …"
 # browser may still show a brief loading state after this returns.
 up=0
 for _ in $(seq 1 120); do
-  if curl -sf -o /dev/null "${URL}"; then up=1; echo "[rebuild] app is up."; break; fi
+  # --max-time: a request the app accepts and never answers must not hold
+  # this loop past its 120 tries.
+  if curl -sf --max-time 20 -o /dev/null "${URL}"; then up=1; echo "[rebuild] app is up."; break; fi
   sleep 3
 done
 [ "${up}" -eq 1 ] || { echo "[rebuild] timed out waiting for app"; docker compose logs --tail 40; exit 1; }

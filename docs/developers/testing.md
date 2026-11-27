@@ -238,6 +238,7 @@ browser coverage are separate decisions.
 | UI, routing or module wiring | R gate plus `./run-tests.sh --e2e <suite>` covering the change; look at layout changes |
 | Representative app check | `./run-tests.sh --e2e` (same as `--e2e smoke`): Enrollment and Course Dynamics |
 | PR acceptance | The synthetic CI gate ([below](#pull-request-checks-without-institutional-data)) |
+| What the app or a session does as it starts (`global.R`, `entrypoint.sh`, the last line of `server.R`, `connect()` in `tests/e2e/lib.mjs`) | `./run-tests.sh --all --fresh`: rebuild, then the new process's first sessions ([a process just started](e2e-testing.md#a-process-just-started)) |
 | Release candidate or major pipeline change | `./run-tests.sh --all`: rebuild and run every institutional browser suite |
 | Dependency, R or Docker toolchain | Native and Docker dependency checks, their R gates and synthetic acceptance; the institutional release gate stays separate |
 | Documentation or presentation only | Check links or appearance; no full run for prose, spacing or colour |
@@ -265,12 +266,15 @@ Run from the host repository root.
 ./run-tests.sh --e2e reports           # full 16-scenario institutional report tour
 ./run-tests.sh --all                   # rebuild + every institutional browser suite
 ./run-tests.sh --all smoke             # rebuild + smoke only
+./run-tests.sh --e2e --fresh           # restart the app, then time its first sessions
+./run-tests.sh --all --fresh           # the same on a rebuilt container (tests the diff)
 ```
 
 Focused report scopes are `dept-trends`, `roadblocks`, `retention` and
 `headcount`; other named suites include `nav`, `admin`, `credit-timeline`
 (Course Timing wiring and the truncation disclosure, one population setup),
-`harness` (run it when `tests/e2e/lib.mjs` changes) and `demo`.
+`harness` (run it when `tests/e2e/lib.mjs` changes) and `demo`. `fresh-start`
+runs only with `--fresh`, first, and is no part of `--all`'s tour.
 
 The gate stops at the first failed suite and the report tour at its first
 failed step; neither retries. Diagnose app, setup or resource failures before
@@ -289,7 +293,15 @@ source; never call focused or synthetic success a full institutional pass.
 | `tests/e2e/lib.mjs` | `harness` |
 | `renv.lock`, `Dockerfile*`, `scripts/r-environment.R` | dependency check + R suite |
 | `dev/**` | R suite + `demo` |
+| `global.R`, `entrypoint.sh` | R suite, and a note that the app's start changed: run `--all --fresh` and the demo gate afterwards |
+| a file the projection model is hashed from (`bash scripts/projection-model-source.sh` prints the list) | what its path selects, marked `PROJECTION MODEL SOURCE`, and a note that the deploy after the merge rebuilds both projection bundles |
 | `docs/**`, `*.md` only | nothing |
+
+The diff is this branch's since it left `origin/main` (as of the last fetch)
+or the local `main`, whichever is the later: a local `main` left weeks behind
+would put everyone's work since into it. The pull-request checks say the same
+about model source where a merger sees it, as a check named `Deploy: rebuilds
+both projection bundles (about 45 minutes)` or `Deploy: no projection rebuild`.
 
 It selects; it never certifies. It cannot know a cone change moved a rendered
 number, so widen it by hand when the blast radius is larger than the paths.
@@ -343,6 +355,96 @@ and the memory limits of the browser stages are on
 
 ---
 
+### One heavy job at a time
+
+A development machine with 8 GB runs one of these at a time: the R suite, a
+browser tour, a real-data script on the host, a table rebuild, a projection
+build. Run two and the result is a failure that names neither:
+
+- A projection bundle build took about 2.5 hours beside the R gate and host
+  scripts, and 21 minutes alone the next day (2026-10-24 and 25). It is one
+  emulated R process at 100% of a core. Time a build alone before concluding
+  a change slowed it.
+- A host real-data script beside a report tour cost the app its R process (a
+  second start in `docker logs`) and failed one step with "Execution context
+  was destroyed"; the same tour alone passed (2026-11-14).
+- The full rebuild of the saved tables beside the R gate and the synthetic
+  stack was killed for memory after 35 minutes of swapping (2026-11-04).
+- A projection build beside the local app is killed in the Docker VM (exit
+  137, no R error): `docker compose stop cedar-shiny` first.
+
+**Do not edit a file a run is reading.** `Rscript` reads a script as it
+executes it, so editing `R/data-parsers/transform-to-cedar.R` or a
+`scripts/*.R` file during its own run ends the run with a parse error no
+`parse()` reproduces ("unexpected '}'"), after the work was saved, and with
+exit status 1. The same goes for a source file mounted into a running
+container and a test file a suite is reading.
+
+**Check the disk before an image build or a browser run** (`df -h`). Docker's
+build cache grows with every image build. On a full disk `docker ps` hangs
+with no error (the VM has stopped), or a build fails with "input/output
+error" and the app answers 500. `docker builder prune -af` returns the most.
+
+### Testing a branch in a git worktree
+
+A worktree has the tracked files only. Three things the main checkout has and
+it lacks:
+
+| Missing | Symptom | Do |
+|---|---|---|
+| `config/config.R`, `config/shiny_config.R` | an image built from the worktree starts and the app stops | copy them in |
+| `tests/e2e/node_modules` | "warm up app" fails with `Cannot find package 'puppeteer-core'` | link the main checkout's (a link is not matched by the ignore rule: never `git add` it) |
+| `data/` | the `admin` suite ends with ENOENT on `data/catalog-normalizations/…` | link the main checkout's `data`, and add `data` to `.git/info/exclude` |
+
+**No image build is needed to browser-test a branch.** The app image runs any
+checkout's source when it is mounted over the baked copy. From the main
+checkout, start the local app with a compose override that mounts the
+worktree's `R/`, `www/`, `docs/`, `institution/`, `global.R`, `ui.R` and
+`server.R` read-only over `/srv/shiny-server/cedar/…`:
+
+```bash
+docker compose -f docker-compose.yml -f <override>.yml up -d --no-build cedar-shiny
+docker inspect cedar-shiny --format '{{range .Mounts}}{{println .Source}}{{end}}'   # names the worktree?
+./run-tests.sh --e2e <suite>                # from the worktree
+docker compose up -d --no-build cedar-shiny # back to the image's own source
+```
+
+The override is a few lines and belongs in a scratch directory. A mounted
+`entrypoint.sh` needs the executable bit, which the repository's copy does not
+carry: mount a `chmod 755` copy. An image is built from a worktree only when
+the image itself changes (a dependency, the Dockerfile).
+
+**The synthetic stack without a build.** `bash scripts/dev.sh up` builds. Its
+source is mounted from the checkout anyway, so the image already on the
+machine serves: stop the institutional app (same port), then from the worktree
+
+```bash
+docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml up -d --no-build --force-recreate
+./run-tests.sh --e2e demo
+docker compose --env-file /dev/null -p cedar-demo -f compose.dev.yml down
+```
+
+**A one-off R script on real data, on uncommitted code.** The
+`cedar-projections` service bakes source too. Mount the working tree over it,
+with the app stopped for memory:
+
+```bash
+docker compose stop cedar-shiny
+docker compose run --rm --no-deps -T -v "$PWD:/srv/shiny-server/cedar:ro" \
+  cedar-projections scripts/<script>.R <args> </dev/null
+docker compose start cedar-shiny
+```
+
+Keep its output out of the repository and out of pull requests: the
+repository is public and the counts are institutional.
+
+**Several open pull requests, tested together.** In a clean worktree, branch
+from `origin/main`, merge each pull request's branch, and run the gates on
+that tree. Merge the pull requests in the same order, then compare
+`origin/main^{tree}` with the tested tree: identical means what deployed is
+what was tested. Merged back to back they leave one deploy, because each push
+cancels the run before it while that run is still in its test job.
+
 ## Running the R suite
 
 CEDAR is a Shiny app, not an R package: `devtools::test()`,
@@ -387,17 +489,75 @@ grepl("cedar-subtab-title", h)                   # assert what should have rende
 
 ### Prove a new test catches the bug
 
-A test written alongside a fix often passes for the wrong reason. Reintroduce
-the bug and confirm it fails; this is mandatory for a guard on a join key, a
-grouping grain or a dedup:
+A test written alongside a fix often passes for the wrong reason: the fixture
+is single-valued on the axis the bug needed, or the assertion reads something
+the bug never touched. Put the bug back and see the test fail. This is
+mandatory for a guard on a join key, a grouping grain or a dedup, and worth
+doing for every line a fix or a rewrite changed.
+
+`scripts/check-test-catches.R` does it from a list of breaks, each one piece
+of text in one file and the tests that should then fail:
+
+```yaml
+- name: the scope joined on the student alone
+  file: R/cones/course-band-dfw.R
+  old: 'by = c("student_id", "term")'
+  new: 'by = "student_id"'
+  tests: [test-course-band-dfw.R]
+- name: the enrolled filter dropped
+  file: R/branches/student-terms.R
+  old: |-
+    rows <- student_terms %>% filter(enrolled)
+  new: |-
+    rows <- student_terms
+  tests: [test-student-terms.R, test-return-rates.R]
+```
 
 ```bash
-cp R/cones/thing.R /tmp/thing.bak
-# revert the fix by hand
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect FAIL
-cp /tmp/thing.bak R/cones/thing.R
-Rscript --vanilla -e "testthat::test_file('tests/testthat/test-thing.R')"   # expect PASS
+Rscript --vanilla scripts/check-test-catches.R /path/to/breaks.yml
 ```
+
+```
+2 breaks against 3 test files, in a copy of the tree. The checkout is not edited.
+
+As the tree stands: test-course-band-dfw.R passes (9 tests).
+…
+1. the scope joined on the student alone  [R/cones/course-band-dfw.R]
+   CAUGHT by test-course-band-dfw.R:
+     BD02: the students read are those of the level and home campus asked for
+
+2. the enrolled filter dropped  [R/branches/student-terms.R]
+   CAUGHT by test-student-terms.R:
+     RS01: a scope is the enrolled student-terms of a level and a home campus
+   NOT CAUGHT: test-return-rates.R passes with the break in place.
+
+2 of 2 breaks caught.
+```
+
+- **The checkout is never edited.** The script copies the tree (what git
+  tracks, plus new files git does not ignore) to a temporary directory, runs
+  the named tests there as the tree stands, and breaks only the copy. So an
+  interrupted run leaves nothing to restore, uncommitted work is safe, a
+  container that mounts the checkout never sees a break, and no `_problems/`
+  is left behind.
+- **`old` must be in the file exactly once**; write enough of the line to make
+  it so. A `|` block ends with a line break and `|-` does not.
+- **A test that fails as the tree stands stops the run**: under a break its
+  failure would prove nothing.
+- **Each run has a time limit** (`--timeout`, 300 seconds; an entry may carry
+  its own `timeout`). A break can send code somewhere slow: one once started a
+  projection build and ran eight minutes. Past the limit is not a catch.
+- **A break is caught when a test fails or errors with it in place.** If the
+  test file cannot run at all (the break stops the suite's set-up), no test is
+  shown to hold it, and it is reported as stopped, with R's error.
+- Exit status 0 when every break is caught, 1 when one is not, 2 when the
+  breaks file cannot be used.
+
+A break that is not caught means the fixture cannot express the bug: add the
+row that can to `fixtures/scenario_tables.R` and run it again. The breaks file
+is a working note. Keep it out of the repository (the text it matches goes
+stale with the next edit) and list the breaks, and how many were caught, in
+the pull request.
 
 ### After a failing run
 
@@ -421,6 +581,11 @@ rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds
   wrong); from inside it is the way to load the fixtures.
 - Don't `source("global.R")`: it starts the interactive setup wizard.
 - Don't hand-source `R/modules/*.R`; use `load_funcs(..., modules = TRUE)`.
+- Don't wait a fixed time in a test. A test held to three seconds failed on a
+  busy machine (ISSUES M74). Wait for the state itself: look, wait, look again,
+  and give up after a stated number of tries, as `set_file_time_back()` does
+  (`helper-projection-refresh.R`). `test-architecture.R` holds the number of
+  `Sys.sleep()` calls in each test file, and it may only go down.
 
 ---
 
@@ -466,6 +631,48 @@ Before touching a projection sentence, `grep` its words in `_snaps/`: the four
 projection files (`test-projection-inputs.R`, `-model.R`, `-view.R`,
 `-page-text.R`) hold every sentence the Projections page and Course Dynamics
 show.
+
+### A backlog held by a ratchet
+
+A rule the code does not yet meet everywhere is held by a ratchet in
+`test-architecture.R`. The test counts the violation in each file and compares
+it with that file's allowance, which is its count on the day the ratchet was
+written. A file over its allowance fails, and so does a file under it, so the
+record follows the code down and a fix cannot be spent on a new violation in
+the same file. A file with no allowance is allowed none.
+
+| Held | What counts | Entry |
+|---|---|---|
+| Silent fallbacks | an `error = function(e)` handler that hands back a value and tells no one | M11 |
+| Units resolved outside `attach_unit()` | a call of a resolver, or a read of the mapping files | I9 |
+| Open blue boxes | `alert alert-info` or `alert-box--info` | M43 |
+| Fixed waits | `Sys.sleep(` in an R test, `sleep(` in a browser script | M74 |
+| Inline styles | `style =` given a fixed string; one built from a value (a bar's width) is not counted | M17 |
+| Bare headings | `h3(` to `h6(` outside `R/modules/ui-helpers.R` | M18 |
+| Colours written in R | a hex value outside `R/trunk/utils.R`, where the palette is | M58 |
+| A latest term | a line taking `max(term)` or `slice_max(term)` that does not carry `MAX-TERM-OK:` | M3 |
+| Class-list classification | a call of `classify_enrollment_outcomes()` outside `R/trunk/utils.R` | M53 |
+| A DFW count divided by hand | a line dividing a name that holds `dfw` | M54 |
+| A student scope written by hand | `student_level` or `student_campus` tested against an option, in a branch, a cone or a feature | M76 |
+
+- **Your change adds one:** write it the way the rule says. The allowance is
+  not raised.
+- **Your change removes one:** lower that file's number in the same change,
+  and delete the entry at zero. The failure gives the number.
+- **Code moved to another file takes its allowance with it:** one number goes
+  down and the other up by as much, and the pull request says so. That is the
+  only way a number rises.
+- **An exception the rule itself makes is said where it is written.** A
+  student's or a group's own latest term is not a right edge: the line carries
+  `MAX-TERM-OK:` and the reason, on it or within three lines above, and is not
+  counted.
+- **A pattern reads text, not meaning.** Where an allowance holds something
+  that is not the violation (a standard error built on a DFW rate, a branch
+  that scopes declarations and not student-terms), the comment beside it says
+  so, and that number stays.
+
+A ratchet stops a backlog from growing; it does not shrink one. The entry
+named beside each says what clearing it takes.
 
 ### The measure of the suite
 
@@ -575,7 +782,17 @@ Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'
 `cedar-repl.R` sets `cedar_base_dir` and `cedar_data_dir` (required globals with
 no defaults), loads lists, trunk, branches, cones and features with
 `modules = FALSE`, and binds each CEDAR table lazily, so a table is read on
-first use. For method development keep one `R --vanilla --quiet` process
+first use.
+
+**The host reads the repository's `data/`; the app reads `CEDAR_DATA_DIR`.**
+`cedar-repl.R` takes its tables from `data/` under the checkout. The container
+mounts the directory `.env` names as `CEDAR_DATA_DIR`, which need not be the
+same one. Where they differ, a number from the host disagrees with the app for
+no reason in the code: compare the dates of the two directories' files before
+believing either, or run the script in the container
+([a one-off R script on real data](#testing-a-branch-in-a-git-worktree)).
+
+For method development keep one `R --vanilla --quiet` process
 alive, source the helper once, and re-source only the changed file:
 
 ```r
@@ -669,3 +886,29 @@ only reads the published bundle. `test-architecture.R` keeps projection code
 free of Shiny and globals; the `test-projection-*.R` files (inputs, model, view, page text) own formula,
 cutoff, selection, empty-scope and artifact-contract behavior. A method change
 is incomplete until both the fixture tests and the real-data aftcast are rerun.
+
+---
+
+## Traps, by symptom
+
+Each of these has cost an hour, most of them more than once. The symptom
+rarely names its cause.
+
+| What you see | What it is | Where |
+|---|---|---|
+| `devtools::test()` or `test_local()` fails; "No test files found" in the container | CEDAR is not a package: run `Rscript --vanilla` from the repository root, and in the container from `/srv/shiny-server/cedar` | [Running the R suite](#running-the-r-suite), [the three environments](#the-three-environments) |
+| "QS format not detected" | data files are qs2: `qs2::qs_read()` | [Dependencies](#dependencies) |
+| `could not find function` for a module's UI function | the R suite does not load modules | [the suite does not load Shiny modules](#the-suite-does-not-load-shiny-modules) |
+| The setup wizard starts, or paths resolve wrong | `source("global.R")`, or `source("setup.R")` from outside `tests/testthat` | [what not to do](#what-not-to-do) |
+| A fix does not show in the browser | the container runs the source it was built with | [the three environments](#the-three-environments) |
+| A library error after a package change | never `renv::deactivate()` or a bare `renv::restore()` | [Dependencies](#dependencies) |
+| Untracked `_problems/` and `testthat-problems.rds` | left by a failing run | [after a failing run](#after-a-failing-run) |
+| A parse error no `parse()` reproduces, at the end of a long run | the script was edited while it ran | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| A job killed with exit 137 and no R error | memory: two heavy jobs at once | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| `docker ps` hangs; a build fails with "input/output error"; the app answers 500 | the disk is full | [one heavy job at a time](#one-heavy-job-at-a-time) |
+| `Cannot find package 'puppeteer-core'`; ENOENT under `data/` | a worktree lacks what git ignores | [testing a branch in a git worktree](#testing-a-branch-in-a-git-worktree) |
+| A host real-data number that disagrees with the app | the host reads the repository's `data/`, the app reads `CEDAR_DATA_DIR` | [the persistent real-data lab](#the-persistent-real-data-lab) |
+| "Execution context was destroyed"; a page back on its empty state | the app's R process was replaced under the browser | [the browser stages are memory-bound](e2e-testing.html#the-browser-stages-are-memory-bound-and-running-out-does-not-look-like-it) |
+| `frame got detached` | the machine slept | [before a browser run](e2e-testing.html#before-a-browser-run-on-a-development-machine) |
+| An input a test set is empty; a picker reads "Type to search..." | the test touched the page before the session had started | [E2E rules](e2e-testing.html#e2e-rules--the-four-that-cause-every-flake) |
+| A browser timeout on a control that exists | a selector rotted: `node tests/e2e/check-ids.mjs` | [E2E rules](e2e-testing.html#e2e-rules--the-four-that-cause-every-flake) |

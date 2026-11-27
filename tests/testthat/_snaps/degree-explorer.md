@@ -1,3 +1,18 @@
+# the board's math sentence names the route's math course, or says what the start adds (I97)
+
+    Code
+      roadmap_view(BIOLOGY, "algebra")$math_note
+    Output
+      [1] "MATH 1512 starts in semester 3."
+    Code
+      roadmap_view(HISTORY, "intermediate")$math_note
+    Output
+      [1] "This math starting point adds MATH 1215 in semester 1, as preparation."
+    Code
+      roadmap_view(HISTORY, "algebra")$math_note
+    Output
+      [1] "This math starting point adds no math course to the plan."
+
 # a board compiled from the catalog says so in the degree list and on the board
 
     Code

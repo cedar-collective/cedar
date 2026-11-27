@@ -68,19 +68,77 @@ test_that("get_course_band_dfw() stops without its edge, its columns or a known 
                "no graded attempt")
 })
 
-test_that("BD01: the page's lists, their count by chance and the sentence", {
-  opt <- list(term_type = "fall", campus = "ABQ", data_edges = bd01$edges)
-  r <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL, opt)
+# ISSUES M67: the Retention page's section read every student in a course,
+# whatever level the page was set to, and read the page's home-campus control
+# as the campus that taught the course.
+test_that("BD02: the students read are those of the level and home campus asked for", {
+  band_dfw <- function(opt, applicants = NULL) {
+    get_course_band_dfw(bd02$attempts, bd02$student_terms, c(list(data_edges = bd02$edges), opt), applicants)
+  }
+  gate_of <- function(r) r$courses[r$courses$subject_course == "GATE 101" & r$courses$campus == "ABQ", ]
+
+  # Undergraduates of home campus ABQ: BD01's seats and BD01's numbers.
+  page <- band_dfw(list(student_level = "UG", student_campus = "ABQ"))
+  gate <- gate_of(page)
+  expect_equal(c(gate$low_attempts, gate$rest_attempts), c(30L, 30L))
+  expect_equal(c(gate$low_dfw_pct, gate$low_other_dfw_pct, gate$rest_dfw_pct, gate$rest_other_dfw_pct),
+               c(60, 20, 20, 10))
+  expect_equal(gate$gap_pts, 30)
+  expect_equal(gate$verdict, "harder")
+  expect_equal(c(page$meta$n_banded, page$meta$n_out_of_scope), c(63L, 61L))
+  # A level is the term's: S1 was an undergraduate one fall and a graduate
+  # student the next, and the course of the second is not read.
+  expect_false("SEMR 600" %in% page$bands$subject_course)
+  # Home campus is not the campus that taught the course: EA1's GATE 101,
+  # taught on EA, is read, and no campus that taught a course is left out.
+  expect_true("EA" %in% page$bands$campus)
+  expect_null(page$meta$campus)
+
+  # Every level: ten graduate seats a fall join the lowest band.
+  every_level <- band_dfw(list(student_campus = "ABQ"))
+  expect_true("SEMR 600" %in% every_level$bands$subject_course)
+  gate <- gate_of(every_level)
+  expect_equal(c(gate$low_attempts, gate$low_dfw_pct, gate$low_other_dfw_pct, gate$gap_pts), c(60, 30, 60, -40))
+  expect_equal(gate$verdict, "easier")
+
+  # Every home campus: ten EA-home seats a fall join the course's other students.
+  gate <- gate_of(band_dfw(list(student_level = "UG")))
+  expect_equal(c(gate$rest_attempts, gate$rest_dfw_pct, gate$rest_other_dfw_pct, gate$gap_pts), c(60, 60, 5, -15))
+  expect_equal(gate$verdict, "no_difference")
+
+  # A scope with no student is an empty result over the same terms and scale.
+  nobody <- band_dfw(list(student_level = "LW"))
+  expect_equal(c(nrow(nobody$courses), nrow(nobody$bands), nobody$meta$n_banded), c(0L, 0L, 0L))
+  expect_equal(nobody$meta$low_band, "below 2.5")
+  expect_equal(nobody$meta$terms, c(202080L, 202180L, 202280L))
+  # No graduate seat is a first-term student: nobody is banded by high-school
+  # GPA, and the scale's lowest band is still the lowest.
+  grads <- band_dfw(list(student_level = "GR", band_by = "hs"), bd02$applicants)
+  expect_equal(grads$meta$low_band, "2.75 or lower")
+  expect_equal(c(grads$meta$n_banded, nrow(grads$courses)), c(0L, 0L))
+
+  # A scope is read from the student-terms' own level and home campus.
+  expect_error(get_course_band_dfw(bd01$attempts, bd01$student_terms,
+                                   list(data_edges = bd01$edges, student_level = "UG")),
+               "student_terms lacks enrolled, student_level, student_campus")
+})
+
+test_that("BD02: the page's lists, their count by chance and the sentence", {
+  # The page's scope: its student level, and its campus as the home campus.
+  opt <- list(term_type = "fall", student_level = "UG", campus = "ABQ", data_edges = bd02$edges)
+  r <- retention_dashboard_band_courses(bd02$attempts, bd02$student_terms, NULL, opt)
   expect_equal(r$harder$subject_course, "GATE 101")
   expect_equal(r$easier$subject_course, "OTHR 200")
+  expect_equal(c(r$meta$student_level, r$meta$student_campus), c("UG", "ABQ"))
+  expect_true("EA" %in% r$bands$campus)
   # 30 attempts at a 30-point gap: 9 more DFWs than at the other students' excess.
   expect_equal(r$harder$excess_dfw, 9)
   expect_equal(r$meta$n_by_chance, 2 * stats::pnorm(-2))
   # The latest two falls only: 20 attempts a side, under the guard.
-  two <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL, c(opt, list(band_terms = 2L)))
+  two <- retention_dashboard_band_courses(bd02$attempts, bd02$student_terms, NULL, c(opt, list(band_terms = 2L)))
   expect_equal(two$meta$terms, c(202180L, 202280L))
   expect_equal(two$meta$n_courses, 0L)
-  hs <- retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, bd01$applicants,
+  hs <- retention_dashboard_band_courses(bd02$attempts, bd02$student_terms, bd02$applicants,
                                          c(opt, list(band_by = "hs", min_n = 3L)))
   testthat::local_edition(3)
   expect_snapshot(cat(retention_band_sentence(r), retention_band_sentence(two), retention_band_sentence(hs), sep = "\n"))
@@ -89,6 +147,6 @@ test_that("BD01: the page's lists, their count by chance and the sentence", {
   expect_equal(c(r$meta$n_harder, r$meta$n_easier), c(1L, 1L))
   many <- r; many$meta$n_harder <- 20L
   expect_snapshot(cat(retention_band_sentence(many)))
-  expect_error(retention_dashboard_band_courses(bd01$attempts, bd01$student_terms, NULL,
-                                                list(term_type = "spring", data_edges = bd01$edges)), "no graded spring")
+  expect_error(retention_dashboard_band_courses(bd02$attempts, bd02$student_terms, NULL,
+                                                list(term_type = "spring", data_edges = bd02$edges)), "no graded spring")
 })

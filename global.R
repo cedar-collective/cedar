@@ -504,9 +504,11 @@ message("[global.R] Pathways choices ready: ",
         length(cedar_pathways_choices$dept_choices), " departments")
 
 # Degree Explorer's boards: each compiled draft in place of its authored board,
-# labelled draft or reviewed from the Catalog Review store (R/features/degree-drafts.R).
-# Catalog Review itself keeps the authored boards, the compiler's baseline.
-CEDAR_DEGREE_DRAFTS <- read_degree_drafts(file.path(cedar_institution_dir(), "degree_drafts"))
+# or added for a program with none, labelled draft or reviewed from the Catalog
+# Review store (R/features/degree-drafts.R). Catalog Review itself keeps the
+# authored boards, the compiler's baseline.
+CEDAR_DEGREE_DRAFTS <- read_degree_drafts(file.path(cedar_institution_dir(), "degree_drafts"),
+                                          read_institution_file("programs", cedar_institution_dir()))
 CEDAR_DEGREE_BOARDS <- publish_degree_drafts(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_DRAFTS,
   degree_board_review_status(CEDAR_DEGREE_DRAFTS, file.path(data_dir, "catalog-normalizations", cedar_institution_id())))
 # Each degree's college, for Degree Explorer's College picker.
@@ -526,12 +528,19 @@ message("[global.R] Initializing logging system...")
 init_logging()
 
 # ── Preload ─────────────────────────────────────────────────────────────────
-# The home campuses the student pages offer (First Year, Retention, Graduation).
+# The home campuses the student pages offer (Retention, Graduation).
 cedar_home_campuses <- sort(unique(stats::na.omit(data_objects[["cedar_student_terms"]]$student_campus)))
 # What the DFW Rates page offers: the teaching campuses and the graded terms.
 # ui.R and the preload below both read them here.
 cedar_dfw_rates_offers <- list(campuses = cedar_campus_choices(data_objects[["cedar_attempts"]]),
                                terms = unique(data_objects[["cedar_attempts"]]$term))
+# The campuses Course Dynamics opens on, in the order its picker lists them
+# (the opening selection of a picker comes back in its list's order, and a
+# result is shared under the campuses as the page sends them). ui.R selects
+# them and the preload below builds for them.
+cedar_course_dynamics_campuses <- intersect(
+  sort(unique(data_objects[["cedar_sections"]]$campus)),
+  cedar_campus_default(data_objects[["cedar_sections"]]))
 # Graduation opens on the same view for everyone, and building it is the
 # longest wait in the app (about 25 seconds on production, during which R
 # answers no one). It is built here instead, in the background once the app is
@@ -541,7 +550,27 @@ cedar_dfw_rates_offers <- list(campuses = cedar_campus_choices(data_objects[["ce
 # they are counted from (cedar_preload_shared_results(), R/modules/ui-helpers.R).
 # DFW Rates opens on one view too (12 seconds on production), and is built
 # after Graduation: the jobs run one at a time.
+# Headcount's program choices with nothing picked are asked for by every
+# session as it starts, on whatever page it opened (the module's set-up fills
+# its pickers). They are built first: about a second, and the first session of
+# a process otherwise counts them itself (headcount_preload_jobs(), ISSUES M75).
+# Course Dynamics > Downstream is opened for a course the reader picks, so no
+# one view can be built ahead for everyone; the courses analysed most in the
+# last month are, after the two pages above (downstream_preload_jobs(),
+# R/modules/later-course.R): ten of them, or CEDAR_PRELOAD_COURSES when the
+# environment sets it (0 for none: each course is about 40 seconds of this
+# process on production, and a restart on a development machine should be
+# ready at once).
+cedar_preload_course_count <- suppressWarnings(as.integer(Sys.getenv("CEDAR_PRELOAD_COURSES", "10")))
+if (is.na(cedar_preload_course_count) || cedar_preload_course_count < 0L) {
+  stop("[global.R] CEDAR_PRELOAD_COURSES must be a whole number, 0 or more; it is '",
+       Sys.getenv("CEDAR_PRELOAD_COURSES"), "'.", call. = FALSE)
+}
+cedar_preload_courses <- downstream_courses_ahead(read_report_timings(), cedar_preload_course_count)
+message("[global.R] Downstream built ahead for: ",
+        if (length(cedar_preload_courses) > 0L) paste(cedar_preload_courses, collapse = ", ") else "no course")
 cedar_preload_shared_results(c(
+  headcount_preload_jobs(data_objects[["cedar_programs"]], data_objects[["cedar_dims"]]),
   graduation_preload_jobs(
     list(student_terms = data_objects[["cedar_student_terms"]], programs = data_objects[["cedar_programs"]],
          degrees = data_objects[["cedar_degrees"]], terms = data_objects[["cedar_terms"]],
@@ -551,8 +580,36 @@ cedar_preload_shared_results(c(
   dfw_rates_preload_jobs(
     list(attempts = data_objects[["cedar_attempts"]], dims = data_objects[["cedar_dims"]],
          edges = data_objects[["cedar_edges"]]),
-    campuses = cedar_dfw_rates_offers$campuses, terms = cedar_dfw_rates_offers$terms)))
+    campuses = cedar_dfw_rates_offers$campuses, terms = cedar_dfw_rates_offers$terms),
+  downstream_preload_jobs(
+    list(registrations = data_objects[["cedar_registrations"]], sections = data_objects[["cedar_sections"]],
+         attempts = data_objects[["cedar_attempts"]], programs = data_objects[["cedar_programs"]],
+         applicants = data_objects[["cedar_applicants"]], student_terms = data_objects[["cedar_student_terms"]],
+         dims = data_objects[["cedar_dims"]], edges = data_objects[["cedar_edges"]]),
+    courses = cedar_preload_courses, campus = cedar_course_dynamics_campuses)))
 
 message("[global.R] Loading ui.R and server.R...")
 source("ui.R")
+# server.R's last line reads this: nothing is compiled yet at this read.
+cedar_compiled_server <- NULL
 source("server.R")
+
+# ── Compile the servers now ─────────────────────────────────────────────────
+# R compiles a function as it is first used. Left to that, the first person to
+# open CEDAR after a restart waits while every module's server is compiled
+# (4.5 seconds here, more on production; ISSUES I81), and the second while the
+# server function is (3 more). Compiled at start, that wait is part of the
+# start, which the restart's own warm-up request sits through instead. Shiny
+# reads server.R again for the first session and runs what that read returns,
+# so the file's last line hands back the function compiled here
+# (cedar_server_to_run()).
+.compile_started <- Sys.time()
+for (.module_server in ls(globalenv(), pattern = "Server$")) {
+  if (is.function(get(.module_server, envir = globalenv()))) {
+    assign(.module_server, compiler::cmpfun(get(.module_server, envir = globalenv())), envir = globalenv())
+  }
+}
+cedar_compiled_server <- cedar_compile_server(server, "server.R")
+message(sprintf("[global.R] Server functions compiled in %.1fs",
+                as.numeric(difftime(Sys.time(), .compile_started, units = "secs"))))
+rm(.module_server, .compile_started)

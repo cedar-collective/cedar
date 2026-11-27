@@ -193,6 +193,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/admin.R")
   source_file("features/course-report.R")
   source_file("features/enrollment.R")
+  source_file("features/low-enrollment.R")
   source_file("features/dept-dashboard.R")
   source_file("features/dept-trends.R")
   source_file("features/gen-ed.R")
@@ -209,7 +210,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/course-similar-students.R")     # text-first preview: a course against similar non-takers, beside every course and by instructor
   source_file("features/dfw-dashboard.R")              # payload and text preview: Bird's Eye > DFW Rates
   source_file("features/retention-dashboard.R")  # Bird's Eye > Retention payload
-  source_file("features/summer-sections.R")     # the summer question on First Year and Retention
+  source_file("features/summer-sections.R")     # Retention's two summer questions
   source_file("features/graduation-dashboard.R")  # Bird's Eye > Graduation payload
   source_file("features/dfw-dashboard-view.R")         # what the DFW Rates page draws
   source_file("features/later-course.R")                # text-first preview: a course's students in a later course, by term, grade and instructor
@@ -221,6 +222,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/catalog-review.R")
   source_file("features/catalog-normalization.R")
   source_file("features/degree-drafts.R")
+  source_file("features/catalog-questions.R")         # Catalog Review > Catalog questions: every reading's open items, by who can settle them
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
@@ -230,15 +232,17 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/headcount.R")
     source_file("modules/seatfinder.R")
     source_file("modules/cancellations.R")
+    source_file("modules/low-enrollment.R")  # Courses > Low Enrollment
     source_file("modules/dfw-rates.R")       # Bird's Eye > DFW Rates
     source_file("modules/retention-dashboard.R")  # Bird's Eye > Retention
-    source_file("modules/first-year.R")  # Bird's Eye > First Year (after Retention: it reads RETENTION_TERM_TYPES)
+    source_file("modules/retention-entering-classes.R")  # Retention's entering-class sections (was the First Year page)
     source_file("modules/graduation.R")  # Bird's Eye > Graduation
     source_file("modules/waitlist.R")
     source_file("modules/regstats.R")
     source_file("modules/admin.R")
     source_file("modules/catalog-review.R")
     source_file("modules/catalog-normalization.R")
+    source_file("modules/catalog-questions.R")    # Catalog Review > Catalog questions
     source_file("modules/gen-ed.R")
     source_file("modules/dept-trends.R")
     source_file("modules/observed-course-paths.R")

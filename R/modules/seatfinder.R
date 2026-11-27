@@ -13,37 +13,7 @@ seatfinderUI <- function(id, sections, default_term, dept_choices) {
       "Open Seats",
       "Courses with available capacity matching your filters, with DFW history and year-over-year schedule comparisons.",
       fluidRow(class = "explore-filter-row",
-        column(2,
-          selectizeInput(ns("sf_campus"), "Campus", multiple = TRUE,
-                         choices = sort(unique(sections$campus)),
-                         selected = cedar_campus_default(sections))
-        ),
-        column(1,
-          selectizeInput(ns("sf_college"), "College", multiple = TRUE,
-                         choices = sort(unique(sections$college)))
-        ),
-        column(2,
-          selectizeInput(ns("sf_term"), "Term", multiple = TRUE,
-                         choices = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
-                         selected = default_term)
-        ),
-        column(1,
-          selectInput(ns("sf_pt"), "PoT", multiple = TRUE,
-                      choices = sort(unique(sections$part_term)))
-        ),
-        column(2,
-          selectizeInput(ns("sf_dept"), "Department", multiple = TRUE,
-                         choices = dept_choices)
-        ),
-        column(1,
-          selectInput(ns("sf_im"), "Method", multiple = TRUE,
-                      choices = sort(unique(sections$delivery_method)))
-        ),
-        column(1,
-          selectInput(ns("sf_level"), "Level", multiple = TRUE,
-                      choices = sort(unique(sections$level)),
-                      selected = "lower")
-        ),
+        cedar_section_scope_inputs(ns, "sf", sections, dept_choices, default_term),
         column(2,
           filter_actions(
             cedar_requires(actionButton(ns("sf_button"), label = "Find Seats",

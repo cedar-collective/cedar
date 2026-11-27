@@ -416,6 +416,32 @@ multi_campus_demo <- local({
   fixture
 })
 
+# The audit fixture plus two students whose rows give a choice of attempt:
+#   SEQ_R1 passed SEQ 101 in 202010, passed SEQ 201 in 202080 and passed
+#     SEQ 101 again in 202110: treatment, by the first pass.
+#   SEQ_D1 sat SEQ 201 on two campuses in 202080, an A on ABQ (listed first)
+#     and an F on EA, with no SEQ 101: control, and one outcome, the DFW.
+# Read with campuses ABQ and EA:
+#   Treatment: SEQ_T1 (Y dfw), SEQ_T2 (Y dfw), SEQ_R1 (Y pass)
+#   Control:   SEQ_C1, SEQ_C2, SEQ_XC (pass), SEQ_D1 (dfw)
+.sequence_repeat_fixture <- local({
+  fixture <- .sequence_audit_fixture
+  fixture$students <- dplyr::bind_rows(
+    fixture$students,
+    .mc_row("SEQ_R1", 202010, "SEQ 101", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_R1", 202080, "SEQ 201", "ABQ", "SEQ", "B", "SEQ_I1"),
+    .mc_row("SEQ_R1", 202110, "SEQ 101", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_D1", 202080, "SEQ 201", "ABQ", "SEQ", "A", "SEQ_I1"),
+    .mc_row("SEQ_D1", 202080, "SEQ 201", "EA", "SEQ", "F", "SEQ_I2")
+  )
+  extra <- c("SEQ_R1", "SEQ_D1")
+  fixture$programs <- dplyr::bind_rows(fixture$programs, lapply(seq_along(extra), function(i) {
+    fixture$programs %>% dplyr::slice(1L) %>%
+      dplyr::mutate(student_id = extra[[i]], program_id = paste0("SEQ-PROG-R", i))
+  }))
+  fixture
+})
+
 # ── test-course-overview.R ──────────────────────────────────────────────────────
 
 # A hand-built overview with only the columns the snapshot reads, so expected
@@ -554,6 +580,64 @@ bd01 <- local({
        edges = list(last_graded = 202280L, last_enrolled_complete = 202280L))
 })
 
+# BD02: BD01 as a page about students reads it. Every BD01 seat is an
+# undergraduate whose home campus is ABQ (EA1 too: its GATE 101 is the one
+# taught on EA), and twenty more seats take GATE 101 and OTHR 200 on ABQ in
+# the same three falls:
+#   G01-G10, graduate students, home campus ABQ, entering GPA 2.0: all pass
+#     GATE 101, all DFW OTHR 200.
+#   T01-T10, undergraduates whose home campus is EA, entering GPA 3.2: all
+#     DFW GATE 101, all pass OTHR 200.
+# and S1, the one student with two terms (home campus ABQ in both): an
+#   undergraduate in 202080, in a first term (no entering GPA, so in no
+#   band), who passes OTHR 200; a graduate student in 202180 (entering GPA
+#   3.0), who passes SEMR 600, a course nobody else takes. A level is the
+#   term's: the undergraduates' reading never holds SEMR 600.
+# Undergraduates of home campus ABQ are BD01's seats: GATE 101 on ABQ is +30
+#   points, harder, and EA's GATE 101 is read (EA1's home campus is ABQ). 61
+#   student-terms are outside that scope: the 60 above and S1's 202180.
+# Every level, home campus ABQ: GATE 101's low band is 60 attempts at 30%
+#   against 60% in their other course (excess -30) and its other students'
+#   excess is 10: gap -40, easier.
+# Undergraduates of every home campus: GATE 101's other students are 60
+#   attempts at 60% against 5% (excess 55): gap -15, inside chance
+#   (se = 100 * sqrt(.6*.4/30 + .2*.8/30 + .6*.4/60 + .05*.95/60) = 13.5).
+# No seat is a law student, and no graduate student-term is a first term.
+bd02 <- local({
+  more <- tidyr::crossing(
+    term = c(202080L, 202180L, 202280L),
+    tibble::tibble(
+      seat = c(sprintf("G%02d", 1:10), sprintf("T%02d", 1:10)),
+      gpa = rep(c(2.0, 3.2), each = 10),
+      student_level = rep(c("GR", "UG"), each = 10),
+      student_campus = rep(c("ABQ", "EA"), each = 10),
+      gate_dfw = rep(c(FALSE, TRUE), each = 10),
+      othr_dfw = rep(c(TRUE, FALSE), each = 10)
+    )
+  ) %>%
+    dplyr::mutate(student_id = paste0("BD02-", seat, "-", term))
+  attempts <- dplyr::bind_rows(
+    bd01$attempts,
+    tibble::tibble(student_id = more$student_id, term = more$term, campus = "ABQ", subject_course = "GATE 101",
+                   outcome = ifelse(more$gate_dfw, "dfw", "pass")),
+    tibble::tibble(student_id = more$student_id, term = more$term, campus = "ABQ", subject_course = "OTHR 200",
+                   outcome = ifelse(more$othr_dfw, "dfw", "pass")),
+    tibble::tibble(student_id = "BD02-S1", term = c(202080L, 202180L), campus = "ABQ",
+                   subject_course = c("OTHR 200", "SEMR 600"), outcome = "pass")
+  )
+  student_terms <- dplyr::bind_rows(
+    bd01$student_terms %>% dplyr::mutate(enrolled = TRUE, student_level = "UG", student_campus = "ABQ"),
+    tibble::tibble(student_id = more$student_id, term = more$term, quality_points = 36, graded_hours = 12,
+                   cumulative_quality_points = 36 + 30 * more$gpa, cumulative_graded_hours = 42,
+                   timeline_valid = TRUE, enrolled = TRUE,
+                   student_level = more$student_level, student_campus = more$student_campus),
+    tibble::tibble(student_id = "BD02-S1", term = c(202080L, 202180L), quality_points = 36, graded_hours = 12,
+                   cumulative_quality_points = c(36, 72), cumulative_graded_hours = c(12, 24),
+                   timeline_valid = TRUE, enrolled = TRUE, student_level = c("UG", "GR"), student_campus = "ABQ")
+  )
+  list(attempts = attempts, student_terms = student_terms, applicants = bd01$applicants, edges = bd01$edges)
+})
+
 # ── test-course-planning-history.R ──────────────────────────────────────────────
 
 course_history_terms <- course_terms_for(test_students_course_history, test_sections_course_history)
@@ -580,6 +664,23 @@ ss_attempts2 <- local({
     .ss_row("RP_REP", 202080, "dfw"), .ss_row("RP_BACK", 202080, "pass"), .ss_row("RP_FAIL", 202080, "dfw")
   )
 })
+
+# The same attempts with two rows that are not classified attempts, for the
+# count of a member's courses in 202010:
+#   FAIL's HIST 101 is restated as an ungraded registration (no outcome): FAIL
+#     holds a row in the course and is neither its taker nor its non-taker,
+#     which leaves BACK the one taker against DROP, GONE, GRAD and REP.
+#   BACK's HIST 101 is also listed on a second campus, ungraded, under another
+#     instructor (RP_I9), ahead of the graded row: one member-course, whose
+#     instructor is the classified attempt's (RP_I1).
+ss_attempts_unclassified <- bind_rows(
+  ss_attempts2 %>%
+    filter(student_id == "RP_BACK", term == 202010L, subject_course == "HIST 101") %>%
+    mutate(campus = "EA", outcome = NA_character_, instructor_id = "RP_I9", instructor_name = "RP_I9"),
+  ss_attempts2 %>%
+    mutate(outcome = if_else(student_id == "RP_FAIL" & term == 202010L & subject_course == "HIST 101",
+                             NA_character_, outcome))
+)
 
 ss_student_terms2 <- test_student_terms_rp %>%
   mutate(sem_gpa = case_when(
@@ -613,6 +714,15 @@ ss_aid <- tibble::tibble(
   pell_eligible = c(TRUE, FALSE, TRUE, FALSE, FALSE, FALSE, NA),
   first_gen     = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, NA)
 )
+
+# The same declarations with a term whose rows disagree and one that records
+# nothing: REP's blank Pell row restated as eligible (a yes beside a no is a
+# yes), and DROP's only row as blank (no label). First-generation status is
+# as it was: REP's no beside a blank is a no.
+ss_aid_mixed <- ss_aid %>%
+  mutate(pell_eligible = case_when(student_id == "RP_REP" & is.na(pell_eligible) ~ TRUE,
+                                   student_id == "RP_DROP" ~ NA,
+                                   TRUE ~ pell_eligible))
 
 # Per-term gaps in by_term's shape, four falls (2019-2022) with a spring and a
 # summer between: GAP 100's return gap climbs 0, 2, 4, 6 (+2 a year) with
@@ -884,6 +994,20 @@ compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", pr
   source_url = "https://catalog.example.invalid/#/programs/biology", retrieved_on = "2026-10-17", coverage = "excerpt",
   notes = "Draft compiled from the designed reading")
 
+# The math routes of a program with no math course of its own, as
+# degree_general_math_routes() reads them from the demo boards (History B.A.):
+# each start's preparation only, so a student at intermediate algebra takes
+# MATH 1215 and every other start has nothing before the Gen Ed math card.
+compiler_general_math_routes <- data.frame(catalog_id = "demo-history-ba-2026",
+  start_id = c("calculus", "precalculus", "algebra", "intermediate"),
+  label = c("Calculus-ready", "Pre-calculus-ready",
+            "College-algebra-ready", "Start with Intermediate Algebra (MATH 1215)"),
+  node_ids = c("", "", "", "math1215"))
+
+# A reading that names no Gen Ed or remainder pools
+# (degree_reading_gen_ed_pools() of a reading without gen_ed_pools).
+compiler_no_gen_ed_pools <- data.frame(rule_id = character(), area = character(), credits = numeric())
+
 # ── test-degree-drafts.R, test-degree-explorer.R ──────────────────────────────
 
 # The page's board status (publish_degree_drafts()$status) for the demo
@@ -891,6 +1015,39 @@ compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", pr
 # yet signed off, History authored by hand.
 degree_board_status_demo <- data.frame(catalog_id = c("demo-biology-bs-2026", "demo-history-ba-2026"),
   source = c("compiled", "authored"), review = c("draft", NA), note = c("Its catalog reading is not signed off in Catalog Review.", ""))
+
+# ── test-catalog-questions.R ──────────────────────────────────────────────────
+
+# degree_reading_questions.csv as the compile script writes it, for two
+# designed programs (read_degree_drafts()$questions):
+#   Biology B.S.  rule:combined-scope  settled by the catalog
+#                 question:1           not sorted (its passage runs past 300
+#                                      characters, so the document cuts it)
+#   History B.A.  passage:b-hist-pool  settled by CEDAR's reading; no board
+# Counts: any 3, the catalog 1, CEDAR's copy 0, CEDAR's reading 1, not sorted 1.
+# Programs alphabetical: Bachelor of Arts in History, then Bachelor of Science in Biology.
+catalog_questions_designed <- data.frame(
+  reading = c(rep("catalog_interpretations/2026-2027/biology.v1.json", 2), "catalog_interpretations/2026-2027/history.v1.json"),
+  reading_file_sha256 = c(rep(strrep("a", 64), 2), strrep("b", 64)),
+  program_id = c("biology", "biology", "history"),
+  program_title = c("Bachelor of Science in Biology", "Bachelor of Science in Biology", "Bachelor of Arts in History"),
+  catalog_url = c(rep("https://catalog.example.invalid/#/programs/biology", 2), "https://catalog.example.invalid/#/programs/history"),
+  catalog_id = c("demo-biology-draft", "demo-biology-draft", ""),
+  item = c("rule:combined-scope", "question:1", "passage:b-hist-pool"),
+  kind = c("rule", "question", "passage"),
+  label = c("Does Combined Biology replace both Biology I and its lab?", "Interpretation question", "Unresolved source treatment"),
+  question = c("The list offers BIOL200 beside the pair without saying it covers the lab.",
+               "Is department permission required for admission, or only advised?",
+               "The credit wording restates the elective requirement; read as the elective pool."),
+  block_id = c("b-12cf2b1d2a007e540e5f8c49", "b-c83ed948337af5e15eada1e2", "b-hist-pool"),
+  section = c("Program requirements", "Admission", "Major requirements"),
+  passage = c("BIOL200 - Combined Biology (4)",
+              paste("Admission to the major requires at least two upper-level courses and department permission.",
+                    "Students should meet with an advisor before applying, and the department reviews each application",
+                    "in the term after it is received. Students who are not admitted may apply again the following term",
+                    "after completing additional coursework; the department may ask for an interview."),
+              "Earned at least 12 credits from HIST 300 - 499."),
+  settled_by = c("catalog", "", "reading"))
 
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
@@ -1206,6 +1363,36 @@ tp_attempts <- keyed_attempts(cedar_registrations_tp, tp01_edges)
 
 # TP01's two reviewed merges, read as the app reads topic_titles.csv.
 tp_topic_titles <- validate_topic_titles(cedar_topic_titles_tp)
+
+# ── test-logging.R ──────────────────────────────────────────────────────────────
+
+# Rows of the timing log, as most_run_report_values() reads them. For report
+# "course_report" and field "course", since 2026-11-01:
+#   HIST 1110  3   two runs and one with no success recorded (an older row);
+#                  a fourth is from October
+#   BIOL 1140  2   ties with CHEM 1215 and comes first, by name
+#   CHEM 1215  2   a third run failed: counted, it would tie with HIST 1110
+#                  and come first
+#   ENGL 1110  1   on 2026-11-01 itself: the date is inside
+# With no date, HIST 1110 has 4.
+# Naming no course to count: a dept_dashboard run that names one, a row whose
+# parameters are not JSON (the one row reported), a run naming two courses,
+# and a run with no parameters.
+.timing_log_rows <- data.frame(
+  timestamp = c(
+    "2026-11-20 10:00:00", "2026-11-21 10:00:00", "2026-11-22 10:00:00", "2026-11-22 11:00:00",
+    "2026-10-15 10:00:00", "2026-11-05 10:00:00", "2026-11-06 10:00:00", "2026-11-07 10:00:00",
+    "2026-11-08 10:00:00", "2026-11-01 00:00:05", "2026-11-10 10:00:00", "2026-11-11 10:00:00",
+    "2026-11-12 10:00:00", "2026-11-13 10:00:00"),
+  report_type = c(rep("course_report", 10L), "dept_dashboard", rep("course_report", 3L)),
+  report_params = c(
+    '{"course":"HIST 1110"}', '{"course":"HIST 1110"}', '{"course":"HIST 1110"}', '{"course":"CHEM 1215"}',
+    '{"course":"HIST 1110"}', '{"course":"CHEM 1215"}', '{"course":"CHEM 1215"}', '{"course":"BIOL 1140"}',
+    '{"course":"BIOL 1140"}', '{"course":"ENGL 1110"}', '{"course":"MATH 1220","dept":"MATH"}',
+    '{course: FYEX 1110', '{"course":["PHYS 1230","PHYS 1240"]}', NA),
+  success = c(1L, 1L, NA, 0L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L),
+  stringsAsFactors = FALSE
+)
 
 # ── test-later-course.R ─────────────────────────────────────────────────────────
 
@@ -2369,6 +2556,8 @@ cc01 <- local({
 #     latest fall.
 #   Two ABQ seniors awarded a degree that term (left out, counted).
 #   Five ABQ graduate students, all back (out of an undergraduate scope).
+#     Each takes MATH 101 too and gets a DFW: 15 attempts over the three
+#     graded falls that an undergraduate reading of the course never holds.
 # Fall 2024: ten ABQ freshmen whose return cannot be observed yet.
 rr01 <- local({
   falls <- c(202080L, 202180L, 202280L, 202380L)
@@ -2405,15 +2594,119 @@ rr01 <- local({
                      returned_next_regular_term = dplyr::if_else(return_observable, returned, NA),
                      return_observable, degree_awarded)
   # MATH 101 attempts, stamped as test_attempts is (one of its rows, restated).
-  takers <- dplyr::filter(rows, grepl("-A", id), i != 38L)
+  takers <- dplyr::filter(rows, (grepl("-A", id) & i != 38L) | grepl("-G", id))
   attempts <- test_attempts[rep(1L, nrow(takers)), ] %>%
     dplyr::mutate(student_id = takers$student_id, term = takers$term, campus = "ABQ",
-                  subject_course = "MATH 101", outcome = ifelse(takers$dfw_grades > 0L, "dfw", "pass"))
+                  subject_course = "MATH 101",
+                  outcome = ifelse(takers$dfw_grades > 0L | grepl("-G", takers$id), "dfw", "pass"))
   dashboard <- build_retention_dashboard(student_terms, attempts, NULL, list(
     term_type = "fall", student_level = "UG", data_edges = rr01_edges,
     min_n = 5L, course_min_n = 10L, course_min_dfw_n = 5L))
   list(student_terms = student_terms, attempts = attempts, dashboard = dashboard)
 })
+
+# RT01: the return rate after each semester since arrival (test-return-rates.R).
+# Four falls (202080..202380, k = 1..4), every undergraduate at home campus
+# ABQ, every return observable, read with min_n 5. Each row is its own
+# student; programs records each one's arrival ("First Time Freshman" or
+# "New Transfer") in the term named:
+#   RT01-F1  200 first-time, arrived that fall (1st semester): 140, 148,
+#            156, 164 come back (70, 74, 78, 82%): rising.
+#   RT01-F3  100 first-time, arrived the fall before (3rd): 85 back: steady.
+#   RT01-F5  100 first-time, arrived two falls before (5th): 92, 86, 80, 74
+#            back: falling.
+#   RT01-F8  6 first-time in their 8th semester (a spring start three and a
+#            half years before), 5 back: the last semester drawn.
+#   RT01-F10 6 first-time in their 10th semester, all back: after the last
+#            semester drawn, the overall line only (24 over the four falls).
+#   RT01-F7  10 first-time in their 7th semester in the first two falls
+#            only, all back: read earlier, not in the latest, left out.
+#   RT01-F2  3 first-time in their 2nd semester (arrived that spring), 2
+#            back: under min_n every fall, never read.
+#   RT01-T1  40 new transfers in their 1st semester, 30 back (75%): one
+#            semester, so no lowest; steady.
+#   RT01-X   4 with no arrival on record, all back: the overall line only
+#            (16 over the four falls).
+# First-time students come back least often after their 1st semester in
+# three of the four falls; after their 5th in the last. Every student
+# together: 469 in each of the first two falls, 459 after. The arrival
+# records begin with RT01-F10's first, Spring 2016, so every semester drawn is
+# reached; `by_semester` is the rates table the semester lines read, for a
+# test that sets the records' start later.
+rt01 <- local({
+  falls <- c(202080L, 202180L, 202280L, 202380L)
+  block <- function(tag, n, back, arrived, entry) {
+    tibble::tibble(i = seq_len(n), tag = tag, returned = seq_len(n) <= back, arrived = arrived, entry = entry)
+  }
+  one <- function(term, k) {
+    dplyr::bind_rows(
+      block("F1", 200L, 132L + 8L * k, term, "first_time"),
+      block("F3", 100L, 85L, term - 100L, "first_time"),
+      block("F5", 100L, 98L - 6L * k, term - 200L, "first_time"),
+      block("F8", 6L, 5L, term - 370L, "first_time"),
+      block("F10", 6L, 6L, term - 470L, "first_time"),
+      if (k <= 2L) block("F7", 10L, 10L, term - 300L, "first_time"),
+      block("F2", 3L, 2L, term - 70L, "first_time"),
+      block("T1", 40L, 30L, term, "transfer"),
+      block("X", 4L, 4L, NA_integer_, NA_character_)
+    ) %>%
+      dplyr::mutate(term = term, student_id = sprintf("RT01-%s%03d-%d", tag, i, term))
+  }
+  rows <- dplyr::bind_rows(lapply(seq_along(falls), function(k) one(falls[[k]], k)))
+  student_terms <- rows %>%
+    dplyr::transmute(student_id, term, enrolled = TRUE, student_level = "UG", student_campus = "ABQ",
+                     student_classification = "Sophomore, 2nd Yr", primary_college_code = "AS", late_withdrawals = 0L,
+                     dfw_grades = 0L, graded_rows = 1L, returned_next_regular_term = returned,
+                     return_observable = TRUE, degree_awarded = FALSE)
+  programs <- rows %>%
+    dplyr::filter(!is.na(arrived)) %>%
+    dplyr::transmute(student_id, term = arrived, student_level = "Undergraduate",
+                     student_population = ifelse(entry == "first_time", "First Time Freshman", "New Transfer"))
+  dashboard <- build_retention_dashboard(student_terms, NULL, NULL, list(
+    term_type = "fall", student_level = "UG", data_edges = rr01_edges, min_n = 5L,
+    courses = FALSE, milestones = FALSE), programs = programs)
+  semesters <- student_term_semesters(student_terms, programs) %>% dplyr::select(student_id, term, entry_type, semester_here)
+  by_semester <- get_return_rates(
+    student_terms %>% dplyr::left_join(semesters, by = c("student_id", "term")),
+    list(term_type = "fall", student_level = "UG", data_edges = rr01_edges, min_n = 5L,
+         group_cols = c("entry_type", "semester_here")), NULL)$rates
+  list(student_terms = student_terms, programs = programs, dashboard = dashboard, by_semester = by_semester)
+})
+
+# RT02: how student_term_semesters() counts (test-return-rates.R). Arrivals
+# in programs' student_population, rows in student_terms:
+#   A  first-time Fall 2020: Fall 2020, Spring 2021, Fall 2021 are its
+#      1st, 2nd and 3rd semesters.
+#   B  first-time Summer 2020: Summer 2020 has no semester; Fall 2020 is the
+#      1st, Spring 2021 the 2nd.
+#   C  first-time Fall 2020, away, back in Fall 2022: its 5th semester (terms
+#      passed, not terms enrolled).
+#   D  first-time Fall 2019, a new transfer in Fall 2022: Spring 2021 is its
+#      4th semester as first-time; Fall 2022 its 1st as a transfer.
+#   E  readmitted, no arrival on record: no row.
+#   F  Fall 2020 recorded both ways: first-time.
+#   G  a row in Spring 2020, before its Fall 2020 arrival: no row for it.
+#   H  first-time Spring 2021: Spring 2021 the 1st, Fall 2021 the 2nd.
+#   I  first-time Fall 2020 as an undergraduate, a graduate student in Fall
+#      2024: Fall 2021 is its 3rd semester; the graduate term has no row (no
+#      arrival at that level).
+#   J  a new transfer graduate student in Fall 2022: Spring 2023 its 2nd
+#      semester at that level.
+# Every row is an undergraduate's (UG) but I's Fall 2024 and J's (GR).
+rt02 <- list(
+  student_terms = tibble::tibble(
+    student_id = c("A", "A", "A", "B", "B", "B", "C", "C", "D", "D", "E", "F", "G", "G", "H", "H", "I", "I", "J"),
+    term = c(202080L, 202110L, 202180L, 202060L, 202080L, 202110L, 202080L, 202280L, 202110L, 202280L,
+             202080L, 202080L, 202010L, 202080L, 202110L, 202180L, 202180L, 202480L, 202310L),
+    student_level = c(rep("UG", 17), "GR", "GR")),
+  programs = tibble::tibble(
+    student_id = c("A", "B", "C", "D", "D", "E", "F", "F", "G", "H", "I", "J"),
+    term = c(202080L, 202060L, 202080L, 201980L, 202280L, 202080L, 202080L, 202080L, 202080L, 202110L, 202080L, 202280L),
+    student_level = c(rep("Undergraduate", 11), "Graduate/GASM"),
+    student_population = c("First Time Freshman", "First Time Freshman", "First Time Freshman",
+                           "First Time Freshman", "New Transfer", "Readmit Student", "New Transfer",
+                           "First Time Freshman", "First Time Freshman", "First Time Freshman",
+                           "First Time Freshman", "New Transfer")))
 
 # RS01: who the Retention page counts in Fall 2022 (test-return-rates.R).
 # Enrolled that fall at home campus ABQ unless said; the record's arrivals:
@@ -2438,7 +2731,8 @@ rr01 <- local({
 rs01 <- local({
   st <- function(id, term = 202280L, level = "UG", campus = "ABQ", enrolled = TRUE) tibble::tibble(
     student_id = id, term = term, enrolled = enrolled, student_level = level, student_campus = campus)
-  said <- function(id, term, population) tibble::tibble(student_id = id, term = term, student_population = population)
+  said <- function(id, term, population, level = "Undergraduate") tibble::tibble(
+    student_id = id, term = term, student_population = population, student_level = level)
   student_terms <- dplyr::bind_rows(
     st("W-A"), st("W-B", 202180L), st("W-B"), st("W-C", 202210L), st("W-C"),
     st("W-D", 202080L), st("W-D"), st("W-E"), st("W-F"), st("W-F", 202310L), st("W-G"),
@@ -2457,7 +2751,8 @@ rs01 <- local({
       said("W-E", 202280L, "Readmit"),
       said("W-F", 202280L, "Continuing"), said("W-F", 202310L, "Summer First Time/Beg Freshman"),
       said("W-G", 202280L, "New Transfer from NM Inst"), said("W-G", 202280L, "First Time/Beginning Freshman"),
-      said("W-H", 202280L, "Frst Time Grad/Prf Deg not UNM"), said("W-I", 202280L, "Continuing"),
+      said("W-H", 202280L, "Frst Time Grad/Prf Deg not UNM", "Graduate/GASM"),
+      said("W-I", 202280L, "Continuing", "Graduate/GASM"),
       said("W-K", 202280L, "New Transfer from NM Inst"),
       said("W-L", 202280L, "First Time/Beginning Freshman"),
       said("W-M", 202180L, "First Time/Beginning Freshman")),

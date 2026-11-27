@@ -3,10 +3,18 @@
 # Settled return first (decided 2026-11-19): one term type at a time, how
 # often enrolled students came back the next regular term and whether that is
 # rising or falling; who is not coming back, by the warning signs known by the
-# end of the term; each classification and college; and the courses where a
+# end of the term; each college; and the courses where a
 # DFW grade goes with not coming back the most. The return watch (this term's
 # students not yet registered, against the same day a year earlier) joins it
 # as the top section once the snapshots allow exact comparisons (ROADMAP).
+#
+# The return rate leads at each semester since a student arrived (decided
+# 2026-11-26: "overall rates obscure too much and everything gets washed
+# out"; "first semester retention over time, 2nd, 3rd"), first-time and
+# transfer students apart (student_term_semesters(), branches/population.R).
+# Not by classification: its meaning changed from Summer 2025 (ISSUES I92).
+# Every student stays on the page, seniors included, and the rate for every
+# student together is drawn faint behind.
 #
 # Every rate is get_return_rates() (cones/return-rates.R) over
 # cedar_student_terms; the trend is compute_rate_trend(); the courses are
@@ -47,9 +55,11 @@ RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 #'   term: the counts and `return_pct`); `trend` (compute_rate_trend() of the
 #'   series); `signs` (per sign and term: with and without the sign, and the
 #'   share of the term's non-returners who had it); `signs_latest` (each
-#'   sign's latest term); `groups` (per dimension,
-#'   classification or college, and group read in the latest term: its series
-#'   and trend; `meta$n_groups_past` counts the others); `courses`
+#'   sign's latest term); `stages` (retention_stage_series(): each semester
+#'   since arrival's series and trend, first-time and transfer students apart,
+#'   and who is in no semester's line; NULL without `programs`); `groups` (each college read
+#'   in the latest term: its series and trend; `meta$n_groups_past` counts
+#'   the others); `courses`
 #'   (get_stopout()'s `by_course` over the latest `course_terms` anchors with
 #'   posted grades, its `terms` and coverage, and `listed`: the 25 gaps beyond
 #'   chance that stand for the most students, `excess_not_back`);
@@ -78,7 +88,7 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
   # this level, say) is an answer, not an error: an empty payload says so.
   if (nrow(series) == 0L) {
     return(structure(list(meta = meta, who = NULL, series = series, trend = NULL, signs = NULL, signs_latest = NULL,
-                          groups = NULL, courses = list(terms = integer(0), by_course = NULL, listed = NULL),
+                          stages = NULL, groups = NULL, courses = list(terms = integer(0), by_course = NULL, listed = NULL),
                           milestones = NULL),
                      class = "retention_dashboard"))
   }
@@ -108,12 +118,25 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
     select(sign, term, n_with, returned_with, return_with_pct, n_without, returned_without,
            return_without_pct, nonreturners, share_of_nonreturners_pct)
 
-  # Each classification and college: its series and trend, over the terms
-  # it had min_n observable. A group not read in the latest term (a
-  # classification retired, a college merged) is left out and counted.
   latest <- max(series$term)
-  groups <- bind_rows(lapply(c(classification = "student_classification", college = "primary_college_code"),
-                             function(col) {
+  # Each semester since arrival, for the students whose arrival is on
+  # record; without the declarations there is none to read.
+  stages <- if (is.null(programs)) NULL else {
+    semesters <- student_term_semesters(student_terms %>% filter(enrolled), programs) %>%
+      select(student_id, term, entry_type, semester_here)
+    by_semester <- get_return_rates(
+      student_terms %>% left_join(semesters, by = c("student_id", "term")),
+      c(scope, list(group_cols = c("entry_type", "semester_here"))), degrees)$rates
+    # The declarations' first term is the first whose arrivals are recorded.
+    recorded <- as.integer(programs$term[!is.na(programs$student_population)])
+    if (length(recorded) == 0L) stop("[retention-dashboard.R] programs records no student_population.", call. = FALSE)
+    retention_stage_series(by_semester, min_n, latest, arrivals_from = min(recorded))
+  }
+
+  # Each college: its series and trend, over the terms it had min_n
+  # observable. A college not read in the latest term (merged, say) is left
+  # out and counted.
+  groups <- bind_rows(lapply(c(college = "primary_college_code"), function(col) {
     r <- rates(col)$rates %>%
       filter(!is.na(.data[[col]]), nzchar(.data[[col]]), n_observable >= min_n) %>%
       transmute(group = .data[[col]], term, n_observable, n_returned, return_pct)
@@ -122,7 +145,7 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
       group_by(group) %>%
       summarize(terms = list(term), rates = list(return_pct), .groups = "drop") %>%
       inner_join(tr, by = "group") %>%
-      mutate(dimension = if (col == "student_classification") "classification" else "college")
+      mutate(dimension = "college")
   }))
   meta$n_groups_past <- sum(groups$last_term < latest)
   groups <- groups %>% filter(last_term == latest)
@@ -135,9 +158,177 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
     who = if (is.null(programs)) NULL else retention_scope_facts(student_terms, programs, opt, latest),
     series = series, trend = trend, signs = signs,
     signs_latest = signs %>% group_by(sign) %>% filter(term == max(term)) %>% ungroup(),
-    groups = groups, courses = courses,
+    stages = stages, groups = groups, courses = courses,
     milestones = if (isFALSE(opt$milestones)) NULL else retention_dashboard_milestones(student_terms, degrees, opt, programs)
   ), class = "retention_dashboard")
+}
+
+# The last semester drawn as a line. Later semesters are not pooled into it:
+# each year a pooled "or later" line would take in students from further back
+# in the records, so its trend would follow the records' length.
+RETENTION_SEMESTER_LAST <- 8L
+
+# How a stage's students started, as the page's control offers them and in
+# the sentence's words.
+RETENTION_STAGE_ENTRIES <- c(first_time = "First-time students", transfer = "Transfer students")
+RETENTION_STAGE_WORDS <- c(first_time = "first-time students", transfer = "transfer students")
+
+.retention_ordinal <- function(k) {
+  k <- as.integer(k)
+  paste0(k, ifelse(k %% 100L %in% 11:13, "th", c("th", "st", "nd", "rd", rep("th", 6))[k %% 10L + 1L]))
+}
+
+# Whether a semester's students started in a spring: in a fall the even
+# semesters, in a spring the odd ones (a summer start counts with the fall
+# after it).
+.retention_spring_start <- function(stage, term) {
+  (as.integer(stage) %% 2L == 1L) == (as.integer(term) %% 100L == 10L)
+}
+
+#' A semester's name: "1st semester", "2nd semester (spring start)", ...
+#'
+#' Marked when its students started in a spring, so that a fall's 2nd
+#' semester is not read as the fall's freshmen.
+#' @param stage Semester since arrival.
+#' @param term The fall or spring term it is read in.
+retention_semester_label <- function(stage, term) {
+  paste0(.retention_ordinal(stage), " semester", ifelse(.retention_spring_start(stage, term), " (spring start)", ""))
+}
+
+#' Each semester since arrival's return series, first-time and transfer
+#' students apart
+#'
+#' A stage is a semester since the student arrived (student_term_semesters()),
+#' 1st to `last`. A stage's term is read when it has `min_n` students whose
+#' return can be read, and only when the arrival records reach back to the
+#' earliest start it can hold (semester_earliest_arrival()): before that its
+#' students are partly unplaceable, so the share would be of an incomplete
+#' set. A stage read in some term but not the latest is left out. Every
+#' student in no line is counted: no start on record (readmitted, moved from
+#' another level, here before the records begin), a semester after `last`,
+#' or a term the records do not reach back far enough for.
+#'
+#' @param rates get_return_rates()'s `rates`, grouped by `entry_type` and
+#'   `semester_here`, over fall or spring terms.
+#' @param min_n Students whose return can be read a stage's term needs.
+#' @param latest The latest term the page reads.
+#' @param arrivals_from The first term whose arrivals are recorded.
+#' @param last The last semester drawn.
+#' @return list(`series`: one row per entry type, stage and term read, with
+#'   `entry_type`, `stage`, `stage_label`, `term`, `n_observable`,
+#'   `n_returned`, `return_pct`; `trend`: compute_rate_trend() per entry type
+#'   and stage, with `stage_label`; `unplaced`: `n_no_start`, `n_beyond`
+#'   (after `last`) and `n_before_records`, students summed over the terms;
+#'   `n_past`: `entry_type` and stages left out; `last`; `arrivals_from`).
+retention_stage_series <- function(rates, min_n, latest, arrivals_from, last = RETENTION_SEMESTER_LAST) {
+  missing <- setdiff(c("term", "entry_type", "semester_here", "n_observable", "n_returned"), names(rates))
+  if (length(missing) > 0L) stop("[retention-dashboard.R] rates lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  if (length(arrivals_from) != 1L || !is.finite(arrivals_from)) {
+    stop("[retention-dashboard.R] arrivals_from must be one term code.", call. = FALSE)
+  }
+  rows <- rates %>% filter(n_observable > 0L)
+  if (length(unique(as.integer(rows$term) %% 100L)) > 1L) {
+    stop("[retention-dashboard.R] rates must be of one term type: a semester's starters differ between falls and springs.", call. = FALSE)
+  }
+  placed <- rows %>% filter(!is.na(entry_type))
+  if (anyNA(placed$semester_here)) {
+    stop("[retention-dashboard.R] a fall or spring student-term with an arrival has no semester.", call. = FALSE)
+  }
+  placed <- placed %>%
+    mutate(stage = as.integer(semester_here),
+           reached = semester_earliest_arrival(term, stage) >= arrivals_from)
+  unplaced <- list(n_no_start = sum(rows$n_observable[is.na(rows$entry_type)]),
+                   n_beyond = sum(placed$n_observable[placed$stage > last]),
+                   n_before_records = sum(placed$n_observable[placed$stage <= last & !placed$reached]))
+  read <- placed %>%
+    filter(stage <= last, reached, n_observable >= min_n) %>%
+    transmute(entry_type, stage, stage_label = retention_semester_label(stage, term), term, n_observable, n_returned,
+              return_pct = 100 * n_returned / n_observable)
+  current <- read %>%
+    group_by(entry_type, stage) %>%
+    filter(any(term == latest)) %>%
+    ungroup() %>%
+    arrange(entry_type, stage, term)
+  trend <- if (nrow(current) == 0L) NULL else
+    compute_rate_trend(current %>% transmute(entry_type, stage, term, k = n_returned, n = n_observable),
+                       group_cols = c("entry_type", "stage")) %>%
+      inner_join(distinct(current, entry_type, stage, stage_label), by = c("entry_type", "stage")) %>%
+      arrange(entry_type, stage)
+  past <- read %>%
+    distinct(entry_type, stage) %>%
+    anti_join(distinct(current, entry_type, stage), by = c("entry_type", "stage")) %>%
+    count(entry_type, name = "n_past")
+  list(series = current, trend = trend, unplaced = unplaced, n_past = past, last = last, arrivals_from = arrivals_from)
+}
+
+#' One kind of student's stages: their series, trend and stages left out
+#'
+#' @param stages `retention_stage_series()` output, or NULL.
+#' @param entry "first_time" or "transfer".
+retention_stage_entry <- function(stages, entry) {
+  if (is.null(stages) || NROW(stages$series) == 0L) {
+    return(list(series = NULL, trend = NULL, n_past = 0L))
+  }
+  list(series = stages$series[stages$series$entry_type == entry, , drop = FALSE],
+       trend = stages$trend[stages$trend$entry_type == entry, , drop = FALSE],
+       n_past = sum(stages$n_past$n_past[stages$n_past$entry_type == entry]))
+}
+
+.retention_and <- function(x) {
+  if (length(x) <= 1L) return(paste(x, collapse = ""))
+  paste0(paste(x[-length(x)], collapse = ", "), " and ", x[[length(x)]])
+}
+
+# "their 1st semester", "their 1st and 3rd semesters".
+.retention_semesters_words <- function(stage) {
+  paste0("their ", .retention_and(.retention_ordinal(stage)), if (length(stage) == 1L) " semester" else " semesters")
+}
+
+#' One kind of student's stages in a sentence: the semester they come back
+#' least often after, over the terms, then the semesters whose share is
+#' rising or falling
+#'
+#' @param stages `retention_stage_series()` output.
+#' @param entry "first_time" or "transfer".
+#' @param type The term type in words ("fall", "spring").
+#' @return One or two sentences, or `character(0)` when that kind of student
+#'   is read in no semester.
+retention_stage_sentence <- function(stages, entry, type) {
+  sel <- retention_stage_entry(stages, entry)
+  s <- sel$series
+  if (is.null(s) || nrow(s) == 0L) return(character(0))
+  who <- RETENTION_STAGE_WORDS[[entry]]
+  upper <- function(x) paste0(toupper(substring(x, 1, 1)), substring(x, 2))
+  out <- character(0)
+  # In each term two or more semesters are read, the semester lowest that term.
+  shared <- s %>% group_by(term) %>% filter(n() >= 2L) %>%
+    slice_min(return_pct, n = 1L, with_ties = FALSE) %>% ungroup()
+  if (nrow(shared) > 0L) {
+    lowest <- shared %>% count(stage, name = "terms") %>% arrange(desc(terms), stage) %>% slice(1L)
+    out <- paste0(upper(who), " came back least often after ", .retention_semesters_words(lowest$stage),
+                  if (.retention_spring_start(lowest$stage, s$term[[1]])) " (those who started in a spring)" else "", ": in ",
+                  if (lowest$terms == nrow(shared)) paste0("every one of the ", nrow(shared), " ", type, " terms read")
+                  else paste0(lowest$terms, " of the ", nrow(shared), " ", type, " terms read"), ".")
+  } else {
+    out <- paste0("Only ", who, "' return after ", .retention_semesters_words(sort(unique(s$stage))),
+                  " can be read.")
+  }
+  t <- sel$trend
+  moving <- c(
+    if (any(t$direction == "falling")) paste0("falling after ", .retention_semesters_words(t$stage[t$direction == "falling"])),
+    if (any(t$direction == "rising")) paste0("rising after ", .retention_semesters_words(t$stage[t$direction == "rising"])))
+  read_trend <- sum(t$direction != "too_few_terms")
+  if (read_trend == 0L) {
+    out <- c(out, paste0("Too few ", type, " terms are read to say whether their share is rising or falling after any semester."))
+  } else if (length(moving) == 0L) {
+    out <- c(out, "Their share coming back is not clearly rising or falling after any semester.")
+  } else {
+    rest <- read_trend - sum(t$direction %in% c("rising", "falling"))
+    out <- c(out, paste0("Their share coming back is ", .retention_and(moving),
+                         if (rest > 0L) paste0(", and not clearly moving after the other ",
+                                               if (rest == 1L) "one" else rest) else "", "."))
+  }
+  paste(out, collapse = " ")
 }
 
 RETENTION_ARRIVALS <- c(first_time = "First-time students", transfer = "Transfer students",
@@ -231,7 +422,9 @@ retention_who_note <- function(who) {
 #'   gap ahead of a small one with a wide gap.
 retention_dashboard_course_list <- function(student_terms, attempts, degrees, series, opt = list()) {
   courses <- retention_dashboard_courses(student_terms, attempts, degrees, series, opt)
-  courses$listed <- if (is.null(courses$by_course)) NULL else courses$by_course %>%
+  # Nothing to list when no term is graded (NULL) or the scope's students hold
+  # no graded attempt in the terms (get_stopout()'s table with no columns).
+  courses$listed <- if (NROW(courses$by_course) == 0L) NULL else courses$by_course %>%
     filter(!is.na(pop_p_value), pop_p_value < 0.05, pop_stopout_gap > 0) %>%
     mutate(excess_not_back = pop_n_dfw * pop_stopout_gap) %>%
     arrange(desc(excess_not_back)) %>%
@@ -264,9 +457,7 @@ retention_dashboard_courses <- function(student_terms, attempts, degrees, series
   graded_edge <- opt$data_edges[["last_graded"]]
   terms <- utils::tail(sort(series$term[series$term <= graded_edge]), as.integer(opt$course_terms %||% 3L))
   if (length(terms) == 0L) return(list(terms = integer(0), by_course = NULL, observation_info = NULL))
-  members <- student_terms %>% filter(enrolled, term %in% terms)
-  if (!is.null(opt$student_level)) members <- members %>% filter(student_level %in% opt$student_level)
-  if (!is.null(opt$campus)) members <- members %>% filter(student_campus %in% opt$campus)
+  members <- scope_student_terms(student_terms, opt$student_level, opt$campus) %>% filter(term %in% terms)
   population <- members %>% distinct(student_id) %>% mutate(population_label = "Population")
   # The population's own outcome rows in those terms (its membership window).
   window <- attempts %>% semi_join(members %>% select(student_id, term), by = c("student_id", "term"))
@@ -338,9 +529,7 @@ retention_lead_sentence <- function(t, type) {
 #' @param target_term The term that step lands on.
 #' @return "2nd semester (spring)", "3rd semester (fall)", and so on.
 retention_milestone_label <- function(step, target_term) {
-  k <- as.integer(step) + 1L
-  suffix <- ifelse(k %% 100L %in% 11:13, "th", c("th", "st", "nd", "rd", rep("th", 6))[k %% 10L + 1L])
-  paste0(k, suffix, " semester (", get_term_type(target_term), ")")
+  paste0(.retention_ordinal(as.integer(step) + 1L), " semester (", get_term_type(target_term), ")")
 }
 
 # The entering students a class holds, in the sentence's words.
@@ -422,6 +611,22 @@ format_retention_dashboard <- function(payload) {
                              " students, ", pct(g$return_with_pct), " returned against ", pct(g$return_without_pct),
                              " without; ", pct(g$share_of_nonreturners_pct), " of those who did not return."))
   }
+  st <- payload$stages
+  for (i in seq_len(NROW(st$trend))) {
+    g <- st$trend[i, ]
+    lines <- c(lines, paste0(RETENTION_STAGE_ENTRIES[[g$entry_type]], ", ", g$stage_label, ": ", pct(g$last_pct), " in ",
+                             fmt_term(g$last_term), "; ", g$direction, "."))
+  }
+  if (!is.null(st)) {
+    lines <- c(lines, paste0("In no semester's line: ", n(st$unplaced$n_no_start), " with no start on record, ",
+                             n(st$unplaced$n_beyond), " after their ", .retention_ordinal(st$last), " semester, ",
+                             n(st$unplaced$n_before_records), " in a semester reaching back before the arrival records (",
+                             fmt_term(st$arrivals_from), ")."))
+    for (i in seq_len(nrow(st$n_past))) {
+      lines <- c(lines, paste0(RETENTION_STAGE_ENTRIES[[st$n_past$entry_type[i]]], ", semesters not read in the latest term, left out: ",
+                               st$n_past$n_past[i], "."))
+    }
+  }
   if (m$n_groups_past > 0L) lines <- c(lines, paste0("Groups not read in the latest term, left out: ", m$n_groups_past, "."))
   for (i in seq_len(nrow(payload$groups))) {
     g <- payload$groups[i, ]
@@ -458,8 +663,8 @@ plot_return_series <- function(payload) {
     x = labels, y = s$return_pct, type = "scatter", mode = "lines+markers+text",
     text = sprintf("%.1f%%", s$return_pct), textposition = "top center",
     line = list(color = CEDAR_PALETTE[[2]], width = 3), marker = list(color = CEDAR_PALETTE[[2]], size = 8),
-    hovertext = paste0(labels, "<br>", format(s$n_returned, big.mark = ","), " of ",
-                       format(s$n_observable, big.mark = ","), " came back"),
+    hovertext = paste0(labels, "<br>", format(s$n_returned, big.mark = ",", trim = TRUE), " of ",
+                       format(s$n_observable, big.mark = ",", trim = TRUE), " came back"),
     hoverinfo = "text", showlegend = FALSE, name = "Came back")
   # The fitted trend, drawn from compute_rate_trend()'s own line, labelled at
   # its end with its slope and verdict (the colour says which way, when it is
@@ -488,6 +693,54 @@ plot_return_series <- function(payload) {
 }
 
 
+#' Each semester's return rate as a line, with every student together faint behind
+#'
+#' One colour per semester, in its order (colour follows the semester, never
+#' its rank), a legend, and each term's counts on hover; no number on any
+#' point. The faint line is the page's overall series.
+#'
+#' @param payload `build_retention_dashboard()` output with `stages`.
+#' @param entry "first_time" or "transfer": whose semesters are drawn.
+plot_return_stages <- function(payload, entry) {
+  st <- retention_stage_entry(payload$stages, entry)$series
+  if (NROW(st) == 0L) stop("[retention-dashboard.R] plot_return_stages: no semester is read for ", entry, call. = FALSE)
+  overall <- payload$series %>% filter(!is.na(return_pct))
+  terms <- sort(unique(c(overall$term, st$term)))
+  labels <- vapply(terms, fmt_term, character(1))
+  colours <- stats::setNames(CEDAR_PALETTE[seq_len(payload$stages$last)], seq_len(payload$stages$last))
+  hover <- function(name, rows) paste0(name, "<br>", vapply(rows$term, fmt_term, character(1)), ": ",
+                                       sprintf("%.1f%%", rows$return_pct), "<br>",
+                                       format(rows$n_returned, big.mark = ",", trim = TRUE), " of ",
+                                       format(rows$n_observable, big.mark = ",", trim = TRUE), " came back")
+  p <- plotly::plot_ly(
+    x = vapply(overall$term, fmt_term, character(1)), y = overall$return_pct, type = "scatter", mode = "lines",
+    line = list(color = CEDAR_SEMANTIC_COLORS[["reference"]], width = 2, dash = "dot"),
+    hovertext = hover("Every student together", overall), hoverinfo = "text", name = "Every student together")
+  for (k in unique(st$stage)) {
+    rows <- st[st$stage == k, ]
+    # A term between its first and last that is not read breaks the line.
+    span <- range(rows$term)
+    gaps <- setdiff(terms[terms > span[[1]] & terms < span[[2]]], rows$term)
+    if (length(gaps) > 0L) {
+      rows <- dplyr::bind_rows(rows, tibble::tibble(term = gaps, return_pct = NA_real_, n_returned = NA_integer_,
+                                                    n_observable = NA_integer_)) %>% arrange(term)
+    }
+    p <- plotly::add_trace(p, x = vapply(rows$term, fmt_term, character(1)), y = rows$return_pct,
+                           type = "scatter", mode = "lines+markers", name = rows$stage_label[[1]],
+                           line = list(color = colours[[as.character(k)]], width = 2),
+                           marker = list(color = colours[[as.character(k)]], size = 8),
+                           hovertext = hover(rows$stage_label[[1]], rows), hoverinfo = "text", connectgaps = FALSE,
+                           inherit = FALSE)
+  }
+  low <- min(c(st$return_pct, overall$return_pct), na.rm = TRUE)
+  plotly::layout(p,
+    xaxis = list(title = "", type = "category", categoryorder = "array", categoryarray = labels),
+    yaxis = list(title = "Came back the next regular term", ticksuffix = "%", range = c(max(0, low - 4), 100)),
+    legend = list(orientation = "h", x = 0, y = -0.15, traceorder = "normal"),
+    margin = list(r = 20))
+}
+
+
 #' Each entering class's share still enrolled, one line per step
 #'
 #' The x axis is the entering class; each line is a distance from entry, so a
@@ -512,7 +765,7 @@ plot_entering_class_milestones <- function(payload) {
       name = names_by_step[[i]], line = list(color = colours[[i]], width = 3), marker = list(color = colours[[i]], size = 8),
       hovertext = paste0("Entered ", vapply(rows$term, fmt_term, character(1)), "<br>", names_by_step[[i]], ", in ",
                          vapply(rows$target_term, fmt_term, character(1)), ": ",
-                         format(rows$n_here, big.mark = ","), " of ", format(rows$n_entering, big.mark = ","),
+                         format(rows$n_here, big.mark = ",", trim = TRUE), " of ", format(rows$n_entering, big.mark = ",", trim = TRUE),
                          sprintf(" (%.1f%%)", rows$here_pct)),
       hoverinfo = "text")
   }
@@ -534,13 +787,15 @@ RETENTION_BAND_WORDS <- c(
 #' The courses harder, and easier, on the lowest-GPA students than the rest of their term
 #'
 #' get_course_band_dfw() over the latest `band_terms` graded terms of the
-#' page's term type, with the two lists the page shows and how many courses
-#' chance alone would put on each.
+#' page's term type, for the page's students, with the two lists the page
+#' shows and how many courses chance alone would put on each.
 #'
-#' @param opt `term_type` (required), `campus` (the campuses that taught the
-#'   courses; NULL reads every campus, each apart), `data_edges` (required),
-#'   `band_by` (`"entering"` or `"hs"`), `band_terms` (terms pooled; default
-#'   5), `min_n`, `z_min`.
+#' @param opt The dashboard's scope: `term_type` (required), `student_level`
+#'   and `campus` (the students' level and home campus that term, as every
+#'   section of the page reads them; NULL reads everyone), `data_edges`
+#'   (required). Each course is read on every campus that taught it to those
+#'   students, each apart. Also `band_by` (`"entering"` or `"hs"`),
+#'   `band_terms` (terms pooled; default 5), `min_n`, `z_min`.
 #' @return get_course_band_dfw()'s list with `harder` and `easier` (the
 #'   courses of each verdict, by the attempts the gap stands for, 15 at most)
 #'   and `meta$n_courses`, `meta$n_by_chance` (the courses read times the
@@ -555,9 +810,11 @@ retention_dashboard_band_courses <- function(attempts, student_terms, applicants
   terms <- terms[terms <= as.integer(edge) & get_term_type(terms) %in% opt$term_type]
   terms <- utils::tail(terms, as.integer(opt$band_terms %||% 5L))
   if (length(terms) == 0L) stop("[retention-dashboard.R] no graded ", opt$term_type, " term to read.", call. = FALSE)
+  # The page's campus is the student's home campus (opt$campus), never the
+  # campus that taught the course: the cone is given it as the student scope.
   r <- get_course_band_dfw(attempts, student_terms,
-                           c(opt[intersect(names(opt), c("campus", "data_edges", "band_by", "min_n", "z_min"))],
-                             list(term = terms)), applicants)
+                           c(opt[intersect(names(opt), c("student_level", "data_edges", "band_by", "min_n", "z_min"))],
+                             list(term = terms, student_campus = opt$campus)), applicants)
   listed <- function(which) r$courses %>%
     filter(verdict == which) %>%
     mutate(excess_dfw = low_attempts * gap_pts / 100) %>%

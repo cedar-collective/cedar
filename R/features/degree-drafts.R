@@ -1,13 +1,17 @@
 # Compiled degree boards on the page: written offline, loaded at startup in
-# place of the hand-built board for the same program, and labelled from the
-# review store.
+# place of the hand-built board for the same program, or beside the hand-built
+# boards for a program that has none, and labelled from the review store.
 #
 # scripts/compile-degree-interpretations.R --write compiles each catalog reading
 # (degree-compiler.R, degree-compiler-board.R) and writes its board's own rows
 # to institution/<id>/degree_drafts/, beside a manifest naming the reading it
 # came from. The app reads that folder, puts each draft in place of the
-# authored board with the same catalog id, and validates the result with the
-# same validators. The authored files are never edited; they stay the baseline
+# authored board with the same catalog id, adds a draft whose program has no
+# authored board after the authored ones (its catalog row is the institution's
+# degree_reading_catalogs.csv row, carried in the draft), and validates the
+# result with the same validators: a draft's Banner program codes are checked
+# against programs.csv like an authored board's, and a code on two boards
+# stops startup. The authored files are never edited; they stay the baseline
 # the compiler is compared with.
 #
 # A draft shows as reviewed only when Admin > Catalog Review holds a complete
@@ -33,7 +37,10 @@ degree_draft_one_line <- function(df) {
 #' @param manifest One `degree_drafts` row per board.
 #' @param authored_evidence The institution's evidence: a draft writes only the
 #'   citations it adds.
-write_degree_drafts <- function(boards, manifest, dir, authored_evidence) {
+#' @param questions Every latest reading's open items, board or not
+#'   (`degree_reading_question_rows()` with the `degree_reading_questions`
+#'   columns), written to `degree_reading_questions.csv`.
+write_degree_drafts <- function(boards, manifest, dir, authored_evidence, questions) {
   if (!setequal(names(boards), manifest$catalog_id) || anyDuplicated(manifest$catalog_id)) {
     stop("[degree-drafts.R] One manifest row per compiled board")
   }
@@ -54,8 +61,14 @@ write_degree_drafts <- function(boards, manifest, dir, authored_evidence) {
   }
   utils::write.csv(degree_draft_one_line(manifest[CEDAR_CONFIG_FILE_SPECS$degree_drafts]),
                    file.path(dir, "degree_drafts.csv"), row.names = FALSE, na = "")
+  utils::write.csv(degree_draft_one_line(as.data.frame(questions)[CEDAR_CONFIG_FILE_SPECS$degree_reading_questions]),
+                   file.path(dir, "degree_reading_questions.csv"), row.names = FALSE, na = "")
   invisible(dir)
 }
+
+# A reading file's own bytes, hashed: its triage is outside the proposal, so a
+# change to who settles a question changes this and not the proposal's hash.
+degree_reading_file_sha256 <- function(path) source_sha256(readBin(path, "raw", file.size(path)))
 
 #' The staged proposal a reading became in Catalog Review
 #'
@@ -71,19 +84,38 @@ degree_reading_proposal_key <- function(root, program, reading) {
 
 #' Read a drafts folder
 #'
+#' @param programs The institution's `programs` file, which each draft's Banner
+#'   program codes are checked against (degree_catalog_program_codes()).
 #' @return NULL when the institution has no drafts folder; otherwise a list of
-#'   the draft tables (named as in `DEGREE_DRAFT_TABLES`) and `manifest`.
-read_degree_drafts <- function(dir) {
+#'   the draft tables (named as in `DEGREE_DRAFT_TABLES`), `manifest`,
+#'   `program_codes`, `questions` (`degree_reading_questions`) and
+#'   `questions_stale`: the readings, by path, edited or removed since the
+#'   questions were compiled (the folder sits in the institution's directory,
+#'   and each `reading` is a path from there).
+read_degree_drafts <- function(dir, programs) {
   if (!dir.exists(dir)) return(NULL)
   drafts <- lapply(DEGREE_DRAFT_TABLES, read_institution_file, dir = dir)
   drafts$manifest <- read_institution_file("degree_drafts", dir)
   if (anyDuplicated(drafts$manifest$catalog_id) || !setequal(drafts$manifest$catalog_id, drafts$catalogs$catalog_id)) {
     stop("[degree-drafts.R] ", dir, ": each draft board needs one manifest row and one catalog row")
   }
+  drafts$program_codes <- degree_catalog_program_codes(drafts$catalogs, programs)
+  drafts$questions <- read_institution_file("degree_reading_questions", dir)
+  if (!all(drafts$questions$settled_by %in% c("", names(CATALOG_QUESTION_SETTLERS)))) {
+    stop("[degree-drafts.R] ", dir, ": degree_reading_questions.csv has an unknown settled_by")
+  }
+  compiled <- unique(drafts$questions[c("reading", "reading_file_sha256")])
+  paths <- file.path(dirname(dir), compiled$reading)
+  now <- vapply(paths, function(p) if (file.exists(p)) degree_reading_file_sha256(p) else "", "", USE.NAMES = FALSE)
+  drafts$questions_stale <- compiled$reading[now != compiled$reading_file_sha256]
   drafts
 }
 
 #' The boards the page shows: each draft in place of its authored board
+#'
+#' A draft with an authored board's catalog id takes that board's place in the
+#' degree list; a draft for a program with no authored board follows the
+#' authored boards, in the manifest's order.
 #'
 #' @param drafts `read_degree_drafts()` output, or NULL.
 #' @param status `degree_board_review_status()` for the drafts.
@@ -95,24 +127,32 @@ publish_degree_drafts <- function(catalog, roadmaps, drafts, status) {
   if (is.null(drafts)) return(list(catalog = catalog, roadmaps = roadmaps, status = authored))
   ids <- drafts$manifest$catalog_id
   if (!setequal(status$catalog_id, ids)) stop("[degree-drafts.R] One review status per draft board")
-  unknown <- setdiff(ids, catalog$catalogs$catalog_id)
-  if (length(unknown)) stop("[degree-drafts.R] A draft replaces an authored board; none has the id ", paste(unknown, collapse = ", "))
+  added <- setdiff(ids, catalog$catalogs$catalog_id)
   clash <- intersect(drafts$evidence$evidence_id, catalog$evidence$evidence_id)
   if (length(clash)) stop("[degree-drafts.R] Draft evidence ids already in the institution's evidence: ", paste(clash, collapse = ", "))
   swap <- function(old, new) rbind(old[!old$catalog_id %in% ids, ], new)
   kept_rules <- catalog$rules[!catalog$rules$catalog_id %in% ids, ]
-  # Keep the authored order of the degree list; a draft takes its board's place.
+  # Keep the authored order of the degree list; a draft takes its board's
+  # place, and a program with no authored board follows them.
   catalogs <- catalog$catalogs
-  catalogs[match(drafts$catalogs$catalog_id, catalogs$catalog_id), ] <- drafts$catalogs[names(catalogs)]
+  replaced <- drafts$catalogs[!drafts$catalogs$catalog_id %in% added, ]
+  # A draft copies its board's row when compiled; codes decided since need a recompile.
+  stale <- replaced$catalog_id[replaced$program_codes != catalogs$program_codes[match(replaced$catalog_id, catalogs$catalog_id)]]
+  if (length(stale)) {
+    stop("[degree-drafts.R] A draft's Banner program codes differ from its authored board's (recompile the drafts): ",
+         paste(stale, collapse = ", "))
+  }
+  catalogs[match(replaced$catalog_id, catalogs$catalog_id), ] <- replaced[names(catalogs)]
+  catalogs <- rbind(catalogs, drafts$catalogs[match(added, drafts$catalogs$catalog_id), names(catalogs)])
   published <- validate_degree_catalog(list(catalogs = catalogs, rules = rbind(kept_rules, drafts$rules),
     courses = rbind(catalog$courses[catalog$courses$rule_id %in% kept_rules$rule_id, ], drafts$courses),
     evidence = rbind(catalog$evidence, drafts$evidence)))
-  published$program_codes <- catalog$program_codes
+  published$program_codes <- rbind(catalog$program_codes[!catalog$program_codes$catalog_id %in% ids, ], drafts$program_codes)
   boards <- roadmaps
   for (table in c("nodes", "links", "math_routes", "conditions", "basis", "plans", "options")) boards[[table]] <- swap(roadmaps[[table]], drafts[[table]])
   boards$courses <- swap(roadmaps$courses, drafts$roadmap_courses)
   boards <- validate_degree_roadmaps(boards, published)
-  status_rows <- authored
+  status_rows <- data.frame(catalog_id = catalogs$catalog_id, source = "authored", review = NA_character_, note = "")
   at <- match(status$catalog_id, status_rows$catalog_id)
   status_rows$source[at] <- "compiled"; status_rows$review[at] <- status$review; status_rows$note[at] <- status$note
   list(catalog = published, roadmaps = boards, status = status_rows)

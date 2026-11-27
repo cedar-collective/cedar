@@ -81,8 +81,12 @@ runs `scripts/build-enrollment-projections.R --refresh-if-model-changed`, which
 calls `enrollment_projection_model_drift()` to compare the saved bundle's
 recorded schema version, model version, and per-file model source hashes against
 the deployed source. It loads **no CEDAR table**: a no-change deploy costs about
-a second, against roughly four minutes for a real rebuild, and most deploys touch
-no projection source at all.
+a second, against roughly twenty minutes a bundle for a real rebuild (43 minutes
+for the two on 2026-11-25, inside a deploy step that is stopped at 60), and most
+deploys touch no projection source at all. Whether a diff will is said before
+the merge: by `./run-tests.sh --changed`, and by the pull-request check named
+`Deploy: rebuilds both projection bundles (about 45 minutes)`. Both read the
+list through `scripts/projection-model-source.sh` (ISSUES M77).
 
 The gate owns **model** staleness only. Data-driven staleness stays with the
 morning refresh, which still runs the full signature comparison including
@@ -1154,7 +1158,7 @@ builds the schedule/upstream/DFW narrative and presentation table; the module
 only renders that payload. Correlation is descriptive: schedule changes can be
 a response to demand, so the UI never labels it a causal capacity effect.
 
-Registration > Projections lists saved bundles with
+Courses > Projections lists saved bundles with
 `find_enrollment_projection_bundles()`, loads the reader's chosen target term
 with `load_enrollment_projection_bundle()`, and filters it through
 `build_enrollment_projection_view()`. It never runs a candidate method, aftcast,

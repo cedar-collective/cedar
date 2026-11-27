@@ -72,7 +72,7 @@ architecture_silent_fallback <- function(handler) {
   argument <- sub(paste0(prefix, ".*$"), "\\1", handler)
   body <- gsub("#[^\n]*", "", sub(prefix, "", handler))
   reported <- paste0(
-    "showNotification\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
+    "showNotification\\(|cedar_notify_caught\\(|handle_error\\(|\\bstop\\(|\\bwarning\\(|",
     "rlang::abort\\(|cli::cli_abort\\(|\\bmessage\\(|cedar_log[a-z_]*\\(|",
     "conditionMessage\\("
   )
@@ -92,6 +92,63 @@ architecture_count_by_file <- function(files, counter) {
   counts <- vapply(files, counter, integer(1))
   names(counts) <- vapply(files, relative_path, character(1))
   counts[counts > 0L]
+}
+
+# How many times a pattern is written in each file's code (whole-line comments
+# left out), for the files where it is written at all.
+architecture_count_matches <- function(files, pattern) {
+  architecture_count_by_file(files, function(file) {
+    hits <- gregexpr(pattern, read_code(file), perl = TRUE)[[1]]
+    sum(hits > 0L)
+  })
+}
+
+# How many code lines of each file match a pattern. With a `marker`, a line
+# that carries it, or has it within `lookback` lines above, is a stated
+# exception and is not counted.
+architecture_count_lines <- function(files, pattern, marker = NULL, lookback = 3L) {
+  architecture_count_by_file(files, function(file) {
+    lines <- readLines(file, warn = FALSE)
+    hits <- grep(pattern, lines, perl = TRUE)
+    hits <- hits[!grepl("^\\s*#", lines[hits])]
+    if (!is.null(marker)) {
+      stated <- vapply(hits, function(i) {
+        any(grepl(marker, lines[max(1L, i - lookback):i], fixed = TRUE))
+      }, logical(1))
+      hits <- hits[!stated]
+    }
+    length(hits)
+  })
+}
+
+# A latest term taken off a column: max(term), max(rows$term),
+# slice_max(term, ...). Not pmax() or which.max(), and not a column that only
+# starts with "term".
+architecture_latest_term_pattern <- "(?<![\\w.])(?:slice_)?max\\((?:[^()]*\\$)?term\\b"
+
+# Code for the counters to read: a latest term in a comment, unstated, stated
+# on the line above, stated on its own line, stated too far above to count,
+# and twice on one line.
+architecture_latest_term_lines <- c(
+  "# latest <- max(term)",
+  "latest <- max(term)",
+  "# MAX-TERM-OK: each student's own last term.",
+  "own_last <- max(rows$term)",
+  "last_row <- rows %>% slice_max(term, n = 1)  # MAX-TERM-OK: each student's last row.",
+  "# MAX-TERM-OK: four lines above the next one, so not about it.",
+  "a <- 1",
+  "b <- 2",
+  "c <- 3",
+  "window_end <- max(terms$term, na.rm = TRUE)",
+  "both <- c(max(a$term), max(b$term))",
+  "other <- c(pmax(term, 1), which.max(term), max(term_rank))"
+)
+
+# A scratch R file holding these lines, removed when the calling test ends.
+architecture_scratch_file <- function(lines, env = parent.frame()) {
+  file <- withr::local_tempfile(fileext = ".R", .local_envir = env)
+  writeLines(lines, file)
+  file
 }
 
 # Compare measured counts with the allowances and explain every mismatch.

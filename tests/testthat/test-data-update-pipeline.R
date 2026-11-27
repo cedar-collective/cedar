@@ -176,6 +176,29 @@ test_that("a fetch nobody can answer, or one that overruns, is stopped and its c
 })
 
 
+# ISSUES.md M66: every fetch signs in through one saved browser profile, whose
+# lock mrgather clears as it starts, and writes to one folder.
+test_that("a fetch is not started while another is running", {
+  blocked <- run_fetch_step(running = "cedar-mrgather-fetch-4242")
+  expect_equal(blocked$step, "FAILED|another fetch is running (cedar-mrgather-fetch-4242)")
+  expect_true(is.na(blocked$args))
+  expect_equal(blocked$parse, "")
+  # It asks docker for the fetch containers by the name this script gives them.
+  expect_match(blocked$asked_running, "--filter name=cedar-mrgather-fetch- ", fixed = TRUE)
+
+  # A file from today may be one the other fetch is still writing: not read.
+  half <- run_fetch_step("Class_List_Guided_Adhoc_20261020.xlsx", running = "cedar-mrgather-fetch-4242")
+  expect_equal(half$step, "FAILED|another fetch is running (cedar-mrgather-fetch-4242)")
+  expect_equal(half$parse, "")
+
+  # With every file already from today no fetch is needed, and none is asked about.
+  both <- c("Class_List_Guided_Adhoc_20261020.xlsx", "Department_Enrollment_Status_20261020.xlsx")
+  current <- run_fetch_step(both, running = "cedar-mrgather-fetch-4242")
+  expect_equal(current$step, "SKIPPED|files already from today")
+  expect_true(is.na(current$asked_running))
+})
+
+
 # ISSUES.md I43: the cron names no reports, and the default asked for the
 # applicants report, which production mrgather never fetches. Under the check
 # above, every scheduled refresh failed from 2026-10-24 and kept the old tables.

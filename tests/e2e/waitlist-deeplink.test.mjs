@@ -16,7 +16,26 @@ const SEARCH = [
   const { browser, page, jsErrors } = await launch();
 
   try {
+    // What the overlay says once the page is there and before Shiny connects,
+    // read after the page's own DOM-ready handlers have run. An autorun link
+    // opens it from the <head> script; it said a bare "Loading…" until it
+    // closed, with no estimate and no running count (ISSUES I83).
+    await page.evaluateOnNewDocument(() => {
+      document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
+        const box = document.getElementById('waitlist-loading-overlay');
+        window.__overlayAtReady = {
+          shown: !!box && box.style.display !== 'none',
+          label: document.getElementById('waitlist-loading-label')?.textContent ?? null,
+        };
+      }, 0));
+    });
     await connect(page, { tab: 'waitlists', search: SEARCH });
+
+    const atReady = await page.evaluate(() => window.__overlayAtReady ?? null);
+    if (!atReady?.shown) throw new Error(`Waitlists deep link did not open its loading overlay at once: ${JSON.stringify(atReady)}`);
+    if (!/~\d+/.test(atReady.label ?? '')) {
+      throw new Error(`Waitlists deep-link overlay gives no estimate before Shiny connects: "${atReady.label}"`);
+    }
 
     const restored = await waitFor(page, (expectedCourse) => {
       const course = document.getElementById('waitlist-wl_course');

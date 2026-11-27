@@ -11,7 +11,8 @@
 # The payload is typed; format_course_similar_students() is the one text
 # rendering (the text-first preview), and the page and tests read the payload.
 #
-# Depends on: get_course_similar_students() (cones/course-similar-students.R)
+# Depends on: get_course_similar_students(), prepare_course_similar_students()
+#               (cones/course-similar-students.R)
 
 #' Who a course's takers are compared with
 #'
@@ -69,7 +70,11 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
   if (comparison == "gen_ed") {
     cone_opt$comparison_courses <- gen_ed_course_ids(attempts, caller = "build_course_similar_students")
   }
-  courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt, programs)
+  # The members, their cells and their courses are the same for the three
+  # readings below (every course, every course term by term, this course's
+  # instructors): built once and read three times (ISSUES M68).
+  prepared <- prepare_course_similar_students(student_terms, attempts, applicants, cone_opt, programs)
+  courses <- get_course_similar_students(student_terms, attempts, applicants, cone_opt, programs, prepared)
   min_n <- as.integer(opt$min_n %||% 30L)
   suppressed <- attr(courses, "suppressed")
   meta <- list(
@@ -90,7 +95,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
   term_opt <- cone_opt
   term_opt$min_n <- as.integer(opt$min_term_n %||% 10L)
   courses_by_term <- get_course_similar_students(
-    student_terms, attempts, applicants, c(term_opt, list(by_term = TRUE)), programs
+    student_terms, attempts, applicants, c(term_opt, list(by_term = TRUE)), programs, prepared
   )
   meta$min_term_n <- term_opt$min_n
   regular <- courses_by_term %>%
@@ -135,7 +140,7 @@ build_course_similar_students <- function(student_terms, attempts, applicants, o
 
   instructors <- get_course_similar_students(
     student_terms, attempts, applicants,
-    c(cone_opt, list(course = course, grain = "instructor")), programs
+    c(cone_opt, list(course = course, grain = "instructor")), programs, prepared
   ) %>% filter(!is.na(instructor_id))
   spread <- NULL
   measured <- instructors %>% filter(!is.na(return_gap), !is.na(return_gap_se), return_gap_se > 0)

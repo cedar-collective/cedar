@@ -101,10 +101,11 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
     filter(student_id %in% all_ids) %>%
     inner_join(entry_terms, by = "student_id") %>%
     filter(term <= covariate_term) %>%
-    group_by(student_id) %>%
+    # Each student's latest such record: one sort and the first row a student
+    # has, where a slice per student took a tenth of a large comparison.
     arrange(desc(term)) %>%
-    slice(1) %>%
-    ungroup() %>%
+    distinct(student_id, .keep_all = TRUE) %>%
+    arrange(student_id) %>%
     select(
       student_id, covariate_term,
       student_population, student_classification, student_level, student_campus,
@@ -114,6 +115,9 @@ build_comparison <- function(treatment_ids, pool_ids, programs,
       # the continuous_cols list in compute_balance().
       current_unm_gpa = inst_gpa
     )
+  # A table of its own, built from its columns: the declarations table's
+  # stamps (its schema version) describe that table and are not carried on.
+  prog_covs <- tibble::tibble(!!!prog_covs)
 
   groups <- prog_covs %>%
     mutate(group = if_else(student_id %in% treatment_ids, "treatment", "control"))
@@ -505,11 +509,18 @@ student_term_aid <- function(programs) {
   if (length(missing) > 0) {
     stop("[comparison.R] student_term_aid: programs lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
-  label <- function(x) if_else(is.na(x), NA_character_, if_else(x, "yes", "no"))
-  programs %>%
-    group_by(student_id, term = as.integer(term)) %>%
-    summarize(pell = suppressWarnings(max(as.logical(pell_eligible), na.rm = TRUE)),
-              first_gen = suppressWarnings(max(as.logical(first_gen), na.rm = TRUE)), .groups = "drop") %>%
-    mutate(pell = label(if_else(is.finite(pell), pell == 1, NA)),
-           first_gen = label(if_else(is.finite(first_gen), first_gen == 1, NA)))
+  # Counted over the whole table at once: which student-term each row belongs
+  # to, then whether any of its rows says yes and whether any says no. Asking
+  # each student-term in turn (a summarize() over half a million groups) took
+  # 20 of the 50 seconds an Against Non-Takers run spent (ISSUES M68).
+  by_term <- tibble::tibble(student_id = programs$student_id, term = as.integer(programs$term)) %>%
+    group_by(student_id, term)
+  student_terms <- group_keys(by_term)
+  row_term <- group_indices(by_term)
+  said <- function(x) {
+    x <- as.logical(x)
+    any_row <- function(rows) tabulate(row_term[rows], nrow(student_terms)) > 0L
+    if_else(any_row(which(x)), "yes", if_else(any_row(which(!x)), "no", NA_character_))
+  }
+  student_terms %>% mutate(pell = said(programs$pell_eligible), first_gen = said(programs$first_gen))
 }

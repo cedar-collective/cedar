@@ -18,8 +18,12 @@
 //
 //   node tests/e2e/harness.test.mjs      # exit code = pass/fail
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   launch, connect, activeTab, queryActive, clickSubTab, clickNavTab, appReloads, explainAppReload,
+  readStartHistory, recordStarts, lastRunOnOtherCode, compareStarts,
 } from './lib.mjs';
 
 let pass = 0, fail = 0;
@@ -34,6 +38,44 @@ const mustThrow = async (label, fn, needle) => {
   }
 };
 
+// What a start took last time: fresh-start's history, in a file of its own
+// here. Two runs on other code are kept, one of them of four sessions; the
+// run to compare with is the latest that timed as many sessions.
+{
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cedar-starts-')), 'history.jsonl');
+  const earlier = { at: '2026-11-20T15:00:00.000Z', code: 'aaa1111', started: [7.6, 8.1, 4.2, 6.2, 4.4, 4.2], began: [0.4, 2.8, 0.1, 0.2, 0.1, 0.1] };
+  const four = { at: '2026-11-22T15:00:00.000Z', code: 'ccc3333', started: [7, 8, 5, 5], began: [0.4, 2.8, 0.1, 0.2] };
+  const now = { at: '2026-11-25T15:00:00.000Z', code: 'bbb2222+changes', started: [6.3, 4.5, 4.2, 5.7, 4.4, 4.6], began: [0.3, 0.2, 0.1, 0.2, 0.1, 0.1] };
+
+  readStartHistory(file).length === 0 ? ok('a history not yet written reads as no runs')
+                                      : bad('a history not yet written reads as no runs', 'rows');
+  for (const run of [earlier, four, now]) recordStarts(file, run);
+  const history = readStartHistory(file);
+  const before = lastRunOnOtherCode(history, now.code, 6);
+  history.length === 3 && before && before.code === 'aaa1111'
+    ? ok('the run to compare with is the latest on other code with as many sessions', before.code)
+    : bad('the run to compare with is the latest on other code with as many sessions', JSON.stringify(before));
+
+  const said = compareStarts(now, before).join('\n');
+  const expected = [
+    'whole start, sessions 1 to 6: 6.3 4.5 4.2 5.7 4.4 4.6 s  (bbb2222+changes)',
+    'the last run on other code:   7.6 8.1 4.2 6.2 4.4 4.2 s  (aaa1111, 2026-11-20)',
+    'since then: first session -1.3 s, second -3.6 s, the later ones +0.2 s at the median',
+    'printed, not held: sessions of one process differ by a second and a half among themselves',
+  ].join('\n');
+  said === expected ? ok('a start is printed beside the last run on other code')
+                    : bad('a start is printed beside the last run on other code', said);
+
+  const alone = lastRunOnOtherCode(history.filter((r) => r.code === now.code), now.code, 6);
+  alone === null && compareStarts(now, alone)[1].startsWith('no run on other code')
+    ? ok('with no run on other code, it says there is nothing to compare')
+    : bad('with no run on other code, it says there is nothing to compare', JSON.stringify(alone));
+
+  fs.appendFileSync(file, '{"at": "2026-11-26"\n');
+  await mustThrow('a line that is not a run is refused, by its line number',
+    async () => readStartHistory(file), 'line 4 is not a record of a run');
+}
+
 const { browser, page } = await launch();
 try {
   await mustThrow('connect() rejects a URL string',
@@ -45,6 +87,13 @@ try {
   const landed = await connect(page, { tab: 'gen-ed', expect: 'Gen Ed' });
   landed === 'Gen Ed' ? ok('connect() returns the landed tab', landed)
                       : bad('connect() returns the landed tab', landed);
+
+  // ISSUES I85: connect() returns once the server has run the session's start
+  // (a busy-to-idle cycle), which a quiet page does not show on a process
+  // that is still compiling.
+  const cycles = await page.evaluate(() => window.__cedarStartCycles);
+  cycles >= 1 ? ok('connect() returns after the session has started', `${cycles} busy-to-idle cycle(s)`)
+              : bad('connect() returns after the session has started', `cycles seen: ${cycles}`);
 
   const all = await page.$$eval('label', ns => ns.length);
   const act = (await queryActive(page, 'label')).length;

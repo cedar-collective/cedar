@@ -70,6 +70,51 @@ evidence: an unreadable page identifies nothing and must not stop a run.
 `CEDAR_ALLOW_APP_MODE_MISMATCH=1` overrides deliberately; `CEDAR_DEV_PORT` still
 moves the demo for a genuine side-by-side comparison.
 
+## Before a browser run on a development machine
+
+- **Chrome shows in the Dock.** Each suite, and each stage of the report tour,
+  starts the installed Chrome headless with a new profile. On macOS every
+  launch still appears in the Dock, so a tour looks like Chrome starting over
+  and over. It is not a loop: say so to whoever shares the machine before
+  starting one.
+- **Keep the machine awake**: `caffeinate -i ./run-tests.sh --e2e <suite>`. A
+  lid closed mid-run fails the next step with `waitForFunction failed: frame
+  got detached`, a lost client and not an app failure; `pmset -g log` shows
+  "Clamshell Sleep" at the same second.
+- **Run a tour alone** ([one heavy job at a time](testing.html#one-heavy-job-at-a-time)).
+- **A script that may hang writes to a file.** `node script.mjs | cut …`
+  prints nothing until the script exits.
+
+## A page whose results are shared or built ahead
+
+[Shared results](shiny-modules.html#results-shared-by-every-session-and-built-ahead)
+are kept for the life of the process, which changes what a second run of a
+suite sees.
+
+- **A rerun on the same process reads what the first run built.** A check
+  that requires a wait label ("Building…") passes only on a new process. Hold
+  the sharing itself instead: open a second session, which builds nothing,
+  and compare how long each worked with no overlay up
+  (`downstream-glance.test.mjs`).
+- **After a rebuild or a restart, run a suite through `./run-tests.sh --e2e
+  <suite>`, not bare `node`.** The runner's warm-up opens the home page as the
+  process's first session, as a reader's first visit does (ISSUES I75).
+- **Before a page that shares results merges**, restart the app, open the home
+  page first, then the page. The suites open their tab directly and cannot
+  see a result that an observer on another tab read too early (ISSUES I75).
+- **The build-ahead says when it is done.** Its log lines are
+  `[preload] 7 of 15: <key>: built (2.8s)`, and
+  `[global.R] Downstream built ahead for: …` lists the courses. A session
+  opened before the last line waits behind the job running. `--fresh` waits
+  for it.
+- **That a built-ahead result is the one the page reads** shows as one wait
+  label on the page ("Reading the course's outcomes…") and no build of that
+  result in the log or in `report_timing.csv`.
+- **A variable given to the container does not reach the app by itself**:
+  shiny-server starts R with a clean environment, and `entrypoint.sh` writes
+  the ones the app reads to the worker's `.Renviron` (`test-ci.R` holds both
+  ends).
+
 ## The browser stages are memory-bound, and running out does not look like it
 
 **All twelve browser suites pass.** The long-standing "Headcount failure" and
@@ -100,10 +145,101 @@ report tour rewrites the error to say the session dropped and why; the guards
 are pinned in `harness.test.mjs`. `run-tests.sh` prints a resource check before
 the browser stages and names other running CEDAR containers.
 
+**After a failed browser stage the runner says what the app's container
+shows.** It notes the container before the first suite and, when a stage
+fails, prints what changed:
+
+```
+What the app's container says (cedar-shiny):
+  - The app's R process is not the one the suites began with (pid 275 then, 3120 now).
+    Every session open when it went was dropped, so the step that failed is probably not the cause.
+  - Docker reports a process in it killed for memory (OOMKilled: true).
+  memory now: cedar-shiny  3.41GiB / 3.83GiB
+```
+
+| It reports | From |
+|---|---|
+| The R process is not the one the suites began with, or none is running | the pid of shiny-server's R process (`pgrep` in the container), before and after |
+| The container restarted, or stopped | `docker inspect`'s `StartedAt` against its value before the suites; no container on the app's port |
+| A process killed for memory, and whether that was before the suites | `OOMKilled`, before and after |
+| A disk nearly full | under 2 GiB free where the checkout is: Docker stops, or answers with input/output errors, as it fills |
+| The app answering 500, or not at all | one request to the app |
+
+When none of them holds it says so, which is the case for reading the suite's
+own output as a real failure. It explains a failure and never changes one:
+the stage still fails, and nothing is retried (`test-ci.R` holds each case).
+
+The same limit decides one setting. The app builds Course Dynamics >
+Downstream ahead for the courses analysed most when it starts
+([built ahead](shiny-modules.md#downstream-for-the-courses-analysed-most)),
+which leaves the worker larger before a suite has opened a page: measured
+2026-11-25, seven suites in a row peaked at 3.42 GB with no course built ahead,
+and the worker was killed once with two built ahead. A development machine
+therefore sets `CEDAR_PRELOAD_COURSES=0` in its `.env` (`.env.example` has the
+line); production, on 8 GB, builds ten. A restart is also ready sooner.
+
 **Before diagnosing any browser failure:** confirm the app source is current
 (`docker compose up -d --build`) and that nothing else large is resident. A
 stale container produced a completely separate phantom — Dept Trends "rendered
 hidden charts" purely because the image predated the fix.
+
+## A process just started
+
+Every browser run but one meets a process already in use: the app was started
+some time ago and a warm-up session has been through it. What a process does
+for its first readers was therefore tested by nobody until a deploy, and two
+things lived there unseen: R compiled the server function while the second
+session waited (ISSUES I81), and the test driver itself lost an input on that
+session (I85).
+
+```bash
+./run-tests.sh --e2e --fresh     # restart the running app, then its first sessions
+./run-tests.sh --all --fresh     # the same on a rebuilt container
+```
+
+`--fresh` restarts whichever container answers on the app's port (the
+institutional stack, the synthetic one or a one-off test container), waits for
+the build-ahead's last job in its log (`[preload] 5 of 5: …`: a session opened
+before then waits behind the job running, and a time taken then is the job's),
+leaves out the warm-up, and runs `fresh-start.test.mjs` as the process's first
+six sessions. A suite named with it runs afterwards. **A restart runs the
+source the container was built with**, so the form that tests a diff is
+`--all --fresh`; `--changed` says so when `global.R` or `entrypoint.sh` is in
+the diff. The wait is 15 minutes at most (`CEDAR_BUILD_AHEAD_TIMEOUT`, in
+seconds).
+
+The suite holds two things for each of the first two sessions:
+
+- **An input set the moment `connect()` returns is still set once the page is
+  idle** (I85).
+- **The server begins as soon after the connection as it does for the four
+  sessions after**, give or take a second. R compiles a function before
+  running it, so a session that meets the server function uncompiled waits
+  for the compiler in exactly this stretch.
+
+Measured 2026-11-25 in the development container (emulated), seconds:
+
+| | Session 1 | Session 2 | Sessions 3 to 6 |
+|---|---|---|---|
+| Connection to the server beginning, before | 0.4 | 2.8 | 0.1 to 0.2 |
+| Connection to the server beginning, after | 0.2 to 0.3 | 0.2 | 0.1 to 0.2 |
+| Whole start, before | 6.1 to 7.6 | 6.7 to 8.1 | 4.2 to 6.2 |
+| Whole start, after | 6.1 to 6.5 | 4.5 | 4.2 to 5.7 |
+
+"After" is with the server function compiled at start: `global.R` compiles the
+function it read (`cedar_compile_server()`, 2 of the 6.3 seconds the start now
+spends compiling) and `server.R`'s last line hands it to Shiny
+(`cedar_server_to_run()`), because Shiny reads `server.R` itself for the
+first session and runs what that read returns. An edited `server.R` is run as
+edited.
+
+The whole start is printed and not held. Sessions after the second differ by
+a second and a half among themselves, about one in four taking that much
+longer, which is as much as the first session still adds (ISSUES M75);
+compiling every function at start cost 33 seconds and changed neither. Run it
+alone: a second heavy job on the machine moves every number. What it prints
+is kept, and shown beside the last run on other code
+([what is held, and what is only printed](performance-monitoring.html#what-is-held-and-what-is-only-printed)).
 
 ## E2E rules — the four that cause every flake
 
@@ -120,11 +256,28 @@ students analyzed" for a run that produced 401.
 `recalculating` forever, so counting every `.recalculating` in the DOM never
 reaches zero. Only **visible** ones count.
 
+`test-architecture.R` counts the `sleep()` calls in every script here but
+`lib.mjs`, whose job waiting is. The count may only go down: two are left, a
+poll with a timeout in `nav.test.mjs` and a beat before a screenshot in
+`shot.mjs`.
+
 **2. `connect()` must settle before you touch inputs.** `isConnected()` goes true
 well before the landing tab's first reactive flush. Inputs set inside that window
 are overwritten by the app's own initialisation — the symptom is a selectize
 still reading "Type to search..." after `setInput`, a page stuck on its empty
-state, and a toast claiming the analysis ran. `connect()` now waits for idle.
+state, and a toast claiming the analysis ran. `connect()` waits for the
+session's first busy-to-idle cycle, and then for idle.
+
+*A quiet page is not a started session.* Waiting for idle alone was not
+enough on a process just started: R compiles the server function as its second
+session starts, and the page shows no busy state until that is done. Measured
+2026-11-25 on the session straight after the warm-up: connected at 0.5 s, busy
+at 3.7 s, the course picker's choices at 5.7 s. "Connected, then quiet for 600
+ms" passed at 3.6 s, the test set a course, and the picker's set-up then
+emptied it (ISSUES I85: four of four such sessions; none of three with the
+wait). A page that looks empty right after a restart: read
+`Shiny.shinyapp.$inputValues` for the input the test set before reading the
+page.
 
 **3. `offsetParent !== null` is not a visibility test.** It also returns null
 inside `position: fixed`/`sticky` ancestors, which in bslib includes the sub-tab

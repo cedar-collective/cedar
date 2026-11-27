@@ -1,6 +1,6 @@
 #' Analyze Cancelled Course Sections
 #'
-#' Returns cancelled section rows and summary tables for the Bird's Eye >
+#' Returns cancelled section rows and summary tables for the Courses >
 #' Cancellations page. Cancellation is defined narrowly as section status "C";
 #' related non-active statuses are counted separately for page context.
 #'

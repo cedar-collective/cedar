@@ -45,3 +45,19 @@ test_that("XC01: each required course counts who passed, who tried and who has n
                                              plans$courses, xc01$boards$catalog$program_codes),
                "programs lacks program_code")
 })
+
+# ISSUES M64: a scope with no far-along leaver (a small level on one campus)
+# read the last term of nobody, and R warned in the app's log.
+test_that("XC01: with no student who left, the result is empty and nothing warns", {
+  exit <- get_exit_credits(xc01$student_terms, xc01$programs, xc01$degrees, xc01$terms, xc01$opt)
+  nobody <- exit$students[0, ]
+  plans <- degree_named_requirements(xc01$boards$roadmaps, c("hist-ba", "anth-ba"))
+  expect_no_warning(
+    r <- get_exit_requirement_progress(nobody, xc01$programs, xc01$attempts, plans$courses,
+                                       xc01$boards$catalog$program_codes, list(min_n = 2L)))
+  expect_equal(nrow(r$programs), 0L)
+  expect_equal(nrow(r$courses), 0L)
+  expect_equal(names(r$courses), c("catalog_id", "subject_course", "title", "semester", "readable",
+                                   "n_students", "n_passed", "n_tried", "n_none"))
+  expect_equal(c(r$meta$n_students, r$meta$n_with_plan, r$meta$n_without_plan), c(0L, 0L, 0L))
+})

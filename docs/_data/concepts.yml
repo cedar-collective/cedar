@@ -10,14 +10,14 @@
 # notes beneath it). Keys are <page>.<section>.
 schema_version: 1
 concepts:
-  first-year.entering-classes: >-
+  retention.entering-classes: >-
     Take everyone who started in the same term and follow them as one class.
     Each line asks the same question a semester later: how much of the class is
     still here? A student who has graduated counts as still here, because
     finishing is not leaving. The space between two lines is the part of the
     class lost between those two semesters, so a widening gap shows when
     students are going.
-  first-year.first-spring-summer: >-
+  retention.first-spring-summer: >-
     Some students take a course in the summer after their first spring, and
     most do not. This compares how often each group is enrolled again in the
     fall. Expect the summer students to return more often: a student who signs
@@ -25,11 +25,16 @@ concepts:
     description of who takes summer courses, not as proof that a summer course
     keeps a student.
   retention.return-rate: >-
-    Of the students enrolled in a term, what share is enrolled again the next
-    fall or spring? Students who finished their degree are taken out first,
-    since they did not leave. Each point is one term's students, and the dashed
-    line says whether the share has been moving up or down over the terms or is
-    only wobbling as it usually does.
+    Of the students in a semester here, what share is enrolled again the next
+    fall or spring? A student's 1st semester is the term they arrived, and
+    every fall and spring after it counts whether they enrolled or not, so the
+    3rd semester is a year on. First-time and transfer students are read
+    apart, and a semester whose students started in a spring says so.
+    Students who finished their degree are taken out first, since they did not
+    leave. Each line is one semester over the terms; the dotted line is every
+    student together, which hides how far apart the semesters are. Each
+    Entering Class follows one class from its start; this asks, of everyone
+    in a given semester, how many come back for the next.
   retention.warning-signs: >-
     By the end of a term two things are already known about a student: whether
     they withdrew from a course late, and whether they got a D, F or other
@@ -37,9 +42,9 @@ concepts:
     beside students without it, and how much of the group that did not come
     back carried the sign. A sign marks who to reach, not why they left.
   retention.groups: >-
-    The same return rate, read separately for each classification and for each
-    college, so you can see whether a change is everywhere or in one place. The
-    small line in each row is that group's own history.
+    The same return rate, read separately for each college, so you can see
+    whether a change is everywhere or in one place. The small line in each row
+    is that college's own history.
   retention.class-pace: >-
     Staying is not the same as finishing on time. This follows each fall's new
     students and, as each year begins, puts every one of them in a single
@@ -105,3 +110,19 @@ concepts:
     they took, and which majors they were in. A major whose summer finishers
     mostly carried a full load is a program built to end in summer. Finishers
     who took one course, or none, were completing a last requirement.
+  low-enrollment.sections: >-
+    Each row is a section meeting this term with few students in it, set
+    against the size your college expects of a class at its level. A
+    crosslisted section is judged by the whole class that meets together, not
+    by its own share of it. The colours say how far under the line a class is;
+    the green rows are over it, but close enough to slip under if a few
+    students drop. Read it as a list to look into, not a verdict: a small class
+    may be a required course, a capstone or a section added on purpose, and
+    none of that shows here.
+  low-enrollment.schedule-check: >-
+    Nobody has registered for this term yet, so there are no students to
+    count. Each course on the schedule is set instead against how it filled in
+    the same season before: a course that has run small is likely to run small
+    again unless something has changed. A course never offered in that season
+    is listed too, because there is nothing to judge it by. This cannot see why
+    a course ran small, or a change in when, where or by whom it is taught.

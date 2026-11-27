@@ -457,6 +457,95 @@ student_arrival_as_of <- function(programs, term) {
 
 
 # ---------------------------------------------------------------------------
+# student_term_semesters
+# ---------------------------------------------------------------------------
+
+#' Each student-term's semester since the student arrived
+#'
+#' The latest arrival the record holds in or before each term at the term's
+#' student level, as student_arrival_as_of() reads it (a student who started
+#' first-time, left and came back as a new transfer reads transfer; a term
+#' recorded both ways reads first-time), and how many regular terms on the
+#' term is. An arrival counts only at its own level, the level of the
+#' declaration that records it: a graduate student is not counted from the
+#' term they started as an undergraduate, as entering_students() reads it. The
+#' arrival's own regular term is the 1st semester; a summer arrival's 1st
+#' semester is the fall after it. The count is of terms passed, not terms
+#' enrolled, as an entering class's semesters are counted
+#' (get_entering_class_retention()): a student away for a year comes back in
+#' their 5th semester, not their 3rd. Unlike classification it does not move
+#' when the registrar's rules do (ISSUES I92).
+#'
+#' @param student_terms Rows with `student_id`, `term` and `student_level`
+#'   (a level code).
+#' @param programs `cedar_programs`, for the arrivals (student_term_entry_type())
+#'   and their `student_level` (as academic studies names it; translated by
+#'   cedar_level_code_from_source()).
+#' @return A tibble of `student_id`, `term`, `student_level`, `entry_type`
+#'   ("first_time" or "transfer"), `arrived_term` and `semester_here`
+#'   (integer; NA for a summer term), one row per distinct student-term with
+#'   an arrival at its level on record by then. A student-term with none
+#'   (readmitted, moved from another campus or level, here before the records
+#'   begin) has no row.
+student_term_semesters <- function(student_terms, programs) {
+  missing <- setdiff(c("student_id", "term", "student_level"), names(student_terms))
+  if (length(missing) > 0) {
+    stop("[population.R] student_term_semesters: student_terms lacks ", paste(missing, collapse = ", "), call. = FALSE)
+  }
+  if (!"student_level" %in% names(programs)) {
+    stop("[population.R] student_term_semesters: programs lacks student_level", call. = FALSE)
+  }
+  # Each level's arrivals, read by the one classifier.
+  arrivals <- programs %>%
+    mutate(student_level = cedar_level_code_from_source(student_level)) %>%
+    group_by(student_level) %>%
+    group_modify(~ student_term_entry_type(.x)) %>%
+    ungroup()
+  if (anyNA(arrivals$student_level)) {
+    stop("[population.R] student_term_semesters: an arrival's level is not in student_levels.csv: ",
+         paste(unique(programs$student_level[!is.na(programs$student_level) &
+                                              is.na(cedar_level_code_from_source(programs$student_level))]), collapse = ", "),
+         call. = FALSE)
+  }
+  arrivals <- arrivals %>%
+    arrange(student_id, student_level, term, entry_type) %>%
+    distinct(student_id, student_level, term, .keep_all = TRUE) %>%
+    transmute(student_id, student_level, arrived_term = term, entry_type)
+  student_terms %>%
+    distinct(student_id, term, student_level) %>%
+    mutate(term = as.integer(term)) %>%
+    inner_join(arrivals, by = join_by(student_id, student_level, closest(term >= arrived_term)), na_matches = "never") %>%
+    mutate(first_regular = if_else(arrived_term %% 100L == 60L, arrived_term + 20L, arrived_term),
+           semester_here = term_diff(first_regular, term) + 1L,
+           semester_here = if_else(is.na(semester_here) | semester_here < 1L, NA_integer_, as.integer(semester_here))) %>%
+    select(student_id, term, student_level, entry_type, arrived_term, semester_here)
+}
+
+
+#' The earliest arrival a student in a semester of a term can have
+#'
+#' The inverse of student_term_semesters()'s count: the regular term
+#' `semester - 1` regular terms before `term`, or, when that is a fall, the
+#' summer before it (a summer arrival's 1st semester is the fall after). A
+#' term's semester holds every student it should only when the arrival
+#' records reach back this far.
+#'
+#' @param term Fall or spring term codes.
+#' @param semester Semesters since arrival, 1 or more.
+#' @return Integer term codes.
+semester_earliest_arrival <- function(term, semester) {
+  term <- as.integer(term)
+  semester <- as.integer(semester)
+  season <- dplyr::case_when(term %% 100L == 10L ~ 0L, term %% 100L == 80L ~ 1L, TRUE ~ NA_integer_)
+  if (any(is.na(season) | is.na(semester) | semester < 1L)) {
+    stop("[population.R] semester_earliest_arrival: terms must be falls or springs and semesters 1 or more.", call. = FALSE)
+  }
+  index <- (term %/% 100L) * 2L + season - (semester - 1L)
+  (index %/% 2L) * 100L + if_else(index %% 2L == 1L, 60L, 10L)
+}
+
+
+# ---------------------------------------------------------------------------
 # classify_entry_method
 # ---------------------------------------------------------------------------
 
@@ -1284,7 +1373,15 @@ program_choices <- function(codes, dims, successions = program_successions, prof
     if (length(missing)) {
       stop("[population.R] program_choices(): profile lacks ", paste(missing, collapse = ", "), call. = FALSE)
     }
-    profile <- profile[as.character(profile$major_code) %in% codes, , drop = FALSE]
+    # Each program's declaration rows, found in one pass over the table: every
+    # code belongs to one program, so its rows are that program's. Looking the
+    # rows up once per program instead read the whole table once per program,
+    # which was 3.4 of the 7.6 seconds a session spent starting (ISSUES I80).
+    profile_code <- as.character(profile$major_code)
+    in_scope <- which(profile_code %in% codes)
+    code_program <- stats::setNames(rep(ids, lengths(by_id)), unlist(by_id, use.names = FALSE))
+    profile_rows <- split(in_scope, unname(code_program[profile_code[in_scope]]))
+    profile <- profile[, c("degree", "student_campus", "term"), drop = FALSE]
   }
   labels <- vapply(seq_along(ids), function(i) {
     id <- ids[i]
@@ -1292,9 +1389,9 @@ program_choices <- function(codes, dims, successions = program_successions, prof
     name <- if (in_file[i]) id_names[[id]] else "[no programs.csv row]"
     label <- paste0(name, " (", paste(covered, collapse = ", "), ")")
     if (is.null(profile)) return(label)
-    rows <- profile[as.character(profile$major_code) %in% covered, , drop = FALSE]
-    if (nrow(rows) == 0L) return(label)
-    paste(c(label, .program_profile_parts(rows)), collapse = " \u00b7 ")
+    rows <- profile_rows[[id]]
+    if (length(rows) == 0L) return(label)
+    paste(c(label, .program_profile_parts(profile[rows, , drop = FALSE])), collapse = " \u00b7 ")
   }, character(1))
   stats::setNames(ids, labels)[order(labels)]
 }

@@ -167,7 +167,7 @@ Compute Waitlist Pressure for a Student Cohort  CEDAR's class-list true waitlist
 
 **Analyze Cancelled Course Sections**
 
-Analyze Cancelled Course Sections  Returns cancelled section rows and summary tables for the Bird's Eye > Cancellations page. Cancellation is defined narrowly as section status "C"; related non-active statuses are counted separately for page context.
+Analyze Cancelled Course Sections  Returns cancelled section rows and summary tables for the Courses > Cancellations page. Cancellation is defined narrowly as section status "C"; related non-active statuses are counted separately for page context.
 
 **Parameters:**
 

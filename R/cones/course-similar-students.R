@@ -68,50 +68,62 @@
 #             hs_gpa_band(), applicant_hs_gpa(), student_term_aid()
 #               (branches/comparison.R)
 
-#' A course's takers against non-takers of the same term, campus, HS GPA band and time status
-#'
-#' @param student_terms `cedar_student_terms`.
-#' @param attempts `cedar_attempts`.
-#' @param applicants `cedar_applicants` (the high-school GPA band).
-#' @param opt `classification` (one or more `student_classification` values;
-#'   required), `course` (course ids; NULL reads every course with `min_n`
-#'   takers), `term` (anchor terms; default every term to the settled edge),
-#'   `campus` (home campuses; NULL keeps every campus, each its own cell),
-#'   `grain` (`"course"`, the default, or `"instructor"`: a course's takers
-#'   by the instructor of their attempt, against the course's non-takers),
-#'   `by_term` (TRUE gives one row per anchor term as well, with `term`
-#'   after the course: the same comparison term by term, for change over
-#'   time; default FALSE pools the terms),
-#'   `comparison_courses` (course ids: the non-takers are only members with
-#'   a classified attempt in one of them that term; NULL, the default, every
-#'   member without a row in the course),
-#'   `min_n` (smallest covered taker count a row needs; default 30),
-#'   `min_cell_n` (smallest non-taker count a cell needs; default 5),
-#'   `match_credits` (TRUE adds the band of UNM credits already earned to
-#'   the cells; default FALSE),
-#'   `data_edges` (`cedar_data_edges()` output, required).
-#' @param programs `cedar_programs`, optional: given, Pell eligibility and
-#'   first-generation status that term are cells too.
-#' @return A tibble, one row per `course` (and `instructor_id`,
-#'   `instructor_name` at the instructor grain): `n_takers`, `n_covered`,
-#'   `n_terms`; `return_n`, `return_pct`, `return_expected_pct`,
-#'   `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`,
-#'   `other_dfw_expected_pct`, `other_dfw_gap`, `other_dfw_gap_se`;
-#'   `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`,
-#'   `next_gpa_gap_se`; `act_n`, `act`, `act_expected`, `act_gap`,
-#'   `act_gap_se`, `act_gap_smd` (the alike check: takers with an ACT score
-#'   in cells whose non-takers have one). Gaps are actual minus expected (a
-#'   positive DFW gap is worse); an outcome with nothing observable is NA.
-#'   Attributes: `edge`, `graded_edge`, `n_population_student_terms`,
-#'   `cells` (the cell columns), `suppressed` (rows under `min_n`),
-#'   `comparison_courses` (as given, NULL for every non-taker),
-#'   `n_comparison_student_terms` (the members who may stand as non-takers:
-#'   every member without comparison courses).
-get_course_similar_students <- function(student_terms, attempts, applicants, opt = list(), programs = NULL) {
+# What decides who is compared with whom: every option and input the prepared
+# rows depend on, resolved and checked. A row grain, one course or a threshold
+# changes what is read off those rows, never the rows, and is not here.
+.course_similar_scope <- function(opt, programs) {
   classification <- opt$classification
   if (is.null(classification) || length(classification) == 0L) {
     stop("[course-similar-students.R] opt$classification is required.", call. = FALSE)
   }
+  edge <- cedar_longitudinal_edge(opt$data_edges)
+  if (is.null(edge)) {
+    stop("[course-similar-students.R] opt$data_edges has no settled enrollment edge (last_enrolled_complete).",
+         call. = FALSE)
+  }
+  graded_edge <- opt$data_edges[["last_graded"]]
+  if (is.null(graded_edge)) {
+    stop("[course-similar-students.R] opt$data_edges has no graded edge (last_graded).", call. = FALSE)
+  }
+  comparison <- opt$comparison_courses
+  if (!is.null(comparison)) {
+    comparison <- unique(as.character(comparison))
+    if (length(comparison) == 0L || anyNA(comparison)) {
+      stop("[course-similar-students.R] opt$comparison_courses must name at least one course.", call. = FALSE)
+    }
+  }
+  list(classification = classification, term = opt$term, campus = opt$campus,
+       match_credits = isTRUE(opt$match_credits), comparison_courses = comparison,
+       with_aid = !is.null(programs), edge = edge, graded_edge = as.integer(graded_edge))
+}
+
+#' The members, their cells and their courses, built once for several readings
+#'
+#' Everything `get_course_similar_students()` reads that does not depend on
+#' which rows are asked for: the members with their outcomes, each member's
+#' courses that term, and the non-takers' rates for every course in every
+#' cell. Reading the comparison for every course, for every course term by
+#' term and for one course's instructors is three readings of one of these;
+#' a caller that wants more than one builds it once and passes it as
+#' `prepared` (rebuilding it for each was 40 of the 50 seconds an Against
+#' Non-Takers run took; ISSUES M68).
+#'
+#' @param student_terms,attempts,applicants,programs As
+#'   `get_course_similar_students()` takes them.
+#' @param opt `classification`, `term`, `campus`, `match_credits`,
+#'   `comparison_courses` and `data_edges`, as there. `course`, `grain`,
+#'   `by_term`, `min_n` and `min_cell_n` are not read.
+#' @return A `course_similar_students_prepared` list: `scope` (the options it
+#'   was built for), `cells` (the cell columns), `touched` (one row per
+#'   member and course that term, with the member's cell and outcomes),
+#'   `non_takers` (one row per course and cell: the non-takers' count and
+#'   rates), `n_population_student_terms`, `n_comparison_student_terms`.
+prepare_course_similar_students <- function(student_terms, attempts, applicants, opt = list(), programs = NULL) {
+  scope <- .course_similar_scope(opt, programs)
+  classification <- scope$classification
+  edge <- scope$edge
+  graded_edge <- scope$graded_edge
+  comparison <- scope$comparison_courses
   if (is.null(applicants)) {
     stop("[course-similar-students.R] applicants (cedar_applicants) is required: the cells need the ",
          "high-school GPA band.", call. = FALSE)
@@ -127,22 +139,6 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
   if (length(missing_att) > 0) {
     stop("[course-similar-students.R] attempts lacks ", paste(missing_att, collapse = ", "), call. = FALSE)
   }
-  grain <- opt$grain %||% "course"
-  if (!grain %in% c("course", "instructor")) {
-    stop("[course-similar-students.R] opt$grain must be \"course\" or \"instructor\", not ", grain, call. = FALSE)
-  }
-  min_n <- as.integer(opt$min_n %||% 30L)
-  min_cell_n <- as.integer(opt$min_cell_n %||% 5L)
-  edge <- cedar_longitudinal_edge(opt$data_edges)
-  if (is.null(edge)) {
-    stop("[course-similar-students.R] opt$data_edges has no settled enrollment edge (last_enrolled_complete).",
-         call. = FALSE)
-  }
-  graded_edge <- opt$data_edges[["last_graded"]]
-  if (is.null(graded_edge)) {
-    stop("[course-similar-students.R] opt$data_edges has no graded edge (last_graded).", call. = FALSE)
-  }
-  graded_edge <- as.integer(graded_edge)
   cell_cols <- c("term", "student_campus", "hs_gpa_band", "time_status",
                  if (!is.null(programs)) c("pell", "first_gen"),
                  if (isTRUE(opt$match_credits)) "credits_band")
@@ -194,23 +190,24 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
   }
   cedar_debug("[course-similar-students.R] ", nrow(members), " member student-terms to ", edge)
 
-  comparison <- opt$comparison_courses
-  if (!is.null(comparison)) {
-    comparison <- unique(as.character(comparison))
-    if (length(comparison) == 0L || anyNA(comparison)) {
-      stop("[course-similar-students.R] opt$comparison_courses must name at least one course.", call. = FALSE)
-    }
-  }
-
+  # One row per member and course, counted over the rows at once: which
+  # member-course each attempt row belongs to, then how many of its rows are
+  # classified and how many are DFW. A classified row sorts first, so the
+  # first row's instructor is the classified attempt's.
   # CAMPUS_ROLLUP: a student took the course wherever it was taught; the grain
   # kept is the student's home campus (student_campus), which is in the cell.
-  touched <- attempts %>%
+  attempt_rows <- attempts %>%
     semi_join(members, by = c("student_id", "term")) %>%
     arrange(student_id, term, subject_course, is.na(outcome)) %>%
-    group_by(student_id, term, course = subject_course) %>%
-    summarize(att = sum(!is.na(outcome)), dfw = sum(outcome %in% "dfw"),
-              instructor_id = first(instructor_id), instructor_name = first(instructor_name),
-              .groups = "drop")
+    group_by(student_id, term, course = subject_course)
+  row_course <- group_indices(attempt_rows)
+  touched <- group_keys(attempt_rows)
+  first_row <- match(seq_len(nrow(touched)), row_course)
+  touched <- touched %>%
+    mutate(att = tabulate(row_course[!is.na(attempt_rows$outcome)], nrow(touched)),
+           dfw = tabulate(row_course[attempt_rows$outcome %in% "dfw"], nrow(touched)),
+           instructor_id = attempt_rows$instructor_id[first_row],
+           instructor_name = attempt_rows$instructor_name[first_row])
   totals <- touched %>%
     filter(term <= graded_edge) %>%
     group_by(student_id, term) %>%
@@ -233,7 +230,6 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
     summarize(n = n(), across(all_of(measures[-1]), sum), .groups = "drop") %>%
     rename_with(~ paste0(.x, ".cell"), all_of(measures))
 
-  if (!is.null(opt$course)) touched <- touched %>% filter(course %in% as.character(opt$course))
   touched <- touched %>%
     inner_join(members %>% select(student_id, term, all_of(cell_cols[-1]), all_of(measures[-1]), in_comparison),
                by = c("student_id", "term")) %>%
@@ -270,6 +266,78 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
       nt_act_var = if_else(act_n.cell - act_n > 0L,
                            pmax((act_sq.cell - act_sq) / (act_n.cell - act_n) - nt_act^2, 0), NA_real_)
     )
+
+  structure(
+    list(scope = scope, cells = cell_cols, touched = touched, non_takers = non_takers,
+         n_population_student_terms = nrow(members),
+         n_comparison_student_terms = sum(members$in_comparison)),
+    class = "course_similar_students_prepared"
+  )
+}
+
+#' A course's takers against non-takers of the same term, campus, HS GPA band and time status
+#'
+#' @param student_terms `cedar_student_terms`.
+#' @param attempts `cedar_attempts`.
+#' @param applicants `cedar_applicants` (the high-school GPA band).
+#' @param opt `classification` (one or more `student_classification` values;
+#'   required), `course` (course ids; NULL reads every course with `min_n`
+#'   takers), `term` (anchor terms; default every term to the settled edge),
+#'   `campus` (home campuses; NULL keeps every campus, each its own cell),
+#'   `grain` (`"course"`, the default, or `"instructor"`: a course's takers
+#'   by the instructor of their attempt, against the course's non-takers),
+#'   `by_term` (TRUE gives one row per anchor term as well, with `term`
+#'   after the course: the same comparison term by term, for change over
+#'   time; default FALSE pools the terms),
+#'   `comparison_courses` (course ids: the non-takers are only members with
+#'   a classified attempt in one of them that term; NULL, the default, every
+#'   member without a row in the course),
+#'   `min_n` (smallest covered taker count a row needs; default 30),
+#'   `min_cell_n` (smallest non-taker count a cell needs; default 5),
+#'   `match_credits` (TRUE adds the band of UNM credits already earned to
+#'   the cells; default FALSE),
+#'   `data_edges` (`cedar_data_edges()` output, required).
+#' @param programs `cedar_programs`, optional: given, Pell eligibility and
+#'   first-generation status that term are cells too.
+#' @param prepared `prepare_course_similar_students()` output for the same
+#'   classification, term, campus, match_credits, comparison_courses,
+#'   data_edges and programs, optional: given, the members and their cells
+#'   are not rebuilt. One built for other options stops.
+#' @return A tibble, one row per `course` (and `instructor_id`,
+#'   `instructor_name` at the instructor grain): `n_takers`, `n_covered`,
+#'   `n_terms`; `return_n`, `return_pct`, `return_expected_pct`,
+#'   `return_gap`, `return_gap_se`; `other_attempts`, `other_dfw_pct`,
+#'   `other_dfw_expected_pct`, `other_dfw_gap`, `other_dfw_gap_se`;
+#'   `next_gpa_n`, `next_gpa`, `next_gpa_expected`, `next_gpa_gap`,
+#'   `next_gpa_gap_se`; `act_n`, `act`, `act_expected`, `act_gap`,
+#'   `act_gap_se`, `act_gap_smd` (the alike check: takers with an ACT score
+#'   in cells whose non-takers have one). Gaps are actual minus expected (a
+#'   positive DFW gap is worse); an outcome with nothing observable is NA.
+#'   Attributes: `edge`, `graded_edge`, `n_population_student_terms`,
+#'   `cells` (the cell columns), `suppressed` (rows under `min_n`),
+#'   `comparison_courses` (as given, NULL for every non-taker),
+#'   `n_comparison_student_terms` (the members who may stand as non-takers:
+#'   every member without comparison courses).
+get_course_similar_students <- function(student_terms, attempts, applicants, opt = list(), programs = NULL,
+                                        prepared = NULL) {
+  grain <- opt$grain %||% "course"
+  if (!grain %in% c("course", "instructor")) {
+    stop("[course-similar-students.R] opt$grain must be \"course\" or \"instructor\", not ", grain, call. = FALSE)
+  }
+  min_n <- as.integer(opt$min_n %||% 30L)
+  min_cell_n <- as.integer(opt$min_cell_n %||% 5L)
+  scope <- .course_similar_scope(opt, programs)
+  if (is.null(prepared)) {
+    prepared <- prepare_course_similar_students(student_terms, attempts, applicants, opt, programs)
+  } else if (!inherits(prepared, "course_similar_students_prepared") || !identical(prepared$scope, scope)) {
+    stop("[course-similar-students.R] `prepared` was built for other options: build it with ",
+         "prepare_course_similar_students() from the same classification, term, campus, match_credits, ",
+         "comparison_courses, data_edges and programs.", call. = FALSE)
+  }
+  cell_cols <- prepared$cells
+  non_takers <- prepared$non_takers
+  touched <- prepared$touched
+  if (!is.null(opt$course)) touched <- touched %>% filter(course %in% as.character(opt$course))
 
   row_cols <- c("course", if (grain == "instructor") c("instructor_id", "instructor_name"),
                 if (isTRUE(opt$by_term)) "term")
@@ -331,13 +399,13 @@ get_course_similar_students <- function(student_terms, attempts, applicants, opt
 
   suppressed <- rows %>% filter(n_covered < min_n) %>% select(all_of(row_cols), n_takers, n_covered)
   result <- rows %>% filter(n_covered >= min_n)
-  attr(result, "edge") <- edge
-  attr(result, "graded_edge") <- graded_edge
-  attr(result, "n_population_student_terms") <- nrow(members)
+  attr(result, "edge") <- scope$edge
+  attr(result, "graded_edge") <- scope$graded_edge
+  attr(result, "n_population_student_terms") <- prepared$n_population_student_terms
   attr(result, "cells") <- cell_cols
   attr(result, "suppressed") <- suppressed
-  attr(result, "comparison_courses") <- comparison
-  attr(result, "n_comparison_student_terms") <- sum(members$in_comparison)
+  attr(result, "comparison_courses") <- scope$comparison_courses
+  attr(result, "n_comparison_student_terms") <- prepared$n_comparison_student_terms
   cedar_debug("[course-similar-students.R] ", nrow(result), " rows (", nrow(suppressed), " under min_n = ", min_n, ")")
   result
 }

@@ -150,6 +150,19 @@ transfer block recovered as `overall_credits_attempted - inst_credits_attempted`
 at one instant and so immune to the freeze), with `timeline_valid` marking students whose UNM history
 predates the data window. `attach_credit_position()` joins it onto any event table.
 
+**These are attempted credits.** A failed or withdrawn course counts, here and elsewhere. That is
+the right figure for the attempted-credit ceiling and the wrong one to set against a degree's
+credits or against classification, which the registrar sets on earned hours: on attempted credits
+27% of Fall 2025's juniors read 90 or more, on earned credits 7%
+([ISSUES I91](../../ISSUES.md)). `opt$earned = TRUE` adds the earned position on the same rows:
+`unm_earned_entering` / `unm_earned_after` (credits completed here with a passing grade, from
+`cumulative_completed_unm_credits`), `transfer_earned` (`overall_credits_earned -
+inst_credits_earned`, recovered the same way), `transfer_earned_known` and `total_earned_entering` /
+`total_earned_after`. The earned pair is as stable as the attempted one (measured 2026-11-26 over
+81,179 students: one gap on every row for 90.9%, against 91.1%) and is present wherever the
+attempted pair is. Read a position against a degree's credits or a classification on the earned
+basis; read it against the 160-credit ceiling on the attempted one.
+
 Validated against the shared data: the reconstruction moves across a student's terms **100%** of the
 time (the frozen columns: 16%), and at a student's first term the frozen field overstates the
 position by a median of **84 credits** (117 vs 6), converging to 9 by term 8.
@@ -173,6 +186,10 @@ axes and reports the count as `timing_meta$n_truncated`, which the Pathways scop
 for **63.9%** of students with 3+ terms, so it is a genuine per-term field by the second reliability
 test and needs no cohort restriction. It is the default x-axis in Pathways → Course Timing for that
 reason. Prefer it unless the question is specifically about credit progress.
+
+**Its meaning changed from Summer 2025** ([ISSUES I92](../../ISSUES.md)): from then on a student is
+placed a step lower than the same student was before, so a comparison by classification across that
+term compares two rules. Within a rule it is still a per-term field.
 
 **Every consumer has been migrated.** None of them falls back to the banned fields when
 `student_terms` is absent — they return NA and say so, because a missing number is visible downstream

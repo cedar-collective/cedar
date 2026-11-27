@@ -24,6 +24,23 @@ test_that("a shared result is built once, and a failed build is not kept", {
   expect_error(cedar_shared_result(list("page"), build(1), cache = NULL), "needs the app's cache")
 })
 
+test_that("a built result its caller declines to keep is handed back and built again", {
+  cache <- cachem::cache_mem()
+  builds <- 0L
+  build <- function(value) function() { builds <<- builds + 1L; value }
+  # A result that lost a part: this reader gets it, the next reader builds.
+  expect_equal(cedar_shared_result(list("page", "UG"), build("in part"), cache, keep = function(value) FALSE), "in part")
+  expect_equal(cedar_shared_result(list("page", "UG"), build("whole"), cache, keep = function(value) TRUE), "whole")
+  expect_equal(cedar_shared_result(list("page", "UG"), build("again"), cache, keep = function(value) FALSE), "whole")
+  expect_equal(builds, 2L)
+  # `keep` sees the built value.
+  expect_equal(cedar_shared_result(list("page", "GR"), build(list(whole = FALSE)), cache,
+                                   keep = function(value) value$whole), list(whole = FALSE))
+  expect_equal(cedar_shared_result(list("page", "GR"), build(list(whole = TRUE)), cache,
+                                   keep = function(value) value$whole), list(whole = TRUE))
+  expect_equal(builds, 4L)
+})
+
 test_that("a preload builds each job once, in order, and a job that fails stops nothing", {
   cache <- cachem::cache_mem()
   waits <- numeric(0)
@@ -58,4 +75,45 @@ test_that("a preload builds each job once, in order, and a job that fails stops 
   expect_equal(cedar_preload_shared_results(list(), schedule = function(...) stop("nothing to schedule")), 0L)
   expect_error(cedar_preload_shared_results(list(list(key = "page", build = function() 1)), schedule = at_once),
                "jobs of list(key, build)", fixed = TRUE)
+})
+
+test_that("a preload makes a job when its turn comes, and stores what the job says to keep", {
+  cache <- cachem::cache_mem()
+  at_once <- function(callback, delay) callback()
+  made <- character(0)
+  job <- function(name, value, keep = NULL) {
+    c(list(key = list("page", name), build = function() value), if (!is.null(keep)) list(keep = keep))
+  }
+  jobs <- list(
+    job("list", c("B", "A")),
+    # Made after the job before it: its key is read off that job's result.
+    function() {
+      first <- cedar_shared_result(list("page", "list"), function() stop("built twice"), cache)[[1]]
+      made <<- c(made, first)
+      job(first, "later")
+    },
+    function() NULL,
+    function() stop("no such course"),
+    function() "not a job",
+    job("in part", "lost a part", keep = function(value) FALSE),
+    job("whole", "all of it", keep = function(value) TRUE)
+  )
+  log <- testthat::capture_messages(
+    expect_equal(cedar_preload_shared_results(jobs, schedule = at_once, cache = function() cache), 7L))
+  expect_equal(made, "B")
+  expect_equal(cedar_shared_result(list("page", "B"), function() stop("built twice"), cache), "later")
+  expect_equal(grepl("nothing to build", log, fixed = TRUE), c(FALSE, FALSE, TRUE, FALSE, FALSE, FALSE, FALSE))
+  expect_equal(grepl("failed: no such course", log, fixed = TRUE), c(FALSE, FALSE, FALSE, TRUE, FALSE, FALSE, FALSE))
+  expect_equal(grepl("failed: the job made is not list(key, build)", log, fixed = TRUE),
+               c(FALSE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE))
+  # A job that declines to keep its result stores nothing, and the log says so:
+  # the page builds it.
+  expect_equal(grepl("built without a part; not kept", log, fixed = TRUE),
+               c(FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, FALSE))
+  expect_match(log[[7]], "[preload] 7 of 7: page, whole: built (", fixed = TRUE)
+  expect_equal(cedar_shared_result(list("page", "in part"), function() "built by the page", cache), "built by the page")
+  expect_equal(cedar_shared_result(list("page", "whole"), function() stop("built twice"), cache), "all of it")
+  # Anything else in the list is refused before a job runs.
+  expect_error(cedar_preload_shared_results(list("not a job"), schedule = at_once, cache = function() cache),
+               "takes jobs of list\\(key, build\\)")
 })

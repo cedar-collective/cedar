@@ -643,6 +643,126 @@ filter_actions <- function(..., class = NULL) {
   div(class = classes, ...)
 }
 
+# ── The scope inputs of a page that lists sections ───────────────────────────
+# Campus, College, Term, Part of term, Department, Method and Level are the
+# same seven questions on Regstats, Open Seats, Waitlists, Low Enrollment,
+# Cancellations and Enrollment, asked of the same table with the same choices.
+# They are written once, here. A page names the fields it shows, in its own
+# order, and adds its own inputs and its run button beside them:
+#
+#   fluidRow(class = "explore-filter-row",
+#     cedar_section_scope_inputs(ns, "cn", sections, dept_choices, default_term),
+#     column(2, filter_actions(...)))
+#
+# An input's id is `<prefix>_<field>` under `ns`, which is what
+# CEDAR_SHARE_SPECS (R/trunk/url-state.R) restores a link into.
+#
+#   ns              the module's NS(id); `identity` on a page that is not a module.
+#   sections        cedar_sections: the choices are its values.
+#   dept_choices    the Department choices (codes, named or grouped by college).
+#   default_term    the term selected on open; NULL for none.
+#   fields          which inputs, in order (any of CEDAR_SECTION_SCOPE_FIELDS).
+#   widths, labels  named by field, to depart from the standard column width
+#                   (of 12) or label; leave a field out to keep the standard.
+#   level_selected  the levels selected on open; NULL for none (every level).
+# Returns a list of column() tags, one per field.
+CEDAR_SECTION_SCOPE_FIELDS <- c("campus", "college", "term", "pt", "dept", "im", "level")
+CEDAR_SECTION_SCOPE_WIDTHS <- c(campus = 2, college = 1, term = 2, pt = 1, dept = 2, im = 1, level = 1)
+CEDAR_SECTION_SCOPE_LABELS <- c(campus = "Campus", college = "College", term = "Term", pt = "PoT",
+                                dept = "Department", im = "Method", level = "Level")
+
+cedar_section_scope_inputs <- function(ns, prefix, sections, dept_choices,
+                                       default_term = NULL,
+                                       fields = CEDAR_SECTION_SCOPE_FIELDS,
+                                       widths = NULL, labels = NULL,
+                                       level_selected = "lower") {
+  unknown <- setdiff(fields, CEDAR_SECTION_SCOPE_FIELDS)
+  if (length(unknown) > 0 || anyDuplicated(fields) > 0) {
+    stop("cedar_section_scope_inputs(): fields are distinct names from ",
+         paste(CEDAR_SECTION_SCOPE_FIELDS, collapse = ", "), "; got ",
+         paste(fields, collapse = ", "), ".")
+  }
+  for (given in list(widths, labels)) {
+    stray <- setdiff(names(given), fields)
+    if (length(given) > 0 && (is.null(names(given)) || length(stray) > 0)) {
+      stop("cedar_section_scope_inputs(): widths and labels are named by a field being shown (",
+           paste(fields, collapse = ", "), ").")
+    }
+  }
+  source_cols <- c(campus = "campus", college = "college", term = "term", pt = "part_term",
+                   im = "delivery_method", level = "level")
+  needed <- unique(c(source_cols[intersect(fields, names(source_cols))],
+                     if ("term" %in% fields) "term_type"))
+  missing_cols <- setdiff(needed, names(sections))
+  if (length(missing_cols) > 0) {
+    stop("cedar_section_scope_inputs() needs sections column(s): ",
+         paste(missing_cols, collapse = ", "))
+  }
+  pick <- function(given, standard, field) {
+    if (field %in% names(given)) given[[field]] else standard[[field]]
+  }
+  col_width <- function(field) pick(widths, CEDAR_SECTION_SCOPE_WIDTHS, field)
+  col_label <- function(field) pick(labels, CEDAR_SECTION_SCOPE_LABELS, field)
+  values_of <- function(field) sort(unique(sections[[source_cols[[field]]]]))
+
+  input_for <- function(field) {
+    id <- ns(paste0(prefix, "_", field))
+    choices <- switch(field,
+      term = sort(unique(c(sections$term_type, sections$term)), decreasing = TRUE),
+      dept = dept_choices,
+      values_of(field))
+    selected <- switch(field,
+      campus = cedar_campus_default(sections),
+      term   = if (!is.null(default_term)) as.character(default_term),
+      level  = level_selected,
+      NULL)
+    selectizeInput(id, col_label(field), multiple = TRUE, choices = choices, selected = selected)
+  }
+  lapply(fields, function(field) column(col_width(field), input_for(field)))
+}
+
+# ── Folded thresholds ────────────────────────────────────────────────────────
+# A page's thresholds are a reader's adjustment, not a filter: they stay folded
+# under one line that says whether the standard values are in force, so a
+# shared link that changed one is visible while closed (ISSUES M43). A link
+# still restores them: hidden inputs keep binding.
+#   state_id  the id (ns() applied) of the line's state, a text output the
+#             server fills with cedar_threshold_state().
+#   ...       the row's columns, one per threshold input.
+cedar_threshold_fold <- function(state_id, ..., title = "Adjust thresholds") {
+  tags$details(
+    class = "cedar-scope-details cedar-threshold-details",
+    tags$summary(
+      tags$span(class = "filter-context-title", title),
+      tags$span(class = "cedar-scope-details-hint", textOutput(state_id, inline = TRUE))
+    ),
+    fluidRow(...)
+  )
+}
+
+# What the closed line says: "standard values", or each value that differs
+# from its standard one, in `labels` order.
+#   values    the inputs' values, named like `labels`; a blank one (NULL or
+#             NA) is not a change.
+#   standard  the standard value of each, named alike.
+#   labels    each threshold's name for a reader.
+cedar_threshold_state <- function(values, standard, labels) {
+  unknown <- setdiff(names(labels), names(standard))
+  if (is.null(names(labels)) || length(unknown) > 0) {
+    stop("cedar_threshold_state(): every label is named by a threshold with a standard value",
+         if (length(unknown) > 0) paste0(" (none for ", paste(unknown, collapse = ", "), ")"), ".")
+  }
+  changed <- Filter(function(key) {
+    value <- values[[key]]
+    length(value) == 1 && !is.na(value) &&
+      !isTRUE(all.equal(as.numeric(value), as.numeric(standard[[key]])))
+  }, names(labels))
+  if (length(changed) == 0) return("standard values")
+  paste0("changed: ", paste(vapply(changed, function(key) sprintf(
+    "%s %s (standard %s)", labels[[key]], values[[key]], standard[[key]]), character(1)),
+    collapse = "; "))
+}
+
 # Light green scope strip shown at the bottom of a filter bar.
 filter_scope_stripe <- function(...) {
   div(class = "filter-scope-strip", ...)
@@ -1303,11 +1423,17 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   }
 
   // An autorun URL can reveal the overlay from the early <head> script before
-  // Shiny connects. Adopt that already-visible overlay once the DOM is ready so
-  // its later completion message can always finalize and dismiss it.
+  // Shiny connects, and a page that loads on open renders it visible. Adopt
+  // that already-visible overlay once the DOM is ready: it says what one opened
+  // by a button says (the estimate, then how long it has been working), and its
+  // later completion message can always finalize and dismiss it. The estimate
+  // is the one embedded when the app started: Shiny is not connected yet, and
+  // a request for current values would be answered only as the wait ends.
   document.addEventListener("DOMContentLoaded", function() {
     var box = el("-loading-overlay");
-    if (box && box.style.display !== "none") beginMeasurement();
+    if (!box || box.style.display === "none") return;
+    beginMeasurement();
+    startWaiting();
   });
 
   // Track only output values belonging to this overlay. This approximates the
@@ -1396,10 +1522,30 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
   var ORIG = { expected: EXPECTED, cached: CACHED, expectedRange: EXPECTED_RANGE, cachedRange: CACHED_RANGE };
   var activeReport = REPORT_TYPE, activeFreshDefault = FRESH_DEFAULT, activeCachedDefault = CACHED_DEFAULT;
   var elapsedTimer = null;
+
+  // What every wait shows, however the overlay was opened: the label with its
+  // estimate, and how long it has been working, so a wait is never a blank
+  // screen.
+  function startWaiting() {
+    if (!el("-loading-overlay")) return;
+    el("-loading-label").textContent = loadingLabel();
+    el("-timing-msg").textContent = "";
+    clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(function() {
+      if (runStartedAt === null) return;
+      var s = Math.round((performance.now() - runStartedAt) / 1000);
+      if (s >= 2) el("-timing-msg").textContent = "Working for " + s + "s";
+    }, 1000);
+  }
+
   function showOverlay(label, reportType, freshDefault) {
     customLabel = (typeof label === "string" && label) ? label : null;
     clearTimeout(hideTimer);
     clearTimeout(finalizeTimer);
+    // A run that starts as the one before it ends (At a Glance runs three in a
+    // row behind one overlay): record the finished run now. Left pending, its
+    // finish would land a moment later and hide the overlay under the new run.
+    if (measurementActive && completionMsg) finalizeMeasurement(true);
     beginMeasurement();
     if (typeof reportType === "string" && reportType && reportType !== REPORT_TYPE) {
       activeReport = reportType;
@@ -1423,19 +1569,17 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     }
     var box = el("-loading-overlay");
     if (!box) return;
-    el("-loading-label").textContent = loadingLabel();
-    el("-timing-msg").textContent = "";
-    // How long it has been working, so a wait is never a blank screen.
-    clearInterval(elapsedTimer);
-    elapsedTimer = setInterval(function() {
-      if (runStartedAt === null) return;
-      var s = Math.round((performance.now() - runStartedAt) / 1000);
-      if (s >= 2) el("-timing-msg").textContent = "Working for " + s + "s";
-    }, 1000);
-    box.style.opacity = "0";
-    box.style.display = "flex";
-    box.style.transition = "opacity 0.2s ease";
-    box.offsetWidth;
+    startWaiting();
+    // Fade in only an overlay that was closed: one still open for the run
+    // before stays as it is, with the new label.
+    if (box.style.display === "none") {
+      box.style.opacity = "0";
+      box.style.display = "flex";
+      box.style.transition = "opacity 0.2s ease";
+      box.offsetWidth;
+    } else {
+      box.style.transition = "";
+    }
     box.style.opacity = "1";
   }
 
@@ -1471,7 +1615,9 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     });
   }
 
-  function finalizeMeasurement() {
+  // keepOpen: record the finished run and leave the overlay as it is, for the
+  // run that is starting behind it.
+  function finalizeMeasurement(keepOpen) {
     if (!measurementActive || !completionMsg || runStartedAt === null) return;
     clearTimeout(finalizeTimer);
     var totalSec = Math.max((performance.now() - runStartedAt) / 1000, 0);
@@ -1502,6 +1648,7 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
       }, {priority: "event"});
     }
 
+    if (keepOpen === true) { stopMeasurement(); return; }
     var verb = completionMsg.cached === true ? "Loaded from cache"
              : completionMsg.cached === false ? "Generated"
              : "Loaded";
@@ -1536,7 +1683,8 @@ cedar_loading_overlay <- function(id, run_button = NULL, ..., emoji = "\U0001f33
     hideTimer = setTimeout(function() {
       box.style.transition = "opacity 0.4s ease";
       box.style.opacity = "0";
-      setTimeout(function() {
+      // Held in hideTimer too, so a run that starts mid-fade cancels the hide.
+      hideTimer = setTimeout(function() {
         box.style.display = "none";
         box.style.transition = "";
         box.style.opacity = "1";
@@ -1598,22 +1746,32 @@ cedar_with_loading <- function(session, id, expr, label = NULL, report_type = NU
 # not, so the next read tries again; and nothing here can store a failed req(),
 # which bindCache() does and which left a page blank for every session (I75).
 # `key` is every input that changes the result, with the result's name first.
-cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache")) {
+# `keep` is asked of a built value: FALSE hands it to this session and stores
+# nothing, for a result that lost a part to a caught error (the session sees
+# what there is and the error; the next reader builds it whole).
+cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache"),
+                                keep = function(value) TRUE) {
   if (is.null(cache)) stop("[ui-helpers.R] cedar_shared_result() needs the app's cache.", call. = FALSE)
   hash <- cedar_content_hash(key)
   held <- cache$get(hash)
   # cachem is shiny's own cache package; its marker tells a miss from a stored value.
   if (!cachem::is.key_missing(held)) return(held)
   value <- build()
-  if (!is.null(value)) cache$set(hash, value)
+  if (!is.null(value) && isTRUE(keep(value))) cache$set(hash, value)
   value
 }
 
 # Build shared results ahead of their first reader, in the background once the
 # app is running. `jobs` is a list of list(key, build), each as
-# cedar_shared_result() takes them; a page's module makes its jobs with the
-# same function its reactives call, so a result built ahead is the one the
-# page asks for (graduation_preload_jobs() is the pattern).
+# cedar_shared_result() takes them (with `keep`, where the page passes one); a
+# page's module makes its jobs with the same function its reactives call, so a
+# result built ahead is the one the page asks for (graduation_preload_jobs()
+# is the pattern).
+#
+# A job whose key waits on an earlier job's result is given as a function that
+# returns the job, and is made when its turn comes (a course's later course is
+# read off its list of later courses, built by the job before). A function
+# that returns NULL has nothing to build. One that fails is a job that failed.
 #
 # R answers one request at a time, so the jobs do not run in one piece: the
 # first waits `start_after` seconds from the moment the event loop starts, so
@@ -1627,21 +1785,35 @@ cedar_shared_result <- function(key, build, cache = shiny::getShinyOption("cache
 cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedule = later::later,
                                          cache = function() shiny::getShinyOption("cache")) {
   is_job <- function(job) is.list(job) && is.list(job$key) && length(job$key) > 0L && is.function(job$build)
-  if (!all(vapply(jobs, is_job, logical(1)))) {
-    stop("[ui-helpers.R] cedar_preload_shared_results() takes jobs of list(key, build).", call. = FALSE)
+  if (!all(vapply(jobs, function(job) is.function(job) || is_job(job), logical(1)))) {
+    stop("[ui-helpers.R] cedar_preload_shared_results() takes jobs of list(key, build), ",
+         "or functions that return one.", call. = FALSE)
   }
   if (length(jobs) == 0L) return(invisible(0L))
   run <- function(i) {
-    job <- jobs[[i]]
-    parts <- vapply(job$key, function(k) paste(k, collapse = "+"), character(1))
-    label <- paste(parts[nzchar(parts)], collapse = ", ")
+    # Each line says where the run is, so the log shows when it finished.
+    place <- sprintf("%d of %d", i, length(jobs))
+    label <- "a job made in its turn"
     started <- Sys.time()
     built <- FALSE
     outcome <- tryCatch({
-      value <- cedar_shared_result(job$key, function() { built <<- TRUE; job$build() }, cache())
-      if (is.null(value)) "the build returned nothing; not kept" else if (built) "built" else "already built"
+      job <- jobs[[i]]
+      if (is.function(job)) job <- job()
+      if (is.null(job)) "nothing to build" else {
+        if (!is_job(job)) stop("the job made is not list(key, build)")
+        parts <- vapply(job$key, function(k) paste(k, collapse = "+"), character(1))
+        label <- substr(paste(parts[nzchar(parts)], collapse = ", "), 1L, 160L)
+        keep <- job$keep %||% function(value) TRUE
+        kept <- TRUE
+        value <- cedar_shared_result(job$key, function() { built <<- TRUE; job$build() }, cache(),
+                                     keep = function(value) { kept <<- isTRUE(keep(value)); kept })
+        if (is.null(value)) "the build returned nothing; not kept"
+        else if (!built) "already built"
+        else if (kept) "built"
+        else "built without a part; not kept"
+      }
     }, error = function(e) paste("failed:", conditionMessage(e)))
-    message(sprintf("[preload] %s: %s (%.1fs)", label, outcome,
+    message(sprintf("[preload] %s: %s: %s (%.1fs)", place, label, outcome,
                     as.numeric(difftime(Sys.time(), started, units = "secs"))))
     if (i < length(jobs)) schedule(function() run(i + 1L), gap)
   }
@@ -1649,6 +1821,17 @@ cedar_preload_shared_results <- function(jobs, start_after = 10, gap = 1, schedu
   # the first job is counted from there, not from this call during startup.
   schedule(function() schedule(function() run(1L), start_after), 0)
   invisible(length(jobs))
+}
+
+# An error a page caught: told to the reader and written to the log. The
+# notice closes by itself, so without the log line a page left empty by a
+# caught error leaves nothing to find afterwards (ISSUES I85). Where there is
+# no session to tell (a result built ahead at start), the log line is all.
+cedar_notify_caught <- function(what, e, type = "error", duration = 10) {
+  message("[caught] ", what, ": ", conditionMessage(e))
+  if (!is.null(shiny::getDefaultReactiveDomain())) {
+    showNotification(paste0(what, ": ", conditionMessage(e)), type = type, duration = duration)
+  }
 }
 
 signal_load_complete <- function(session, id, duration_sec = NULL,

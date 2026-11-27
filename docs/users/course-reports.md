@@ -67,7 +67,7 @@ A topic taught by one instructor in a term is that instructor's course, so its D
 ## Section Plan
 
 The published plan for this course in each term CEDAR has projected, read from
-the same saved projection as **Registration → Projections → Plan**. One block per
+the same saved projection as **Courses → Projections → Plan**. One block per
 projected term (a Fall and a Spring are both current) shows the sections to
 schedule, the registrations they are sized for, each step that built the number
 from last year's class list, the recent same-season evidence, and how close

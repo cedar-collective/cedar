@@ -24,6 +24,7 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 | Enrollment projections: the contract | [enrollment-projections.md](docs/developers/enrollment-projections.md), [forecasting-lessons.md](docs/developers/forecasting-lessons.md) |
 | Degree Explorer and the catalog tooling | [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md), [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md) |
 | Running tests, fixtures, environments | [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md) |
+| Where a slow page's time goes; profiling a session or a cone; which times a test holds | [performance-monitoring.md](docs/developers/performance-monitoring.md) |
 | The synthetic institution | [synthetic-institution.md](docs/developers/synthetic-institution.md) |
 
 ---
@@ -31,10 +32,10 @@ Open-source Shiny analytics platform for higher-ed curriculum, enrollment and st
 ## Architecture Layers
 
 ```
-app.R          — 3 lines: loads ui/server, calls shinyApp()
-global.R       — data loading, library loading, load_funcs()
+global.R       — runs once at start: data loading, library loading, load_funcs()
 ui.R           — page_navbar() structure; mounts module UIs
-server.R       — module wiring + legacy inline handlers
+server.R       — module wiring + legacy inline handlers; its last line hands
+                 Shiny the function global.R compiled
 R/lists/       — static constants and the readers of the institution files
 R/trunk/       — pure infrastructure (filter, utils, cache, logging, data I/O)
 R/branches/    — reusable CEDAR domain computations
@@ -166,6 +167,7 @@ The classifier is **`classify_enrollment_outcomes()`** (`R/trunk/utils.R`); `cla
 
 - **Current enrollment is never hidden** from descriptive charts; it is labelled. SCH is attempted hours at census (`filter_sch_rows()`).
 - A term counts as settled by pull date against its start, never by comparing row counts to prior years. An edge that cannot be determined is `NULL` and fails closed; startup stops without the settled and graded edges. Say which edge you used (`cedar_edge_note()`).
+- **A student's or a group's own latest term is not an edge:** mark the line `MAX-TERM-OK:` with the reason. `test-architecture.R` counts every `max(term)` and `slice_max(term)` without one (M3).
 - **Longitudinal follow-up** (retention, persistence, flows, sequences) stops at `last_enrolled_complete`, or `cedar_longitudinal_edge(edges, grade_dependent = TRUE)` when it reads a grade. Never let a partial term into a cohort, denominator or cache key.
 - **A row with no posted grade is unknown, never a failure.** Filter to `last_graded` before classifying; no catch-all `TRUE ~ "failed"`.
 - **An A→B analysis needs an opportunity edge:** drop A rows whose follow-up term is past `last_enrolled_complete`, report how many, and keep that separate from B's outcome edge.
@@ -242,7 +244,7 @@ Every new tab is a module (`R/modules/pathways.R` is the full pattern, `headcoun
 - An Explore tool modeled on Open Seats or Regstats copies the whole run pattern: overlay, report timer, `*_load_complete` message, URL copy, autorun.
 - **A run button waits for what it needs:** disabled, with a hint, until its inputs hold a value (`cedar_requires()`); one that waits on server state, such as a defined population, is set with `updateActionButton(disabled =)`. The server's own check stays as the last guard.
 - **A result shared across sessions is read through `cedar_shared_result()`** inside a plain reactive, after its `req()`; never `bindCache(..., cache = "app")`, which keeps a failed `req()` for every session until a restart (ISSUES I75; `test-architecture.R` fails on one).
-- **A page everyone opens on the same view, with a slow first build, is built ahead**: its module makes each shared result as a job (a key and a build) in one function, read by its reactive and by `cedar_preload_shared_results()` (called from `global.R`), so the result built ahead is the one the page asks for. Nothing is saved to disk ([built ahead](docs/developers/shiny-modules.md#results-shared-by-every-session-and-built-ahead)).
+- **A page everyone opens on the same view, with a slow first build, is built ahead**: its module makes each shared result as a job (a key and a build) in one function, read by its reactive and by `cedar_preload_shared_results()` (called from `global.R`), so the result built ahead is the one the page asks for. Course Dynamics > Downstream is built ahead the same way for the courses analysed most: a key, a build or what a control opens on changes in the job function, never beside it. Nothing is saved to disk ([built ahead](docs/developers/shiny-modules.md#results-shared-by-every-session-and-built-ahead)).
 - **Input values match data values**: level is `"lower"`/`"upper"`/`"grad"`; map labels to values in the server.
 - **Tables are interfaces**: pick an explicit display-column order in the module.
 - Shared UI helpers and CSS classes only; no inline `style =` or one-off classes.
@@ -275,6 +277,8 @@ if (!"dept_code" %in% names(df)) stop("dept_code column required")    # right
 
 There is one canonical way to count each thing: census `add_census_enrl()`; DFW counts and rates `summarize_attempt_outcomes()` over `attempt_outcome_flags()` (`get_course_outcome_rates()` for a course page), with `classify_enrollment_outcomes()` only where no `cedar_attempts` exists (M53); term type `add_term_type_col()`; enrollment history `summarize_term_enrl_series()` / `format_term_history()`; a rate's trend across terms `compute_rate_trend()`. Shared visuals (sparklines, fill bars, badges) live in `R/modules/ui-helpers.R`. Duplicated logic is consolidated up a layer, never copied sideways.
 
+**A backlog is held by a ratchet.** Where the code does not yet meet a rule everywhere (inline styles, bare headings, hex colours in R, an unmarked `max(term)`, a DFW count divided by hand, a student scope written by hand, a reader classifying the class list, silent fallbacks), `test-architecture.R` holds each file's count, which may only go down. Write the new one the way the rule says; lower the number when you remove one; never raise it ([ratchets](docs/developers/testing.md#a-backlog-held-by-a-ratchet)).
+
 **Numbers.** Round for display only, once, in the display adapter. Counts whole, percentages one decimal, GPA and means two, SMDs three; more when the default would collapse a reported difference. Missing values show as an em dash. Identifiers (terms, CRNs, IDs, course numbers) get no separators or decimals. Don't apply one formatter to different kinds of column.
 
 **Style.** Bare function names for attached packages; a namespace only to disambiguate or flag an unusual dependency. Cone functions under ~150 lines, cone files under ~500, module servers under ~300. **No new dependencies without explicit approval.**
@@ -289,36 +293,28 @@ All test data is in `tests/testthat/fixtures/`. `designed_test_data.R` **is** th
 
 - Expected values are committed after running against fixtures; if one changes, investigate before updating it.
 - Domain rows belong in the shared fixture; one function's intermediate frames are fixed objects in `fixtures/scenario_tables.R`, with documented expectations.
-- **A fixture too simple to express the bug gives a test that passes forever.** Reintroduce the bug and confirm the test fails before trusting it; mandatory for any guard on a join key, grouping grain or dedup.
+- **A fixture too simple to express the bug gives a test that passes forever.** Reintroduce the bug and confirm the test fails before trusting it (`scripts/check-test-catches.R` breaks a copy of the tree, never the checkout, and says which test failed); mandatory for any guard on a join key, grouping grain or dedup.
 - **One layer per fact.** A calculation is tested at its branch or cone on the fixtures; a view builder for its own transformations only; the page's words with `expect_snapshot()` (the file under `tests/testthat/_snaps/` is committed, and a wording change is accepted with `testthat::snapshot_accept()` and reviewed as a diff); wiring and visibility in the browser. Never pin a sentence with `expect_match()` or a pasted string, and never assert a function exists when the next line calls it.
 - **A test file holds `test_that()` blocks only, and every table a test reads is a fixed object, never a function.** Rows that enter the system are in `designed_test_data.R`; a table one test file reads (a frame typed by hand as one function's input, or a population or attempts table derived from the fixtures) is an object in `tests/testthat/fixtures/scenario_tables.R`, built once by `setup.R`. `tests/testthat/helper-*.R` holds what a test does (run the function under test, stamp a stated series on a fixed row, write a temporary file) and never types a table; a test that needs a table different states the change in its own body. Scenario edges are in `helper-scenario-edges.R` and packages in `helper-load-functions.R`. `test-architecture.R` enforces each ([testing.md](docs/developers/testing.md#where-test-code-lives)).
-- **Never write custom testing scripts** (scratch runners, probes, ad-hoc smoke tests). The entry points are the gates below, `testthat::test_file()` / `test_dir()` on committed files, and `tests/e2e/`. Exploratory diagnostics stay in the session scratchpad.
+- **Never write custom testing scripts** (scratch runners, probes, ad-hoc smoke tests). The entry points are the gates below, `testthat::test_file()` / `test_dir()` on committed files, `scripts/check-test-catches.R`, and `tests/e2e/`. Exploratory diagnostics stay in the session scratchpad.
 
 | Change | Required checks |
 |---|---|
 | Calculation or data contract | focused R tests while editing; `./run-tests.sh` when finished |
 | UI, routing, module wiring | the R gate plus `./run-tests.sh --e2e <suite>` for the changed behavior; look at layout changes |
 | `global.R`, or a validator that can stop startup | also `bash scripts/dev.sh up && ./run-tests.sh --e2e demo` |
+| What the app or a session does as it starts (`global.R`, `entrypoint.sh`, the last line of `server.R`, `connect()`) | also `./run-tests.sh --all --fresh`: every other browser run meets a process already in use |
 | A grouping grain or join key | also a real-data check (`scripts/cedar-repl.R`): fixtures are often single-valued on the axis you changed |
 | Release candidate or major pipeline change | `./run-tests.sh --all` |
 | Documentation or presentation only | check links or appearance |
 
 `./run-tests.sh --changed` picks stages from the diff; it selects, it never certifies. When reporting, name the exact command, pass/fail counts, skips, whether Chrome and the app came up, and whether the image was rebuilt.
 
-**Gotchas that cost an hour each:**
+**Running them.** R tests run as `Rscript --vanilla` from the repository root: CEDAR is not a package, and **module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`), so a module change is parsed, rendered and looked at. A browser suite runs through `./run-tests.sh --e2e <suite>` against an app serving the source under test: **the image bakes source with `COPY`**, so rebuild it or mount the checkout, and check `docker ps`. One CEDAR app, one port (3838). One heavy job at a time on a development machine.
 
-- **`--vanilla` is required**; CEDAR is not a package (`devtools::test()` fails). Data files are **qs2**, not qs.
-- Host path `/Users/fwgibbs/Dropbox/projects/cedar-project/cedar`; in the container, `/srv/shiny-server/cedar` (not `/srv/shiny-server`).
-- **The container bakes source with `COPY`**: a running container has old code until rebuilt. Check `docker ps`.
-- One CEDAR app, one port (3838): the synthetic and institutional stacks are alternatives.
-- **Module code is not loaded by the R suite** (`load_funcs(..., modules = FALSE)`; `helper-load-functions.R` sources three module files for their pure helpers and no test file sources one): parse, render and look.
-- Dependencies go through `scripts/r-environment.R`, never a bare renv call; never `renv::deactivate()`.
-- Don't `source("setup.R")` from outside `tests/testthat`, `source("global.R")`, or hand-source modules. After a failing run, `rm -rf tests/testthat/_problems tests/testthat/testthat-problems.rds`.
-- Real-data checks: `Rscript --vanilla -e 'source("scripts/cedar-repl.R"); nrow(cedar_registrations)'`.
+Never: `source("global.R")`; `source("setup.R")` from outside `tests/testthat`; hand-source a module; call renv directly (`scripts/r-environment.R`) or `renv::deactivate()`; `sleep()` in a test (`waitForIdle()` / `runAndWait()` in a browser suite, a bounded poll in R); touch a page before `connect()` returns; edit a file a run is reading.
 
-**E2E rules** (`tests/e2e/lib.mjs` solves each): after a rebuild, run a suite through `./run-tests.sh --e2e <suite>`, not bare `node`, so the home-page warm-up is the process's first session (I75); never `sleep()`, use `waitForIdle()` / `runAndWait()`; let `connect()` settle before touching inputs; `checkVisibility()`, not `offsetParent`; run `node tests/e2e/check-ids.mjs` for selector rot. `connect(page, { tab })` takes options; scope with `queryActive()`; module ids are namespaced.
-
-Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
+A failure that does not name its cause is in [traps, by symptom](docs/developers/testing.md#traps-by-symptom). Full reference: [testing.md](docs/developers/testing.md), [e2e-testing.md](docs/developers/e2e-testing.md).
 
 **Text-first previews.** A computation-heavy feature gets a committed text formatter over its payload before its Shiny surface. Tests and UI consume the typed payload, never the text. It is computational evidence, not UI evidence.
 
@@ -333,7 +329,7 @@ The full contract and the one summary of its rules: [enrollment-projections.md](
 - **Selection is rolling and published accuracy is out of sample.** A challenger replaces the prior same-season spine only by beating it on earlier aftcasts.
 - **The pressure bump and feeder adjustment change the plan, never the forecast or its accuracy.**
 - **Shiny never fits a model:** it reads validated bundles (`load_enrollment_projection_bundle()`), one per season.
-- `model_version` changes for calculation; `schema_version` for shape. **Editing any model-source file rebuilds both bundles on deploy**; page text belongs in `R/features/enrollment-projection-view.R`.
+- `model_version` changes for calculation; `schema_version` for shape. **Editing any model-source file rebuilds both bundles on deploy** (`./run-tests.sh --changed` and the pull-request check named `Deploy: …` say when a diff does; `R/trunk/utils.R` is one, so a helper no projection reads goes in another file); page text belongs in `R/features/enrollment-projection-view.R`.
 - Named populations come from `CEDAR_POPULATION_GROUPS`; run `population_group_audit()` when adding one.
 
 ## Degree Explorer and the catalog tooling

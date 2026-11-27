@@ -265,38 +265,16 @@ cedar_home_ui <- function() {
 
     tags$section(
       class = "cedar-home-section",
-      tags$h2("Analysis Workspaces"),
+      tags$h2("Courses"),
       div(
-        class = "cedar-home-grid cedar-home-grid--dept",
-        cedar_home_card(
-          "Student Pathways",
-          "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
-          "?tab=pathways",
-          "route",
-          "Best for curriculum and student-progress questions."
-        ),
-        cedar_home_card(
-          "Degree Explorer",
-          "A degree's catalog plan, semester by semester, with each course's prerequisites and enrollment history.",
-          "?tab=degree-explorer",
-          "graduation-cap",
-          "Best for seeing the route a degree lays out."
-        ),
+        class = "cedar-home-grid cedar-home-grid--top",
         cedar_home_card(
           "Course Dynamics",
           "Enrollment trends, student flows, grade distributions, and outcomes for a single course.",
           "?tab=course-dynamics",
           "chart-line",
           "Best for course-level questions."
-        )
-      )
-    ),
-
-    tags$section(
-      class = "cedar-home-section",
-      tags$h2("Registration Tools"),
-      div(
-        class = "cedar-home-grid cedar-home-grid--top",
+        ),
         cedar_home_card(
           "Regstats",
           "Registration signals for pressure points, drops, waitlists, and downstream course demand.",
@@ -315,6 +293,46 @@ cedar_home_ui <- function() {
           "Course waitlist demand by term, campus, level, department, and part of term.",
           "?tab=waitlists",
           "clipboard-list"
+        ),
+        cedar_home_card(
+          "Projections",
+          "Sections to plan for each course next term, the registrations they are sized for, and how close past forecasts came.",
+          "?tab=projections",
+          "bullseye"
+        ),
+        cedar_home_card(
+          "Low Enrollment",
+          "Sections running under the enrollment expected for their level, and scheduled courses that have run small.",
+          "?tab=low-enrollment",
+          "exclamation-triangle"
+        ),
+        cedar_home_card(
+          "Cancellations",
+          "Review canceled courses by term, campus, department, and course level.",
+          "?tab=cancellations",
+          "ban"
+        )
+      )
+    ),
+
+    tags$section(
+      class = "cedar-home-section",
+      tags$h2("Pathways"),
+      div(
+        class = "cedar-home-grid cedar-home-grid--dept",
+        cedar_home_card(
+          "Student Pathways",
+          "Build a student population and examine timing, sequences, roadblocks, major movement, and outcomes.",
+          "?tab=pathways",
+          "route",
+          "Best for curriculum and student-progress questions."
+        ),
+        cedar_home_card(
+          "Degree Explorer",
+          "A degree's catalog plan, semester by semester, with each course's prerequisites and enrollment history.",
+          "?tab=degree-explorer",
+          "graduation-cap",
+          "Best for seeing the route a degree lays out."
         )
       )
     ),
@@ -326,7 +344,7 @@ cedar_home_ui <- function() {
         class = "cedar-home-grid cedar-home-grid--explore",
         cedar_home_card(
           "Enrollment",
-          "Section and course enrollment views with low-enrollment review.",
+          "Seats and enrollment for the sections you choose, and which courses are growing or shrinking.",
           "?tab=enrollment",
           "table",
           "Best for schedule review and section-level questions."
@@ -350,14 +368,8 @@ cedar_home_ui <- function() {
           "percent"
         ),
         cedar_home_card(
-          "First Year",
-          "How much of each entering class is still here after its first semesters, by how the students entered.",
-          "?tab=first-year",
-          "seedling"
-        ),
-        cedar_home_card(
           "Retention",
-          "After the first year: whether students come back each semester and keep pace, which warning signs go with not returning, and where a DFW costs the most.",
+          "Whether students come back each semester and keep pace, each entering class from its first semesters on, which warning signs go with not returning, and where a DFW costs the most.",
           "?tab=retention",
           "user-check"
         ),
@@ -366,12 +378,6 @@ cedar_home_ui <- function() {
           "The end of the road: who leaves without a degree and how far along they were, the courses they never passed, and who finishes in the summer.",
           "?tab=graduation",
           "graduation-cap"
-        ),
-        cedar_home_card(
-          "Cancellations",
-          "Review canceled courses by term, campus, department, and course level.",
-          "?tab=cancellations",
-          "ban"
         )
       )
     ),
@@ -950,37 +956,14 @@ nav_panel(
   deptTrendsUI("dept_trends", cedar_sections, .dept_choices, cedar_current_term)
 ), # end department trends nav_panel
 
-# Pathways menu — how students move through courses and programs: the routes
-# they took (Student Pathways, population-aware) and the routes a degree lays
-# out (Degree Explorer, the catalog's semester plan).
+
+# Courses menu — everything looked up by course or section: one course's
+# history (Course Dynamics), the term being registered for (Regstats, Open
+# Seats, Waitlists, Projections) and the sections that were cancelled.
 nav_menu(
-  title = "Pathways",
-  icon  = icon("route"),
+  title = "Courses",
+  icon  = icon("book-open"),
 
-nav_panel(
-  title = "Student Pathways",
-  icon  = icon("users-line"),
-  pathwaysUI(
-    "pathways",
-    campus_choices = sort(unique(cedar_programs$student_campus[
-      !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
-    ])),
-    program_choices = cedar_pathways_choices$program_choices,
-    dept_choices = cedar_pathways_choices$dept_choices,
-    course_campus_choices = cedar_campus_choices(cedar_registrations)
-  )
-), # end Student Pathways nav_panel
-
-nav_panel(
-  title = "Degree Explorer",
-  icon = icon("graduation-cap"),
-  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status,
-    CEDAR_DEGREE_BOARDS$colleges)
-)
-
-), # end Pathways nav_menu
-
-# Course Dynamics tab — promoted from Explore
 nav_panel(
   title = "Course Dynamics",
   icon = icon("file-lines"),
@@ -995,7 +978,7 @@ nav_panel(
           label = "Campus",
           multiple = TRUE,
           choices  = sort(unique(cedar_sections$campus)),
-          selected = cedar_campus_default(cedar_sections)
+          selected = cedar_course_dynamics_campuses
         )
       ),
       column(4,
@@ -1146,7 +1129,7 @@ nav_panel(
         subtab_header(
           "Section Plan",
           "How many sections to schedule for this course in each projected term, and the registrations they are sized for. ",
-          "It is the course's row of Registration > Projections, read from the same saved projection.",
+          "It is the course's row of Courses > Projections, read from the same saved projection.",
           method = tags$p("Each plan opens to the steps that built the number and how close past forecasts came. A course outside the monitored groups, or screened out of a term, says so.")
         ),
         # The model pools ABQ and EA as one market (enrollment-projections.md,
@@ -1356,11 +1339,6 @@ nav_panel(
   ) # end Course Dynamics loading overlay
 ), # end course dynamics nav_panel
 
-# Registration dropdown menu
-nav_menu(
-  title = "Registration",
-  icon = icon("clipboard-list"),
-
   nav_panel(
     title = "Regstats",
     icon = icon("tachometer-alt"),
@@ -1383,8 +1361,50 @@ nav_menu(
     title = "Projections",
     icon = icon("bullseye"),
     enrollmentProjectionsUI("enrollment_projections")
-  ) # end projections nav_panel
-), # end Registration nav_menu
+  ), # end projections nav_panel
+
+  nav_panel(
+    title = "Low Enrollment",
+    icon = icon("exclamation-triangle"),
+    lowEnrollmentUI("low_enrollment", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ), # end low enrollment nav_panel
+
+  nav_panel(
+    title = "Cancellations",
+    icon = icon("ban"),
+    cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
+  ) # end cancellations nav_panel
+), # end Courses nav_menu
+
+# Pathways menu — how students move through courses and programs: the routes
+# they took (Student Pathways, population-aware) and the routes a degree lays
+# out (Degree Explorer, the catalog's semester plan).
+nav_menu(
+  title = "Pathways",
+  icon  = icon("route"),
+
+nav_panel(
+  title = "Student Pathways",
+  icon  = icon("users-line"),
+  pathwaysUI(
+    "pathways",
+    campus_choices = sort(unique(cedar_programs$student_campus[
+      !is.na(cedar_programs$student_campus) & nzchar(cedar_programs$student_campus)
+    ])),
+    program_choices = cedar_pathways_choices$program_choices,
+    dept_choices = cedar_pathways_choices$dept_choices,
+    course_campus_choices = cedar_campus_choices(cedar_registrations)
+  )
+), # end Student Pathways nav_panel
+
+nav_panel(
+  title = "Degree Explorer",
+  icon = icon("graduation-cap"),
+  degreeExplorerUI("degree_explorer", CEDAR_DEGREE_BOARDS$catalog, CEDAR_DEGREE_BOARDS$roadmaps, CEDAR_DEGREE_BOARDS$status,
+    CEDAR_DEGREE_BOARDS$colleges)
+)
+
+), # end Pathways nav_menu
 
 # Explore dropdown menu
 nav_menu(
@@ -1403,43 +1423,9 @@ nav_panel(
       "Enrollment",
       "Seats and enrollment for the sections you choose, from the first day of classes to the end of the term.",
     fluidRow(
-      column(2,
-             selectizeInput(
-               inputId = "enrl_campus",
-               label = "Campus",
-               multiple = TRUE,
-               choices  = sort(unique(cedar_sections$campus)),
-               selected = cedar_campus_default(cedar_sections)),
-      ),
-      column(1,
-             selectizeInput(
-               inputId = "enrl_college",
-               label = "College", 
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$college))),
-      ),
-      column(2,
-             selectInput(
-               inputId = "enrl_term",
-               label = "Term",
-               multiple = TRUE,
-               choices = sort(unique(c(cedar_sections$term_type,cedar_sections$term)), decreasing = TRUE),
-               selected = as.character(cedar_default_term)),
-      ),
-      column(1,
-             selectInput(
-               inputId = "enrl_pt",
-               label = "PoT",
-               multiple = TRUE,
-               choices = sort(unique(cedar_sections$part_term))),
-      ),
-      column(3,
-             selectizeInput(
-               inputId = "enrl_dept",
-               label = "Department",
-               multiple = TRUE,
-               choices = .dept_choices),
-      ),
+      cedar_section_scope_inputs(
+        identity, "enrl", cedar_sections, .dept_choices, cedar_default_term,
+        fields = c("campus", "college", "term", "pt", "dept"), widths = c(dept = 3)),
       column(1,
              selectizeInput(
                inputId = "enrl_subj",
@@ -1644,105 +1630,6 @@ nav_panel(
         reactable::reactableOutput("enrl_summary")
       ),
 
-      # Low enrollment — mode banner, summary cards, thresholds, then level sub-tabs
-      nav_panel(
-        title = "Low Enrollment",
-        value = "low_enrl",
-        icon = icon("exclamation-triangle"),
-
-        subtab_header(
-          "Low Enrollment",
-          "Sections running under the review thresholds, split by course level ",
-          "because the bar differs for each. Set the thresholds below to match your ",
-          "own review rule. For current and past terms this reports what enrollment ",
-          "actually was. A future term nobody has registered for gets a schedule ",
-          "check instead: each scheduled course against its own history, flagging ",
-          "what looks at risk. Once registration opens, it reports the registrations ",
-          "so far and says when they were pulled \u2014 the banner tells you which you are seeing."
-        ),
-
-        # Mode banner — shown when a future term triggers concerns mode
-        uiOutput("enrl_mode_banner"),
-
-        # Summary stat cards — shown above sub-tabs once data is gathered
-        uiOutput("low_enrl_summary"),
-
-        # Threshold controls and calculate button
-        div(style = "display: flex; align-items: flex-end; gap: 20px; padding: 4px 0 8px 0;",
-          span("Thresholds:", style = "font-weight: 600; color: var(--text-secondary); padding-bottom: 6px; white-space: nowrap;"),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_lower", "Lower div", value = 12, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_upper", "Upper div", value = 12, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_split", "Split-level", value = 10, min = 1, max = 100, step = 1)
-          ),
-          div(style = "width: 100px;",
-            numericInput("low_enrl_threshold_grad", "Graduate", value = 5, min = 1, max = 100, step = 1)
-          ),
-          conditionalPanel(
-            condition = "output.low_enrl_schedule_check !== 'true'",
-            div(style = "width: 100px;",
-              numericInput("low_enrl_min_enrl", "Min enrolled", value = 1, min = 0, max = 1000, step = 1)
-            )
-          ),
-          div(style = "padding-bottom: 6px;",
-            uiOutput("low_enrl_download_ui"))
-        ),
-
-        info_panel("How to read this table",
-          tags$p(tags$strong("Current / past terms (alerts mode):"), class = "mb-1"),
-          tags$ul(
-            tags$li(tags$strong("Sects"), " — number of active home sections of this course in the selected term."),
-            tags$li(tags$strong("Enrolled"), " — this section's own registered student count."),
-            tags$li(tags$strong("XL Total"), " — for crosslisted sections, the combined count across all partner sections; equals Enrolled for non-crosslisted courses."),
-            tags$li(tags$strong("Course Total"), " — sum of XL Total across all home sections of this course. Color-coded against the threshold.")
-          ),
-          tags$p(tags$strong("Schedule check (a future term with no registrations yet):"), class = "mt-2 mb-1"),
-          tags$ul(
-            tags$li(tags$strong("Sects"), " — number of scheduled home sections."),
-            tags$li(tags$strong("Hist Avg"), " — average combined enrollment over the course's last 4 same-season terms on the same campus. Color-coded against the threshold; a dash when there are none."),
-            tags$li(tags$strong("Trend"), " — ↑ up / ↓ down / ↔ stable based on linear regression slope across prior terms."),
-            tags$li(tags$strong("# Terms"), " — how many prior terms contributed to the average."),
-            tags$li(tags$strong("Prior History"), " — those terms' enrollment. A course with none lists its latest offerings in other seasons, on other campuses or as other topics; they never set the average.")
-          ),
-          tags$p(tags$strong("Color bands:"), " red = below 50% of threshold; yellow = 50–75%; blue = 75–100%; green = meets or exceeds threshold.", class = "mt-2"),
-          cedar_docs_link("users/enrollment-tab")
-        ),
-
-        navset_tab(
-          id = "low_enrl_tabs",
-          nav_panel(
-            title = "Lower",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_lower")
-          ),
-          nav_panel(
-            title = "Upper",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_upper")
-          ),
-          nav_panel(
-            title = "Split",
-            icon = icon("exclamation-triangle"),
-            br(),
-            p("Crosslisted courses that span the undergraduate/graduate boundary (at least one section ≤499 and one ≥500). The Sections column shows all partner courses in the group. Enrollment is the combined total.",
-              class = "cedar-body"),
-            reactable::reactableOutput("low_enrl_table_split")
-          ),
-          nav_panel(
-            title = "Graduate",
-            icon = icon("exclamation-triangle"),
-            br(),
-            reactable::reactableOutput("low_enrl_table_grad")
-          )
-        ) # end low_enrl navset_tab
-      ),
-
       # Filter-driven course trend explorer — single dept only
       # Level overview + top growing/declining course charts
       nav_panel(
@@ -1811,12 +1698,6 @@ nav_panel(
     ), # end DFW Rates nav_panel
 
     nav_panel(
-      title = "First Year",
-      icon = icon("seedling"),
-      firstYearUI("first_year", cedar_home_campuses)
-    ), # end First Year nav_panel
-
-    nav_panel(
       title = "Retention",
       icon = icon("user-check"),
       retentionDashboardUI("retention_dashboard", cedar_home_campuses)
@@ -1826,14 +1707,7 @@ nav_panel(
       title = "Graduation",
       icon = icon("graduation-cap"),
       graduationUI("graduation", cedar_home_campuses)
-    ), # end Graduation nav_panel
-
-    nav_panel(
-      title = "Cancellations",
-      icon = icon("ban"),
-      cancellationsUI("cancellations", cedar_sections, cedar_default_reg_term, .dept_choices)
-    ) # end cancellations nav_panel (was under Admin)
-
+    ) # end Graduation nav_panel
 
   ), # end Bird's Eye nav_menu
 
@@ -1991,7 +1865,7 @@ nav_panel(
 
       nav_panel(
         title = "Catalog Review",
-        catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
+        catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_DRAFTS)
       ),
 
       # ── Tab 2: Usage (lazy loaded) ─────────────────────────────────────

@@ -1,3 +1,30 @@
+# RT01: the sentence names the semester students come back least often after, and the semesters moving
+
+    Code
+      cat(retention_stage_sentence(st, "first_time", "fall"),
+      retention_stage_sentence(st, "transfer", "fall"), retention_stage_sentence(
+        steady, "first_time", "fall"), retention_stage_sentence(few, "first_time",
+        "fall"), retention_stage_sentence(spring_low, "first_time", "fall"), sep = "\n")
+    Output
+      First-time students came back least often after their 1st semester: in 3 of the 4 fall terms read. Their share coming back is falling after their 5th semester and rising after their 1st semester, and not clearly moving after the other 2.
+      Only transfer students' return after their 1st semester can be read. Their share coming back is not clearly rising or falling after any semester.
+      First-time students came back least often after their 1st semester: in 3 of the 4 fall terms read. Their share coming back is not clearly rising or falling after any semester.
+      First-time students came back least often after their 1st semester: in 3 of the 4 fall terms read. Too few fall terms are read to say whether their share is rising or falling after any semester.
+      First-time students came back least often after their 8th semester (those who started in a spring): in every one of the 4 fall terms read. Their share coming back is falling after their 5th semester and rising after their 1st semester, and not clearly moving after the other 2.
+
+# RT01: the dashboard as text carries each semester's line and who has none
+
+    Code
+      cat(lines[grepl("semester|no start", lines)], sep = "\n")
+    Output
+      First-time students, 1st semester: 82.0% in Fall 2023; rising.
+      First-time students, 3rd semester: 85.0% in Fall 2023; steady.
+      First-time students, 5th semester: 74.0% in Fall 2023; falling.
+      First-time students, 8th semester (spring start): 83.3% in Fall 2023; steady.
+      Transfer students, 1st semester: 75.0% in Fall 2023; steady.
+      In no semester's line: 16 with no start on record, 24 after their 8th semester, 0 in a semester reaching back before the arrival records (Spring 2016).
+      First-time students, semesters not read in the latest term, left out: 1.
+
 # RS01: the page says who it counts: the level's students by how they started, other levels left out
 
     Code
@@ -60,9 +87,6 @@
         Fall 2023: 49 of 60 returned, 81.7%.
       A late withdrawal, Fall 2023: 6 students, 0.0% returned against 90.7% without; 54.5% of those who did not return.
       A DFW grade, Fall 2022: 7 students, 28.6% returned against 86.5% without; 41.7% of those who did not return.
-      Groups not read in the latest term, left out: 1.
-      Classification Freshman, 1st Yr, 1st Sem: 85.0% in Fall 2023; steady.
-      Classification Sophomore, 2nd Yr: 75.0% in Fall 2023; steady.
       College AS: 85.0% in Fall 2023; steady.
       College EN: 75.0% in Fall 2023; steady.
       Entered Fall 2021 (62): 0.0% 2nd semester (spring); 0.0% 3rd semester (fall); 0.0% 4th semester (spring); 0.0% 5th semester (fall).

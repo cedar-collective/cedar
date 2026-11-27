@@ -6,6 +6,8 @@
 # Exported functions:
 #   headcountUI(id)
 #   headcountServer(id, programs, dims, in_progress_terms)
+#   headcount_choices_job(programs, dims, scope)   a scope's program choices, as a shared result
+#   headcount_preload_jobs(programs, dims)         the choices every session opens on, for the preload
 
 headcountUI <- function(id) {
   ns <- NS(id)
@@ -56,6 +58,43 @@ headcountUI <- function(id) {
   )
 }
 
+# ── Shared results ───────────────────────────────────────────────────────────
+#
+# The Major / Minor / Concentration choices for a scope are the same for every
+# session, so they are counted once and shared (cedar_shared_result()). A job
+# is the result's key and its build. The server and the startup preload make
+# their jobs here, so the choices built ahead are the ones a session asks for.
+
+HEADCOUNT_CHOICE_SCOPE <- c("college", "dept_code", "major_codes", "minor_codes")
+
+# The choices for the scope picked so far: headcount_filter_choices()'s opt.
+# The scope is put in one form before it becomes a key: a part nobody picked
+# is an empty vector, however the input says so (NULL from a select left
+# alone), and the same picks in another order are one scope.
+headcount_choices_job <- function(programs, dims, scope = list()) {
+  if (is.null(programs) || is.null(dims)) {
+    stop("[headcount.R] The Headcount choices need programs and dims.", call. = FALSE)
+  }
+  unknown <- setdiff(names(scope) %||% rep("", length(scope)), HEADCOUNT_CHOICE_SCOPE)
+  if (length(unknown) > 0L) {
+    stop("[headcount.R] headcount_choices_job: the scope is ", paste(HEADCOUNT_CHOICE_SCOPE, collapse = ", "),
+         "; it was given '", paste(unknown, collapse = "', '"), "'.", call. = FALSE)
+  }
+  scope <- lapply(stats::setNames(HEADCOUNT_CHOICE_SCOPE, HEADCOUNT_CHOICE_SCOPE),
+                  function(part) sort(unique(as.character(scope[[part]]))))
+  list(key = c(list("headcount_filter_choices"), scope),
+       build = function() headcount_filter_choices(programs, dims, scope))
+}
+
+# What the preload builds: the choices with nothing picked. Every session asks
+# for them as it starts, on whatever page it opened, and the first session of
+# a process counted them itself, 1.3 of its seconds (ISSUES M75).
+headcount_preload_jobs <- function(programs, dims) {
+  list(headcount_choices_job(programs, dims))
+}
+
+# ── Server ───────────────────────────────────────────────────────────────────
+
 headcountServer <- function(id, programs, dims, in_progress_terms, error_handler = NULL) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
@@ -87,9 +126,12 @@ headcountServer <- function(id, programs, dims, in_progress_terms, error_handler
     # code, renames joined, a department's own programs only.
     program_labels <- reactiveVal(character(0))
     update_program_choices <- function(which = c("major", "minor", "concentration")) {
-      choices <- headcount_filter_choices(programs, dims, list(
+      # Shared by every session (cedar_shared_result(), ISSUES I80); the
+      # choices with nothing picked are already there, built at start.
+      job <- headcount_choices_job(programs, dims, list(
         college = input$college, dept_code = input$dept,
         major_codes = input$major, minor_codes = input$minor))
+      choices <- cedar_shared_result(job$key, job$build)
       # Code to label, so the scope bar names a picked program as the picker did.
       known <- c(choices$major, choices$minor)
       program_labels(c(stats::setNames(names(known), known),

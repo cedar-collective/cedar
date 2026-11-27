@@ -88,6 +88,21 @@ Named atomic vectors can trigger jsonlite warnings such as `Input to asJSON(keep
   paints at once and the outputs land seconds later, so the page otherwise
   looks finished while empty. The server then owes a `signal_load_complete()`
   for the first load on every path, including the empty state.
+- **A wait is shown where the reader is.** An overlay inside a hidden subtab is
+  not on screen. A view that another view runs for it (Downstream's At a
+  Glance runs Against Non-Takers and Next Courses) opens the page's overlay
+  for that run, with its own label, and its own overlay only on its own subtab
+  (`page_overlay =`; I82). Runs may follow one another behind one overlay: a
+  run that starts as the one before ends keeps it open.
+- An overlay that is already on screen when the page arrives (an autorun
+  link's, or `show_at_start`) says what one opened by a button says: the
+  estimate embedded at start, then how long it has been working (I83).
+- **Nothing table-sized runs when a session starts.** R answers one request at
+  a time, so what a module's server does as a session opens is waited for on
+  every page, and a deep link's run starts only after it. Choices that are the
+  same for every session are built once (`global.R`, or
+  `cedar_shared_result()`); work that reads a whole table waits for its own
+  page (I80).
 - Always show a clear blue info callout when a run succeeds but returns no rows for the selected criteria. If a secondary tab intentionally ignores one filter (e.g., Trends ignoring exact term codes), do not hide useful secondary results just because the primary table is empty.
 
 **User-facing polish review.**
@@ -137,13 +152,26 @@ input that changes the result, with the result's name first. Only a built
 value is stored; a build that fails stores nothing and is tried again
 (ISSUES I75 is what `bindCache(cache = "app")` did instead).
 
+A result that depends on what the reader picked is shared the same way, with
+the pick in the key. Course Dynamics > Downstream keeps each course's three
+comparisons (`course_cohort`, `later_course`, `course_sequence`: the course,
+the campuses and every setting are the key) and what they start from (the
+later-course list, the settings Against Non-Takers opens on), so the first
+session to open a course builds them behind the overlay and every later
+session reads them with no wait (ISSUES M72). A page whose result is assembled from parts, each caught
+on its own, passes `keep =`: a result that lost a part to an error is shown to
+the session that built it and is not stored, so the next reader builds it
+whole. The caught error itself goes through `cedar_notify_caught()`, which
+tells the reader and writes the log: a notice closes by itself, and a page
+left empty by a caught error otherwise leaves nothing to find (ISSUES I85).
+
 Sharing leaves one wait: the first person to open the page after each restart
 (every morning's refresh, every deploy) pays for the build, and so does
 everyone else using the app at that moment. Where the page opens on the same
 view for everyone, that build is done ahead instead:
 `cedar_preload_shared_results(jobs)`, called at the end of `global.R`, builds a
 list of jobs in the background once the app is running. A job is
-`list(key, build)`.
+`list(key, build)`, with `keep` where the page passes one.
 
 Graduation is the pattern (`R/modules/graduation.R`):
 
@@ -175,9 +203,13 @@ How the runner behaves, and why:
 - Nothing is saved to disk. A saved payload would need a key over the data and
   over every source file that shapes it, and a deploy that forgot one would
   show yesterday's numbers; a result held in the process cannot be stale.
-- The log line for each job (`built`, `already built`, its seconds) is the
-  evidence that the preload ran. A page build that still appears in
+- The log line for each job (its place in the run, `built`, `already built`,
+  `built without a part; not kept`, its seconds) is the evidence that the
+  preload ran, and the last line (`12 of 12`) that it finished. A page build that still appears in
   `report_timing.csv` under the opening scope means the key drifted.
+- **A job whose key waits on an earlier job's result is given as a function
+  that returns the job**, and is made when its turn comes. A function that
+  returns `NULL` has nothing to build; one that fails is a job that failed.
 
 Before adding a page: the preload occupies the process right after every
 start, so add what is slow and opened on a fixed view, and say what it costs.
@@ -190,6 +222,68 @@ DFW Rates is built ahead too, after Graduation (`dfw_rates_payload_job()`,
 `dfw_rates_page_scope()`). Until 2026-11-23 each session built its own copy.
 Its one timed build on production took 12 seconds; on a development machine
 it takes 7 to 16.
+
+Headcount's program choices with nothing picked are the first job of all
+(`headcount_choices_job()`, `headcount_preload_jobs()`,
+`R/modules/headcount.R`), and for another reason. No page opens on them:
+every session asks for them as it starts, on whatever page it opened, because
+the module's set-up fills its Major, Minor and Concentration pickers. They
+were shared already, so the first session of a process counted them for the
+rest, inside its own start (ISSUES M75). **A result every session reads as it
+starts is built ahead however small**: what it costs is paid once either way,
+and the build-ahead pays it where nobody is waiting.
+
+### Downstream, for the courses analysed most
+
+Course Dynamics > Downstream is opened for a course the reader picks, so no
+one view can be built ahead for everyone. The courses analysed most are
+(`downstream_preload_jobs()`, `R/modules/later-course.R`), after Graduation
+and DFW Rates:
+
+- **Which courses.** The ten analysed most in the timing log's last 30 days
+  (`downstream_courses_ahead()`, over `most_run_report_values()` in
+  `R/trunk/logging.R`: the `course` of each `course_report` run that did not
+  fail, ties by name). `global.R` writes the list to the log at start. On
+  production, in the 30 days to 2026-11-25, ten courses were 40% of 156 course
+  analyses over 83 courses.
+- **What is built**, five jobs a course, each a turn of its own: the
+  later-course list, Next Courses for the later course the page opens on, the
+  settings Against Non-Takers opens on, that comparison, and the sequence
+  comparison for the same later course. The later course and the settings are
+  read off the results built a turn before, which is why these jobs are made
+  in turn. A course with no later course has nothing to build there.
+- **One function makes the job for both**, as for Graduation:
+  `downstream_course_options_job()`, `later_course_job()`,
+  `course_sequence_job()` (`later-course.R`), `course_cohort_defaults_job()`
+  and `course_cohort_job()` (`course-cohort.R`) give the page and the preload
+  the same key and the same build. The page wraps the build in its overlay and
+  its notice; the preload logs it. What a control opens on is a constant its
+  job's default also reads (`LATER_COURSE_MIN_N`, `COURSE_COHORT_MIN_N`,
+  `COURSE_COHORT_COMPARISON`, `COURSE_SEQUENCE_MIN_N`,
+  `DOWNSTREAM_DEFAULT_WINDOW`), and the campuses are
+  `cedar_course_dynamics_campuses` (`global.R`), which `ui.R` selects.
+- **How many** is `CEDAR_PRELOAD_COURSES` (ten when unset, 0 for none).
+  shiny-server starts its R process with a clean environment, so the value
+  reaches `global.R` only through `entrypoint.sh`, which writes it to the
+  worker's `.Renviron` as it does the instructor password
+  (`test-ci.R` holds both ends).
+
+What it costs, measured 2026-11-25. On production, the first start with it
+built ten courses in 366 seconds (37 a course: the comparisons with non-takers
+226 seconds between them, the sequence comparisons 68, Next Courses 51), and
+the whole run, Graduation and DFW Rates included, ended 7.4 minutes after its
+first job. The jobs run one at a time: a click made meanwhile waits for the
+job running, 34 seconds at the longest (one comparison with non-takers). All
+55 jobs built and none failed; the R process stood at 2.7 GB on a host with
+4.7 GB still available. In the development container (emulated), eight
+courses took 197 seconds, 25 a course. The ten courses' results are about 11
+MB of the app's 200 MB cache.
+
+What it gives, in the same container with two courses built ahead: both
+opened Downstream in 10 to 11 seconds with one wait shown (the course's own
+outcomes) and no build in `report_timing.csv`; a course not built ahead took
+44.5 seconds behind its three labels. A course outside the list, another
+campus or a changed setting is built when first asked for, as before.
 
 ## URL deep links & shareable state
 
@@ -342,6 +436,27 @@ the scope. It is not where a page explains itself.
 - **No page-level paragraph** restating the time scope above the tabs: the
   charts mark in-progress terms (`mark_plotly_terms()`) and the bar names them.
 
+### A section page's filter bar
+
+Regstats, Open Seats, Waitlists, Low Enrollment, Cancellations and Enrollment
+ask the same questions of `cedar_sections`: campus, college, term, part of
+term, department, method, level.
+
+- **The inputs come from `cedar_section_scope_inputs(ns, prefix, sections,
+  dept_choices, default_term)`** (`ui-helpers.R`): one label, order, width and
+  default for each, with ids `<prefix>_<field>` matching the page's
+  `CEDAR_SHARE_SPECS` fields. A page states only where it differs (`fields`,
+  `widths`, `labels`, `level_selected`) and writes its own extra inputs beside
+  them. Never hand-write one of the seven.
+- **Thresholds a reader may adjust are folded** under one line
+  (`cedar_threshold_fold()`), which the server fills with
+  `cedar_threshold_state()`: "standard values", or each value changed. They
+  are read at Run, carried by the page's link, and stated in the scope bar.
+  Regstats and Low Enrollment are the two users.
+- Low Enrollment (`R/modules/low-enrollment.R`) is the shortest whole example:
+  bar, run button that waits for a term, overlay, scope bar of facts, one
+  section with its method, link copy and restore.
+
 ### Headings
 
 - **A subtab opens with `subtab_header()`, never with a section bar.** The
@@ -357,7 +472,10 @@ the scope. It is not where a page explains itself.
   reads as a section of the page.** Reach for `section_heading()` only for a
   minor label inside an already-described block.
 - **Never use a bare `h3()`–`h6()`.** An unclassed heading renders at browser
-  default and will not match anything around it.
+  default and will not match anything around it. `test-architecture.R` holds
+  each file's count of them, of `style =` given a fixed string and of hex
+  colours written in R (M18, M17, M58): a count may only go down
+  ([ratchets](testing.md#a-backlog-held-by-a-ratchet)).
 - **`description` is not optional in spirit.** If a section genuinely needs no
   sentence, that is a signal the section may not need to exist.
 
@@ -406,10 +524,13 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 |------|-------------------|------------|
 | `pathways.R` | `pathwaysUI/Server`, `populationSelectorUI/Server` | Pathways > Student Pathways |
 | `headcount.R` | `headcountUI/Server` | Bird's Eye > Headcount |
-| `seatfinder.R` | `seatfinderUI/Server` | Registration > Open Seats |
-| `cancellations.R` | `cancellationsUI/Server` | Bird's Eye > Cancellations |
+| `seatfinder.R` | `seatfinderUI/Server` | Courses > Open Seats |
+| `cancellations.R` | `cancellationsUI/Server` | Courses > Cancellations |
+| `low-enrollment.R` | `lowEnrollmentUI(id, sections, default_term, dept_choices)`, `lowEnrollmentServer(id, sections, current_term, min_days_after_start, error_handler)` | Courses > Low Enrollment: the seven shared scope inputs, thresholds folded under "Adjust thresholds" (`cedar_threshold_fold()`) and read at Run, then `build_low_enrollment_page()`'s payload drawn as notes, cards and one table a level. Deep-linkable (`?tab=low-enrollment`) |
 | `dfw-rates.R` | `dfwRatesUI(id, campuses)`, `dfwRatesServer(id, attempts, dims, edges, active)` | Bird's Eye > DFW Rates: lower-division DFW one term type at a time (Term type and Campus, deep-linkable, no run button); builds only while the tab is open, once per term type and campus a session asks for; every number from `build_dfw_dashboard()` through `features/dfw-dashboard-view.R` |
-| `waitlist.R` | `waitlistUI/Server` | Registration > Waitlists |
+| `retention-dashboard.R` | `retentionDashboardUI(id, campuses)`, `retentionDashboardServer(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active, course_dim, course_codes)` | Bird's Eye > Retention: Term type, Student level and Home campus, no run button; each section's result is built once per scope a process is asked for (`cedar_shared_result()`), only while the tab is open. It places and feeds the module below |
+| `retention-entering-classes.R` | `retentionEnteringClassesUI(id)` (a list of two sections, `classes` and `summer`, for the page to place), `retentionEnteringClassesServer(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, scope)` | Two sections of Retention, a module inside it: each entering class semester by semester, and the summer after its first spring. It owns one control (Entering students) and reads the page's term type, level and campus through `scope`, a reactive that waits while the page is closed. It was the First Year page until 2026-11; `?tab=first-year` opens Retention |
+| `waitlist.R` | `waitlistUI/Server` | Courses > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |
 | `regstats.R` | `regstatsUI/Server` | Regstats |
 | `retention.R` | `retentionUI/Server` | **Hidden** — UI commented out in ui.R pending cross-course comparison (`retentionServer` is still wired in server.R); course-level retention lives in Course Dynamics |

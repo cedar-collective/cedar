@@ -162,12 +162,37 @@ try {
   await page.waitForFunction(() => document.getElementById('catalog_review-rules-summary')?.innerText.includes('History B.A.'));
   check('selected planning scenario shows the math starting-point label',
     await page.$eval('#catalog_review-rules-summary', el =>
-      el.innerText.includes('Math: Calculus-ready') && !el.innerText.includes('Math: NA')));
+      el.innerText.includes('Math: College-algebra-ready') && !el.innerText.includes('Math: NA')));
   const ruleList = await readReactable(page, 'catalog_review-rules-table');
   check('History rules show readable requirements and the catalog wording',
     colIndex(ruleList.headers, 'Readable rule') >= 0 && colIndex(ruleList.headers, 'Catalog wording') >= 0 &&
     ruleList.rows.some(row => row.join(' ').includes('History major')));
   await page.screenshot({ path: '/tmp/cedar-admin-visualization-rules.png', fullPage: true });
+
+  // Catalog questions: every reading's open items, by who can settle each.
+  // An institution with no compiled readings shows the empty state instead.
+  await openSubTab(page, 'Catalog questions');
+  if (await page.$('#catalog_review-questions-questions')) {
+    await readyAll(['catalog_review-questions-questions', 'catalog_review-questions-boards']);
+    const questionList = await readReactable(page, 'catalog_review-questions-questions');
+    const who = colIndex(questionList.headers, 'Who can settle it');
+    check('Catalog questions lists open questions with who can settle each and the file to change',
+      questionList.rows.length > 0 && who >= 0 && colIndex(questionList.headers, 'Change it in') >= 0 &&
+      questionList.rows.every(row => /\.json · (rule|question|passage) /.test(row.join(' '))));
+    await page.$eval('#catalog_review-questions-settled_by', el => el.selectize.setValue('catalog'));
+    await waitForIdle(page);
+    await page.waitForFunction(() => !document.getElementById('catalog_review-questions-questions')?.classList.contains('recalculating'));
+    const catalogOnly = await readReactable(page, 'catalog_review-questions-questions');
+    check('"The catalog" keeps only the questions the catalog can settle',
+      catalogOnly.rows.length > 0 && catalogOnly.rows.every(row => row[who] === 'The catalog'));
+    const boardList = await readReactable(page, 'catalog_review-questions-boards');
+    check('each board compiled from a reading is listed with what it leaves out',
+      boardList.rows.length > 0 && colIndex(boardList.headers, 'What the board leaves out') >= 0);
+    await page.screenshot({ path: '/tmp/cedar-admin-catalog-questions.png', fullPage: true });
+  } else {
+    check('Catalog questions says when no readings are compiled',
+      await page.evaluate(() => document.body.innerText.includes('No catalog readings are compiled for this institution.')));
+  }
   await openSubTab(page, 'Draft interpretations');
   await page.waitForFunction(() => document.getElementById('catalog_review-normalization-status')?.innerText.trim());
   const reviewProgram = '#catalog_review-normalization-program';

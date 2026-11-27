@@ -94,7 +94,7 @@ curl -fsS -o /dev/null http://localhost:3838/ && echo up
 ```
 
 The first build on a small droplet takes several times longer than on a
-laptop. Registration > Projections needs a published bundle in `output/`;
+laptop. Courses > Projections needs a published bundle in `output/`;
 `restart-cedar.sh --update` builds one when it is missing
 ([Release Runbook: projection artifact](release-runbook.html#projection-artifact)).
 
@@ -148,8 +148,15 @@ Add the refresh to the server's crontab, keeping its term window current
 (`scripts/README.md`, "Adding this to crontab"):
 
 ```cron
-2 10 * * * /root/cedar/scripts/restart-cedar.sh --mode production --update -s 202680 -e 202710 >> /var/log/cedar-update.log 2>&1
+2 10 * * * /root/cedar/scripts/restart-cedar.sh --mode production --update -s 202680 -e 202710 --hard-restart >> /var/log/cedar-update.log 2>&1
 ```
+
+Keep `--hard-restart` on a scheduled job. Without it the script touches
+`restart.txt`: Shiny Server starts a new R process for new sessions and, with
+`app_idle_timeout 0`, never ends the old one, which holds its memory (over a
+gigabyte, and more in swap) until the container next restarts (ISSUES M69).
+The hard restart ends every open session, so schedule it for when nobody is
+reading.
 
 A refresh that cannot answer a 2FA prompt stops rather than waiting, and a
 report that did not arrive is marked failed while the others load
