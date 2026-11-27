@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I96](#i96--the-demo-browser-suites-dept-trends-step-can-read-the-course-list-before-the-server-has-filtered-it) | Defect | The demo browser suite's Dept Trends step failed twice in three runs: it read the course list after "Other departments" was set and still found the department's own course; the page filters correctly by hand |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -123,6 +124,72 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I96 — The demo browser suite's Dept Trends step can read the course list before the server has filtered it
+
+**Status:** open
+**Found:** 2026-11-26, running `./run-tests.sh --e2e demo` for the
+compiled-reading drafts (branch `degree/new-program-drafts`).
+**Severity:** low for users: the page works and the step fails at random.
+But a red demo suite blocks a merge, and a habit of rerunning would hide a
+real failure (I24).
+**Affects:** `tests/e2e/reports-smoke.test.mjs`, step "Dept Trends defers
+hidden charts and renders opened tabs": the full course list check added
+2026-11-21 (14a918a).
+
+### What was seen
+
+The step sets Courses Taken's "Taught by" to "Other departments" with
+`setInput()` (`Shiny.setInputValue`), waits with `waitForIdle()`, then
+counts the department's own rows in the table's Reactable state. Twice in a
+row it failed with `"Other departments" still lists 1 of the department's
+own courses`.
+
+- The third run passed on the same code, from a fresh stack. So did one run
+  on `origin/main` (b26299c), and six runs on other branches on 2026-11-25
+  and 11-26.
+- The branch changes nothing the synthetic institution's Dept Trends reads:
+  `institution/demo` has no `degree_drafts/`.
+- The step's screenshot shows the table unchanged: HIST 327, "History (this
+  department)". "Any department" is still marked, which is expected, because
+  the test sets the value and not the control.
+- The app's log holds no error.
+- Set by hand on the same stack, the value emptied the list within 0.1 to
+  0.4 seconds, three times out of three. The session went busy 66 to 92 ms
+  after the input was set.
+
+### Probable cause
+
+Not settled. There are two candidates, and both are test faults until shown
+otherwise:
+
+1. **The wait returns too early.** `waitForIdle()` returns after 600 ms with
+   no `shiny-busy` class and no visible output recalculating. It cannot tell
+   a server that has finished from one that has not started. If the R
+   process spends longer than that on another session's work, the step reads
+   the table before the input reaches the server.
+2. **A re-render resets the choice.** The radio buttons are drawn in a
+   `renderUI` (`mcu_body`). If that section renders again after the input is
+   set, the new radio binds with its default "all" and Shiny sends that
+   value, because it differs from the "outside" set by script. The table
+   then returns to the full list. A reader's own choice would be lost the
+   same way, so this one would be a page defect.
+
+### Reproduce
+
+Not on demand. Repeat `bash scripts/dev.sh up && ./run-tests.sh --e2e demo`;
+it failed 2 of 3 runs on 2026-11-26.
+
+### What a fix requires
+
+Wait for what the step checks, not for idle:
+
+- After setting the value, poll the table's state until it holds none of
+  the department's own rows.
+- On timeout, report what the table holds and the input's value as the
+  server last rendered it. A timeout then tells the two candidates apart:
+  a list that never changes means candidate 2.
+- Confirm the step still fails when the filter does nothing.
 
 ## I92 — Classification changed meaning from Summer 2025: a student now sits a step lower, and every reading by classification crosses the change unmarked
 
