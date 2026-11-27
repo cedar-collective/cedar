@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I95](#i95--retention-looks-dead-for-most-of-a-minute-on-its-first-visit-after-a-start) | Defect | Retention's first visit after a start takes about 45 s on production with nothing saying it is working past the first 8 s: its view is not built ahead, and the overlay covers one of its seven builds |
 | [I94](#i94--retention-reads-no-graduate-start-so-it-says-graduate-students-have-none-on-record) | Defect | Retention reads no graduate start: `student_term_entry_type()` knows freshman and new-transfer codes only, so the page says graduate students have no start on record while about a quarter of a fall's graduate declarations say first-time graduate |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
@@ -125,6 +126,53 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I95 — Retention looks dead for most of a minute on its first visit after a start
+
+**Status:** open.
+**Found:** 2026-11-26, by a reader on production: "the text appears right
+away; plots and tables seemed to take a long time; i thought the app was
+dead."
+**Severity:** medium. No number is wrong; a reader leaves a page that is
+working.
+**Affects:** Bird's Eye > Retention (`R/modules/retention-dashboard.R`,
+`R/modules/retention-entering-classes.R`) and `global.R`'s start-up builds.
+
+### What is wrong
+
+- **Its view is not built ahead.** `global.R` builds Headcount's, Graduation's,
+  DFW Rates' and Downstream's default views at start
+  (`cedar_preload_shared_results()`), but not Retention's, which every reader
+  opens on the same view. The first visitor after each start computes it.
+- **Seven builds, one after another.** In one R process, timed natively on
+  this Mac over the app's tables: the payload 4.1 s, Courses Where a DFW Costs
+  the Most 6.1 s, Courses Harder on Students with Lower GPAs 5.2 s, class pace
+  4.8 s, summer and pace 1.5 s, the entering classes 1.0 s and the summer
+  after the first spring 1.1 s, about 24 s. On production the payload alone
+  took 7.6 s (`report_timing.csv`), so the page is about 45 s there; the local
+  amd64 image under emulation took about 90 s.
+- **Shiny sends a page's outputs together** at the end of the update cycle,
+  so every chart and table waits for the slowest build while the headings,
+  which are static, show at once.
+- **The overlay covers one build.** Only the payload runs inside
+  `cedar_with_loading()`; the overlay closes when it finishes, and the other
+  builds run with nothing on screen.
+
+### Reproduce
+
+Restart the app, wait for the start-up builds to finish (`[preload]` lines in
+the log), open Bird's Eye > Retention in a fresh session and time it to the
+last chart; the log's `retention_dashboard completed in` line covers only the
+first build.
+
+### Done when
+
+Retention's default view is among the start-up builds (one key and build per
+result, read by the module and by `cedar_preload_shared_results()`), and a
+view that is not built ahead shows that it is working until its last section
+arrives.
+
+---
 
 ## I94 — Retention reads no graduate start, so it says graduate students have none on record
 
