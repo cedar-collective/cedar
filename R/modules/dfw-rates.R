@@ -3,8 +3,8 @@
 # How are UNM's lower-division courses doing on DFW grades, and where is
 # action needed? One term type at a time: the rate term by term and its
 # verdict, the courses that hold the DFW grades, which are rising, falling or
-# swinging, which courses' sections disagree term after term, and each campus
-# and college.
+# swinging, how far apart each course's sections are and whether that is
+# changing, and each campus and college.
 #
 # The module holds no analysis: it collects the term type, campuses and term
 # range, calls
@@ -24,7 +24,7 @@ DFW_RATES_TERM_TYPES <- c(Fall = "fall", Spring = "spring", Summer = "summer")
 
 # The tone each part of a figure carries; the same tone marks its rows below.
 DFW_RATES_TONES <- c(quarter = "critical", half = "warning", rest = "muted",
-                     uneven = "warning", even = "muted")
+                     rising = "warning", falling = "success", steady = "muted")
 
 # campuses  the teaching campuses to offer; ABQ and EA are selected, and none
 #           selected reads every campus.
@@ -90,11 +90,20 @@ dfwRatesUI <- function(id, campuses, terms) {
     ),
     dashboard_section(
       "Sections That Disagree",
-      "Courses whose sections' DFW rates differ by more than chance, term after term.",
+      "How far apart a course's sections are on DFW rate, averaged over its terms, and whether they are drawing together or moving apart.",
       method = uiOutput(ns("method_sections")),
       uiOutput(ns("section_finding")),
-      plotly::plotlyOutput(ns("section_strip"), height = "640px"),
-      reactable::reactableOutput(ns("section_table"))
+      dashboard_subsection(
+        "Every Course, Term by Term",
+        "How far apart sections were each term, over every course with enough sections to compare.",
+        plotly::plotlyOutput(ns("spread_terms_plot"), height = "300px")
+      ),
+      dashboard_subsection(
+        "Courses, Furthest Apart First",
+        "Each course's average over its terms. The chart draws the fifteen courses whose sections are furthest apart.",
+        plotly::plotlyOutput(ns("spread_course_bars"), height = "460px"),
+        reactable::reactableOutput(ns("section_table"))
+      )
     ),
     dashboard_section(
       "By Campus and College",
@@ -192,16 +201,37 @@ dfwRatesUI <- function(id, campuses, terms) {
 }
 
 .dfw_rates_section_finding <- function(p) {
-  parts <- dfw_section_parts(p)
-  cedar_finding_card(
-    "Uneven term after term", scope = .dfw_rates_terms(p$sections$meta$window_terms),
-    headline = fmt_count(attr(parts, "n_repeat")), caption = "courses uneven in two or more terms",
-    warn = attr(parts, "n_repeat") > 0L,
-    if (sum(parts$n) > 0L) cedar_segment_figure(
-      data.frame(n = parts$n, tone = unname(DFW_RATES_TONES[parts$part]), label = parts$label,
-                 detail = NA_character_, stringsAsFactors = FALSE),
-      description = paste0("In ", parts$n[1], " of ", sum(parts$n), " course-terms the sections differed more than chance allows."))
-  )
+  f <- dfw_spread_finding(p)
+  if (f$n_courses == 0L) {
+    return(empty_state(paste0("No course in this scope has ", p$sections$meta$min_sections, " or more sections of ",
+                              p$sections$meta$min_section_n, "+ attempts in a term, so there are no sections to compare.")))
+  }
+  parts <- dfw_spread_direction_parts(p)
+  n_short <- attr(parts, "n_short")
+  n_spreading <- parts$n[parts$part == "rising"]
+  div(class = "finding-card-row",
+      cedar_finding_card(
+        "How far apart", scope = paste(fmt_term(f$first_term), "to", fmt_term(f$last_term)),
+        headline = sprintf("%.1f", f$spread_pts),
+        caption = "points between a section's DFW rate and its course's, beyond chance",
+        tags$p(class = "stat-compare", paste0(
+          "Lowest section ", .dfw_rates_pct(f$lo_pct), ", highest ", .dfw_rates_pct(f$hi_pct),
+          " on average, over ", fmt_count(f$n_course_terms), " course-terms in ", fmt_count(f$n_courses), " courses.")),
+        tags$p(class = "stat-compare", paste0("Term by term: ", f$direction_phrase, "."))),
+      cedar_finding_card(
+        "Direction", scope = paste0("of ", fmt_count(sum(parts$n)), " courses read in ",
+                                    attr(parts, "min_trend_terms"), " or more terms"),
+        headline = fmt_count(n_spreading), caption = "courses whose sections are spreading",
+        warn = n_spreading > 0L,
+        if (sum(parts$n) > 0L) cedar_segment_figure(
+          data.frame(n = parts$n, tone = unname(DFW_RATES_TONES[parts$part]), label = parts$label,
+                     detail = NA_character_, stringsAsFactors = FALSE),
+          description = paste0(parts$n[1], " courses' sections are spreading, ", parts$n[2],
+                               " consolidating, and ", parts$n[3], " show no clear change.")),
+        if (n_short > 0L) tags$p(class = "stat-compare", paste0(
+          fmt_count(n_short), if (n_short == 1L) " course" else " courses", " read in fewer than ",
+          attr(parts, "min_trend_terms"), " terms ", if (n_short == 1L) "has" else "have",
+          " no direction and ", if (n_short == 1L) "is" else "are", " not listed."))))
 }
 
 .dfw_rates_course_reactable <- function(t) {
@@ -237,17 +267,25 @@ dfwRatesUI <- function(id, campuses, terms) {
 }
 
 .dfw_rates_section_reactable <- function(t) {
-  .dfw_rates_table(t, list(
+  series <- t$series
+  .dfw_rates_table(dplyr::select(t, -series), list(
     subject_course = reactable::colDef(name = "Course", minWidth = 100),
     campus = reactable::colDef(name = "Campus", maxWidth = 80),
-    terms_tested = reactable::colDef(name = "Terms tested", align = "right"),
-    terms_uneven = reactable::colDef(name = "Terms uneven", align = "right"),
-    n_attempts = cedar_count_coldef("Attempts"),
-    n_dfw = cedar_count_coldef("DFW grades"),
+    spread_pts = reactable::colDef(name = "Points apart, beyond chance", align = "right",
+                                   format = reactable::colFormat(digits = 1)),
+    lo_pct = .dfw_rates_rate_coldef("Lowest section, average"),
+    hi_pct = .dfw_rates_rate_coldef("Highest section, average"),
+    # The direction's word with the spread each term behind it.
+    direction = reactable::colDef(name = "Direction", minWidth = 210, html = TRUE,
+                                  cell = function(value, index) paste0(as.character(make_sparkline(series[[index]])),
+                                                                       " ", value)),
     dfw_pct = .dfw_rates_rate_coldef("DFW rate"),
-    sections_above = reactable::colDef(name = "Sections above", align = "right"),
-    sections_below = reactable::colDef(name = "Sections below", align = "right")
-  ), searchable = TRUE)
+    terms_read = reactable::colDef(name = "Terms", maxWidth = 70, align = "right"),
+    sections_per_term = reactable::colDef(name = "Sections a term", align = "right",
+                                          format = reactable::colFormat(digits = 1)),
+    n_attempts = cedar_count_coldef("Attempts")
+  ), searchable = TRUE,
+  language = reactable::reactableLang(noData = "No course in this scope is read in enough terms to list."))
 }
 
 .dfw_rates_group_reactable <- function(t, title) {
@@ -300,11 +338,18 @@ dfwRatesUI <- function(id, campuses, terms) {
 .dfw_rates_method_sections <- function(p) {
   m <- p$sections$meta
   tags$ul(
-    tags$li(paste0("Over ", .dfw_rates_terms(m$window_terms), ", each course-term with ", m$min_sections,
-                   " or more sections of ", m$min_section_n, "+ attempts is tested; smaller sections are left out of the test.")),
-    tags$li(paste0("Its sections are uneven when their rates spread more than chance allows (a chi-square test of one rate across them, at ",
-                   m$alpha, "). Each section is above, within or below the band chance gives a section its size around the course's rate that term (95%).")),
-    tags$li("A course uneven term after term is a matter of how it is run, not of one term's draw. The chart shows the courses uneven in two or more terms, their uneven terms only; a dot is a section, sized by its attempts."),
+    tags$li(paste0("Scope: ", .dfw_rates_scope(p), ". Each course-term with ", m$min_sections, " or more sections of ",
+                   m$min_section_n, "+ attempts is read, in every term of the scope; smaller sections are left out.")),
+    tags$li("Points apart is about how far a section's DFW rate sits from its course's rate that term, after taking out the difference chance alone gives sections of their sizes. Sections that differ only as chance would make them read 0."),
+    tags$li("The lowest and highest section are each term's, averaged over the course's terms. They are shown beside the points and do not rank the courses: the gap between them grows with the number of sections, and with how small they are, by chance alone."),
+    tags$li(paste0("A course's figure pools its terms, a larger term counting for more. A course is listed, and given a direction, when it is read in ",
+                   m$min_trend_terms, " or more terms; the first card's figure pools every course-term read.")),
+    tags$li("Direction is judged as the page's other trends are: the line through a course's terms has to clear both chance and the terms' own scatter to be called spreading or consolidating. The bar is strict, so most courses read no clear change."),
+    tags$li("The term-by-term line pools every course read that term, so it also moves with which courses had enough sections. In the table, the small line is the course's own spread each term."),
+    if (m$n_without_spread > 0L) {
+      tags$li(paste0("Left out: ", fmt_count(m$n_without_spread), if (m$n_without_spread == 1L) " course-term" else " course-terms",
+                     " in which no student, or every student, got a DFW grade."))
+    },
     tags$li("Sections differ for reasons the grades do not record (time of day, delivery, which students chose it). A section is its CRN; no instructor is shown.")
   )
 }
@@ -435,17 +480,24 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
     output$method_changing <- renderUI({ p <- payload(); req(p); .dfw_rates_method_changing(p) })
 
     output$section_finding <- renderUI({ p <- payload(); req(p); .dfw_rates_section_finding(p) })
-    output$section_strip <- plotly::renderPlotly({
+    output$spread_terms_plot <- plotly::renderPlotly({
       p <- payload()
       req(p)
-      strip <- prepare_dfw_section_strip_data(p)
-      req(nrow(strip$sections) > 0L)
-      plot_dfw_section_strip(strip)
+      terms <- prepare_dfw_spread_term_plot_data(p)
+      req(nrow(terms) > 0L)
+      plot_dfw_spread_terms(terms)
+    })
+    output$spread_course_bars <- plotly::renderPlotly({
+      p <- payload()
+      req(p)
+      bars <- prepare_dfw_spread_course_bars(p)
+      req(nrow(bars) > 0L)
+      plot_dfw_spread_course_bars(bars)
     })
     output$section_table <- reactable::renderReactable({
       p <- payload()
       req(p)
-      .dfw_rates_section_reactable(dfw_section_course_table(p))
+      .dfw_rates_section_reactable(dfw_spread_course_table(p))
     })
     output$method_sections <- renderUI({ p <- payload(); req(p); .dfw_rates_method_sections(p) })
 

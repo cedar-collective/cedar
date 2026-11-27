@@ -6,8 +6,9 @@
 #                                    term and its trend
 #   courses                          get_dfw_course_board()  which courses hold
 #                                    the DFW grades, and how each is moving
-#   sections                         get_dfw_section_spread() whether a
-#                                    course's sections agree
+#   sections                         get_dfw_section_spread() how far apart
+#                                    a course's sections are, and whether
+#                                    that is changing
 # format_dfw_dashboard() is the one text rendering of it (text-first preview).
 # The payload is typed and unrounded; a page rounds once, in its display.
 #
@@ -17,6 +18,7 @@
 #                                    the page's scope: where it opens, one form of it
 #   format_dfw_dashboard(payload, n_list)
 #   dfw_trend_sentence(trend_row, min_terms)
+#   dfw_spread_direction_phrase(trend_row)
 #
 # Depends on: get_dfw_term_series() (cones/dfw-term-series.R)
 #             get_dfw_course_board() (cones/dfw-course-board.R)
@@ -41,7 +43,7 @@ DFW_NR_NOTE_SHARE <- 0.01
 #'   (teaching campus codes; NULL for every campus), `from_term` and `to_term`
 #'   (NULL for the whole history), `data_edges`, and the cones' thresholds
 #'   (`n_window`, `min_window_n`, `min_term_n`, `min_trend_terms`,
-#'   `min_section_n`, `min_sections`, `alpha`).
+#'   `min_section_n`, `min_sections`).
 #' @return A list of class `dfw_dashboard`: `overall`, `by_campus`,
 #'   `by_college` (get_dfw_term_series() output; `by_campus` reads every
 #'   campus whatever `campus` says, so the page can set each campus beside
@@ -216,56 +218,46 @@ dfw_trend_sentence <- function(t, min_terms) {
 }
 
 .dfw_dash_sections <- function(p, n_list) {
-  s <- p$sections
-  ct <- s$course_terms
-  repeat_uneven <- utils::head(s$courses[s$courses$terms_uneven >= 2L, , drop = FALSE], n_list)
-  detail <- vapply(seq_len(nrow(repeat_uneven)), function(i) {
-    r <- repeat_uneven[i, ]
-    u <- ct[ct$campus == r$campus & ct$subject_course == r$subject_course & ct$uneven, , drop = FALSE]
-    paste0("    ", sprintf("%-18s", .dfw_dash_course_label(r)), " uneven in ", r$terms_uneven, " of ",
-           r$terms_tested, " terms: ",
-           paste0(vapply(u$term, fmt_term, character(1)), " ", sprintf("%.0f-%.0f%%", u$lo_pct, u$hi_pct),
-                  " across ", u$n_sections, collapse = "; "))
-  }, character(1))
-  c(paste0("4. Sections that disagree (", .dfw_dash_terms(s$meta$window_terms), ")"),
-    paste0("  ", fmt_count(nrow(ct)), " course-terms had ", s$meta$min_sections, " or more sections of ",
-           s$meta$min_section_n, "+ attempts; in ", fmt_count(sum(ct$uneven)),
-           " the sections' rates differed more than chance allows."),
-    paste0("  Uneven in two or more terms: ", sum(s$courses$terms_uneven >= 2L), " course",
-           if (sum(s$courses$terms_uneven >= 2L) == 1L) "" else "s", if (length(detail)) ":" else "."),
-    detail,
-    .dfw_dash_spread(s, n_list))
+  c("4. Sections that disagree", .dfw_dash_spread(p$sections, n_list))
 }
 
-# How far apart sections are over every term in scope: every course pooled,
-# term by term, then each course's average and its direction, widest first.
-# A course read in too few terms for a direction is one or two terms, not an
-# average: counted, not listed.
+# A spread's direction in a phrase: what it is called and, with a line, where
+# the fitted line starts and ends, in points. Shared with the page.
+dfw_spread_direction_phrase <- function(t) {
+  if (t$direction == "too_few_terms") return(DFW_SPREAD_DIRECTIONS[["too_few_terms"]])
+  paste0(DFW_SPREAD_DIRECTIONS[[t$direction]], ", the fitted line from ", sprintf("%.1f", t$first_spread_pts),
+         " to ", sprintf("%.1f", t$last_spread_pts))
+}
+
+# How far apart sections are over every term in scope: every course and term
+# pooled, every course term by term, then each course's average and its
+# direction, widest first. A course read in too few terms for a direction is
+# one or two terms, not an average: counted, not listed.
 .dfw_dash_spread <- function(s, n_list) {
   pts <- function(x) sprintf("%.1f", x)
   terms <- s$overall$terms
   if (nrow(terms) == 0L) {
     return("  How far apart: no course-term in scope has a spread between sections to read.")
   }
-  between <- function(t) {
-    if (t$direction == "too_few_terms") return(DFW_SPREAD_DIRECTIONS[["too_few_terms"]])
-    paste0(DFW_SPREAD_DIRECTIONS[[t$direction]], ", the fitted line from ", pts(t$first_spread_pts), " to ",
-           pts(t$last_spread_pts))
-  }
+  avg <- s$overall$average
   listed <- s$spread_courses[s$spread_courses$direction != "too_few_terms", , drop = FALSE]
   n_short <- nrow(s$spread_courses) - nrow(listed)
   courses <- utils::head(listed, n_list)
   c(paste0("  How far apart, in points beyond what chance gives sections of their sizes (",
            fmt_term(min(terms$term)), " to ", fmt_term(max(terms$term)), "; a direction is read from ",
            s$meta$min_trend_terms, " or more terms):"),
+    paste0("    Every course and term: ", pts(avg$spread_pts), " over ", fmt_count(avg$n_course_terms),
+           " course-term", if (avg$n_course_terms == 1L) "" else "s", " in ", fmt_count(avg$n_courses), " course",
+           if (avg$n_courses == 1L) "" else "s", " (lowest section ", .dfw_dash_pct(avg$lo_pct), ", highest ",
+           .dfw_dash_pct(avg$hi_pct), " on average)."),
     paste0("    Every course, by term: ", paste(pts(terms$spread_pts), collapse = ", "), " (",
-           paste(terms$n_courses, collapse = ", "), " courses): ", between(s$overall$trend), "."),
+           paste(terms$n_courses, collapse = ", "), " courses): ", dfw_spread_direction_phrase(s$overall$trend), "."),
     vapply(seq_len(nrow(courses)), function(i) {
       r <- courses[i, ]
       paste0("    ", sprintf("%-18s", .dfw_dash_course_label(r)), " ", pts(r$spread_pts), " over ", r$terms_read,
              " term", if (r$terms_read == 1L) "" else "s", " (", pts(r$sections_per_term),
              " sections a term; lowest ", .dfw_dash_pct(r$lo_pct), ", highest ", .dfw_dash_pct(r$hi_pct),
-             " on average): ", between(r), ".")
+             " on average): ", dfw_spread_direction_phrase(r), ".")
     }, character(1)),
     if (n_short > 0L) {
       paste0("    Not listed: ", fmt_count(n_short), " course", if (n_short == 1L) "" else "s",

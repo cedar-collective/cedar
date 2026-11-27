@@ -703,6 +703,11 @@ const checkDegreeExplorer = async () => {
     const note = els.find(el => el.innerText.startsWith('Banner program codes for this degree'));
     return note ? note.innerText.split(/[\s,;:.]+/) : [];
   });
+  // The online programs share their base program's map, and state it.
+  for (const [catalog, online] of [['psychology-ba-2026', 'BA-XPSY-AS'], ['business-bba-2026', 'BBA-XBAD-MG']]) {
+    await choose('degree_explorer-dx_catalog_id', catalog);
+    check((await programCodes()).includes(online), `${catalog}: states the online code that shares its map (${online})`);
+  }
   for (const [catalog, own, sibling] of [
     ['psychology-ba-2026', 'BA-PSY-AS', 'BS-PSY-AS'],
     ['psychology-bs-2026', 'BS-PSY-AS', 'BA-PSY-AS'],
