@@ -1,0 +1,4691 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "HJxPjJOii9",
+  "unit_key": "839852af906987676e84363bf1ffea572f3300921ac080af74b0e5da41dfb387",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "concentration",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Complete one 24-credit concentration-teaching field",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "One concentration-teaching field: Language Arts, Mathematics, Science or Social Studies; some of its courses may also fulfill General Education or program requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e98479fa7022247bbffa12a8",
+            "quote": "along with specialty areas in four concentration-teaching fields: Language Arts, Mathematics, Science, and Social Studies"
+          },
+          {
+            "block_id": "b-cb586d6f8c4aee0335a922a8",
+            "quote": "concentrationRequiredYes"
+          }
+        ]
+      },
+      {
+        "id": "admit-credits",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "admission",
+        "kind": "credits",
+        "label": "15 credit hours applicable toward the program, from any accredited institution",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Credit hours applicable toward the Elementary Education program, from any accredited institution",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3c4955b5ebddf59b37377e4e",
+            "quote": "Completed 15 credit hours applicable toward the Elementary Eduction program from any accredited institution"
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Grade point average of at least 2.75 in all course work, transfer and UNM",
+        "minimum": 2.75,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "All coursework, including transfer and UNM",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4073ff965d58565547349117",
+            "quote": "Have a minimum 2.75 GPA in all coursework (including transfer and UNM)"
+          }
+        ]
+      },
+      {
+        "id": "admit-application",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Complete the online application by the deadline: February 1 for fall, September 1 for spring",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of the online application; deadlines are February 1 for fall and September 1 for spring",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7a805fe067f934096c9f84f9",
+            "quote": "Completion of the online application"
+          },
+          {
+            "block_id": "b-908a5b6bbd8f261e855451a0",
+            "quote": "Fall: February 1 Spring: September 1"
+          },
+          {
+            "block_id": "b-205d1dfa92133b0494382b0a",
+            "quote": "Application Deadlines"
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits, including General Education and every program requirement",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e87b4e1b53ef3494460eedf6",
+            "quote": "Complete 120 hours, including general education requirements and all program requirements."
+          },
+          {
+            "block_id": "b-c2c292d43923939defb1d418",
+            "quote": "Grand Total Credits: 120"
+          },
+          {
+            "block_id": "b-31d5f3db01e35e867d6e2338",
+            "quote": "\"120\""
+          }
+        ]
+      },
+      {
+        "id": "sequence-order",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "Every introductory and pre-professional course before starting the Professional Education Sequences",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of all introductory and pre-professional courses is required before starting the Professional Education Sequences",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d1c06cd7fff22c6deacb1225",
+            "quote": "Completion of all introductory and pre-professional courses is required before starting the Professional Education Sequences."
+          }
+        ]
+      },
+      {
+        "id": "advance-gpa",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "policy",
+        "kind": "gpa",
+        "label": "Overall grade point average of at least 2.75 to advance to each next sequence",
+        "minimum": 2.75,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Overall GPA in all courses, to advance to the next sequence",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cfc6ebd9643167b01cfeed56",
+            "quote": "A minimum overall GPA of 2.75 in all courses is required to advance to the next sequence."
+          },
+          {
+            "block_id": "b-dedc7e6b30cba6de21695167",
+            "quote": "A minimum overall GPA of 2.75 in all courses is required to advance to the next sequence."
+          }
+        ]
+      },
+      {
+        "id": "background-check",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "A background check completed before the semester begins",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Successful completion of a background check before the semester begins, following College of Education and Human Sciences Field Services instructions",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-36988b5ffbabb12864c14eca",
+            "quote": "Successful completion of a background check before the semester begins is required."
+          },
+          {
+            "block_id": "b-162dc7766896cb8422fbf21d",
+            "quote": "Follow the instructions from the College of Education and Human Sciences Field Services."
+          }
+        ]
+      },
+      {
+        "id": "portfolio",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete the TEELP Elementary Education portfolio",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of the TEELP Elementary Education portfolio is required for graduation",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-514ec7be2b2e6a7c8045e558",
+            "quote": "Completion of the TEELP Elementary Education portfolio is a requirement for graduation in Elementary Education licensure degrees and certification programs."
+          },
+          {
+            "block_id": "b-d87a78f9a9c29e402f3b0316",
+            "quote": "Completion of the TEELP Elementary Education portfolio is a requirement for graduation in Elementary Education licensure degrees and certification programs."
+          }
+        ]
+      },
+      {
+        "id": "core",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Elementary Education Program Core",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-decf6474c23355dee1481b6f",
+            "quote": "Elementary Education Program Core"
+          },
+          {
+            "block_id": "b-40023c21e3db560173bdb704",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "core-communication",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Communication: 9 credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-82eba2decc5629d7d425fde6",
+            "quote": "Communication"
+          }
+        ]
+      },
+      {
+        "id": "communication",
+        "parent_id": "core-communication",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 9 credits of Communication",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "COMM 1130 or 2150; ENGL 1110 (or ENGL 1110Y or ENGL 1110Z), ENGL 1120, or any courses that meet General Education Area I Communication",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7dc60b2fb8a43a58e97ee82b",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-5d84f1b0523243a07c4c1024",
+            "quote": "COMM 1130 or 2150; ENGL 1110 (or ENGL 1110Y; or ENGL 1110Z), ENGL 1120, or any courses that meet the General Education Curriculum Area I Communication."
+          }
+        ]
+      },
+      {
+        "id": "core-math",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Mathematics and Statistics: MATH1118 and MATH2118",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-86d25f1434e07aa9d8459fd0",
+            "quote": "Mathematics and Statistics"
+          },
+          {
+            "block_id": "b-6a3de04f958585878df98614",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "core-math1118",
+        "parent_id": "core-math",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1118 - Mathematics for Elementary and Middle School Teachers I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skggf9N5o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cd21b94ea5b7592231c9028b",
+            "quote": "MATH1118 - Mathematics for Elementary and Middle School Teachers I (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-math2118",
+        "parent_id": "core-math",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH2118 - Mathematics for Elementary and Middle School Teachers III (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJ-R3qNcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a3624bf1d9dd7b94ef5dd60f",
+            "quote": "MATH2118 - Mathematics for Elementary and Middle School Teachers III (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-science",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Physical and Natural Sciences: 8 credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-aa1798018bfbee90a4010bcf",
+            "quote": "Physical and Natural Sciences"
+          }
+        ]
+      },
+      {
+        "id": "science",
+        "parent_id": "core-science",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 8 credits of laboratory science",
+        "minimum": 8,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any Area III Physical and Natural Sciences lecture courses with their associated labs that meet the General Education curriculum",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a1dec5980b3ce733d2b4b41c",
+            "quote": "Earn at least 8 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-6a188da50ce6f42af7ec39ab",
+            "quote": "Any Area III: Science: Physical and Natural Sciences lecture courses with associated labs that meet General Education curriculum."
+          }
+        ]
+      },
+      {
+        "id": "core-social",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Social and Behavioral Science",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4eb20198502969ef3203b41b",
+            "quote": "Social and Behavioral Science"
+          },
+          {
+            "block_id": "b-baeaed115509866d0faa16f3",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "core-social-ling",
+        "parent_id": "core-social",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "LING2110",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-af7fc08cc0747814ca063251",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "core-ling2110",
+        "parent_id": "core-social-ling",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LING2110 - Introduction to the Study of Language and Linguistics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryZKvq4coq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-02c49124d9e6afc150cc81b9",
+            "quote": "LING2110 - Introduction to the Study of Language and Linguistics (3)"
+          }
+        ]
+      },
+      {
+        "id": "social",
+        "parent_id": "core-social",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits of Area IV Social and Behavioral Sciences",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any Area IV Social and Behavioral Sciences courses that meet the General Education curriculum",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9ebdd3db6f839fc47fa7226d",
+            "quote": "Earn at least 6 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-1e83010e76075118f2c20c8c",
+            "quote": "Any Area IV: Social and Behavioral Sciences courses that meet General Education curriculum."
+          }
+        ]
+      },
+      {
+        "id": "core-humanities",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Humanities: 6 credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8c439b22796c398ae6b81362",
+            "quote": "Humanities"
+          }
+        ]
+      },
+      {
+        "id": "humanities",
+        "parent_id": "core-humanities",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits of Humanities",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "HIST 1110, 1120, 1150, 1160 or 2110, or HIST 463, or any Area VA Humanities courses that meet the General Education curriculum",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4f35a25bd49e34c1921e0ac1",
+            "quote": "Earn at least 6 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-264a1afac5d907bb938b451e",
+            "quote": "HIST 1110 or HIST 1120 or HIST 1150 or HIST 1160 or HIST 2110, or HIST463 or any Area VA: Humanities courses that meet General Education curriculum."
+          }
+        ]
+      },
+      {
+        "id": "core-language",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Second Language: 3 credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae0d92b2b111d2ea76d6a343",
+            "quote": "Second Language"
+          }
+        ]
+      },
+      {
+        "id": "language",
+        "parent_id": "core-language",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 3 credits of Second Language",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any Area VB language course that meets the General Education curriculum",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-27b9f9cb086c5af960715e9d",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-28c8a56abda4fc993ad61052",
+            "quote": "Any Area VB: Language course that meets General Education curriculum."
+          }
+        ]
+      },
+      {
+        "id": "core-arts",
+        "parent_id": "core",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Arts and Design: 3 credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0feacd4c3c729d5cef0fe4f5",
+            "quote": "Arts and Design"
+          }
+        ]
+      },
+      {
+        "id": "arts",
+        "parent_id": "core-arts",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 3 credits of Arts and Design",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTE 2214 or any Area VI Creative and Fine Arts: Arts and Design course that meets the General Education curriculum",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-207858a08ebba186a2feaa0b",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-f8c6aef1d462c86341ef094b",
+            "quote": "ARTE 2214 OR any Area VI: Creative and Fine Arts: Arts and Design course that meets General Education curriculum."
+          }
+        ]
+      },
+      {
+        "id": "introductory",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Introductory courses: EDPY310 and EDUC1120",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f195745d3e499a8f52ea6b08",
+            "quote": "Introductory Courses"
+          },
+          {
+            "block_id": "b-01626b3ef67bc57dd0f5bea8",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "intro-edpy310",
+        "parent_id": "introductory",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDPY310 - Learning and the Classroom (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyGxJsE9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6cdad6874db152d38cd60b64",
+            "quote": "EDPY310 - Learning and the Classroom (3)"
+          }
+        ]
+      },
+      {
+        "id": "intro-educ1120",
+        "parent_id": "introductory",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC1120 - Introduction to Education (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJWyGsVcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-deac163d416dc9e2460b5c12",
+            "quote": "EDUC1120 - Introduction to Education (3)"
+          }
+        ]
+      },
+      {
+        "id": "strand",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "One Diversity/Specialty Strand",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-60c7c5ca85d7c73a3a4fedb2",
+            "quote": "Diversity/Specialty Strand Courses"
+          },
+          {
+            "block_id": "b-a9291b3c9c44781a5c551bf4",
+            "quote": "Complete 1 of the following"
+          }
+        ]
+      },
+      {
+        "id": "strand-general",
+        "parent_id": "strand",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "General Diversity Strand: LLSS1110, LLSS315 and LLSS321",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-79ca5084fc57705ac67442c8",
+            "quote": "General Diversity Strand"
+          },
+          {
+            "block_id": "b-8f7498473a38bf9481020f8a",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "strand-llss1110",
+        "parent_id": "strand-general",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS1110 - Foundations of American Indian Education (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJsZ5Nqo9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2b5f1e92a9d2f598605c70b3",
+            "quote": "LLSS1110 - Foundations of American Indian Education (3)"
+          }
+        ]
+      },
+      {
+        "id": "strand-llss315",
+        "parent_id": "strand-general",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS315 - Educating Linguistically and Culturally Diverse Students (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Ski-9Vqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-205edd22d53ba58b78101ed5",
+            "quote": "LLSS315 - Educating Linguistically and Culturally Diverse Students (3)"
+          }
+        ]
+      },
+      {
+        "id": "strand-llss321",
+        "parent_id": "strand-general",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS321 - School and Society (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SybKbjV5oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6432bb4ea620dfdcfe05a0db",
+            "quote": "LLSS321 - School and Society (3)"
+          }
+        ]
+      },
+      {
+        "id": "strand-bilingual",
+        "parent_id": "strand",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Bilingual Education Strand: at least 9 credits of endorsement courses",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Bilingual Education endorsement courses, with advisement in the Department of Language, Literacy, and Sociocultural Studies",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ab2a4d1cb49b164c0d6090ca",
+            "quote": "Bilingual Education Strand"
+          },
+          {
+            "block_id": "b-9c0d4a790b374134b1a918bb",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-bbfad6efee58676ded717ad5",
+            "quote": "Bilingual Education endorsement courses."
+          }
+        ]
+      },
+      {
+        "id": "strand-tesol",
+        "parent_id": "strand",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Teaching English to Speakers of Other Languages Strand: at least 9 credits of endorsement courses",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Teaching English to Speakers of Other Languages endorsement courses, with advisement in the Department of Language, Literacy, and Sociocultural Studies",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b732f633aa87903229934568",
+            "quote": "Teaching English to Speakers of Other Languages Strand"
+          },
+          {
+            "block_id": "b-fdd4b3676258fcbf8af697fb",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-40d3aefb74ed921ff8170a82",
+            "quote": "Teaching English to Speakers of Other Languages endorsement courses."
+          }
+        ]
+      },
+      {
+        "id": "strand-sped",
+        "parent_id": "strand",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Special Education Strand: at least 9 credits of Special Education minor courses",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Special Education minor courses, with advisement in the Department of Special Education",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a937d3486496fdcca6415b6f",
+            "quote": "Special Education Strand"
+          },
+          {
+            "block_id": "b-7de9a7767984890f425b3fa8",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-fc56962d4ad471aaace24a65",
+            "quote": "Special Education minor courses."
+          }
+        ]
+      },
+      {
+        "id": "preprofessional",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Pre-Professional Sequence",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c09fa60342aed15c09efce23",
+            "quote": "Pre-Professional Sequence"
+          },
+          {
+            "block_id": "b-1b802c9e7588908764871ef8",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "prepro-edpy472",
+        "parent_id": "preprofessional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDPY472 - Classroom Assessment (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Sy-YI9Eco9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f4909471791c168fc4bd4c26",
+            "quote": "EDPY472 - Classroom Assessment (3)"
+          }
+        ]
+      },
+      {
+        "id": "prepro-educ330l",
+        "parent_id": "preprofessional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC330L - Teaching of Reading to Culturally and Linguistically Diverse Students I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hy-xt9V5j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-eeb128d39a45ca941f2f7abe",
+            "quote": "EDUC330L - Teaching of Reading to Culturally and Linguistically Diverse Students I (3)"
+          }
+        ]
+      },
+      {
+        "id": "prepro-llss443",
+        "parent_id": "preprofessional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS443 - Children's Literature (Literatura Infantil) (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1ZSLcV9s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e1e793fffa38b7b8c3fcc6c5",
+            "quote": "LLSS443 - Children's Literature (Literatura Infantil) (3)"
+          }
+        ]
+      },
+      {
+        "id": "prepro-mset365",
+        "parent_id": "preprofessional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MSET365 - Technology Integration for Effective Instruction (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1Wby549jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fa70f7ca6c23d59744ffa473",
+            "quote": "MSET365 - Technology Integration for Effective Instruction (3)"
+          }
+        ]
+      },
+      {
+        "id": "professional",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequences I and II",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9a02d827c899cb829e854fe0",
+            "quote": "Professional Sequences I and II"
+          },
+          {
+            "block_id": "b-cec1f2bf33f6c77ee3d4d0bb",
+            "quote": "Complete all of the following"
+          },
+          {
+            "block_id": "b-b1f4c06f09dde7d49dec98dc",
+            "quote": "Students must successfully complete the Professional Education Sequence courses listed below."
+          }
+        ]
+      },
+      {
+        "id": "ps1",
+        "parent_id": "professional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequence I",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b5406b323a6829dfc9b9a078",
+            "quote": "Professional Sequence I"
+          },
+          {
+            "block_id": "b-665038c8df5657f863b8c1ae",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "ps1-courses",
+        "parent_id": "ps1",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequence I courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-00a471243e0b4fcaa68a3e9c",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps1-educ333l",
+        "parent_id": "ps1-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC333L - Teaching Language Arts K-8 (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1zki45sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-31ffe87c669459cc2631b77f",
+            "quote": "EDUC333L - Teaching Language Arts K-8 (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps1-educ353l",
+        "parent_id": "ps1-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC353L - Teaching Science K-8 (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJbQEcVqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f7f57de84944370f145a3749",
+            "quote": "EDUC353L - Teaching Science K-8 (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps1-educ361l",
+        "parent_id": "ps1-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC361L - Teaching Mathematics K-8 (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJG49E5s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d27cb038e79db2e786cbf0c7",
+            "quote": "EDUC361L - Teaching Mathematics K-8 (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps1-educ401l",
+        "parent_id": "ps1-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC401L - Creating Effective K-8 Learning Environments I (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkOCn5V9s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-26da104f5bb9e3a26848f2c9",
+            "quote": "EDUC401L - Creating Effective K-8 Learning Environments I (1)"
+          }
+        ]
+      },
+      {
+        "id": "ps1-field",
+        "parent_id": "ps1",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 1 credit of EDUC411L",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "EDUC411L K-8 Field Experience I",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7e76c0894ac63ed89090fe1a",
+            "quote": "Earn at least 1 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps1-educ411l",
+        "parent_id": "ps1-field",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC411L - K-8 Field Experience I (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1eSu5Nqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bc304713e237cb180331b2fb",
+            "quote": "EDUC411L - K-8 Field Experience I (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "ps2",
+        "parent_id": "professional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequence II",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2d1f7cc39f77cd12c487e69b",
+            "quote": "Professional Sequence II"
+          },
+          {
+            "block_id": "b-250549de6818e9f222ab19f0",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "ps2-courses",
+        "parent_id": "ps2",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequence II courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e67884da88b828c8443b1390",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps2-educ321l",
+        "parent_id": "ps2-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC321L - Teaching Social Studies K-8 (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1fkGj49iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2a47e93d36cf87ec6229e900",
+            "quote": "EDUC321L - Teaching Social Studies K-8 (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps2-educ331l",
+        "parent_id": "ps2-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC331L - Teaching of Reading to Culturally and Linguistically Diverse Students II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Syt8949iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-22e1a591f989a4992e835a9b",
+            "quote": "EDUC331L - Teaching of Reading to Culturally and Linguistically Diverse Students II (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps2-educ402l",
+        "parent_id": "ps2-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC402L - Creating Effective K-8 Learning Environments II (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJZlt9Ecoc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ee3495c76e42ebcaf1e66679",
+            "quote": "EDUC402L - Creating Effective K-8 Learning Environments II (1)"
+          }
+        ]
+      },
+      {
+        "id": "ps2-field",
+        "parent_id": "ps2",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 2 credits of EDUC412L",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "EDUC412L K-8 Field Experience II",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dfe63948caf9aae73e330f8c",
+            "quote": "Earn at least 2 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps2-educ412l",
+        "parent_id": "ps2-field",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC412L - K-8 Field Experience II (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1lvAYNcjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-377882a606453905e6f31b2a",
+            "quote": "EDUC412L - K-8 Field Experience II (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "ps2-inclusion",
+        "parent_id": "ps2",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 3 credits of SPCD489",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "SPCD489 Teaching Exceptional Students in Inclusive General Education Classrooms",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bd8c94bfc1e5011ae2c3a7e0",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps2-spcd489",
+        "parent_id": "ps2-inclusion",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "SPCD489 - Teaching Exceptional Students in Inclusive General Education Classrooms (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJh8cNcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-33298280cd268cf6830a55e8",
+            "quote": "SPCD489 - Teaching Exceptional Students in Inclusive General Education Classrooms (3)"
+          }
+        ]
+      },
+      {
+        "id": "ps3",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Professional Sequence III/Student Teaching",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3c0a7c468e5701bee751150d",
+            "quote": "Professional Sequence III/Student Teaching"
+          },
+          {
+            "block_id": "b-f17468476fb110806a6e5117",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "ps3-courses",
+        "parent_id": "ps3",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "EDUC403L",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-87d89f2424d2fbdc83ceb68c",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps3-educ403l",
+        "parent_id": "ps3-courses",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC403L - Using Assessment: Creating Effective K-8 Learning Environments III (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryxdL5Vcjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c4c5176a57bfd1e2f920a318",
+            "quote": "EDUC403L - Using Assessment: Creating Effective K-8 Learning Environments III (1)"
+          }
+        ]
+      },
+      {
+        "id": "ps3-teaching",
+        "parent_id": "ps3",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits of EDUC413L student teaching",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "EDUC413L K-8 Field Experience III-Student Teaching",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0237decbcbaaaf2b4ce21189",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ps3-educ413l",
+        "parent_id": "ps3-teaching",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EDUC413L - K-8 Field Experience III-Student Teaching (6 - 15)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkeP754qoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fcf8ca1fbc7334eccfe06b98",
+            "quote": "EDUC413L - K-8 Field Experience III-Student Teaching (6 - 15)"
+          }
+        ]
+      },
+      {
+        "id": "additional",
+        "parent_id": "",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Additional Requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3929eed901b8af8405f05b2c",
+            "quote": "Additional Requirements"
+          },
+          {
+            "block_id": "b-974e641ab766b28fe48aeefb",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "additional-credits",
+        "parent_id": "additional",
+        "entity_id": "programs:HJxPjJOii9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 19 more credits toward the concentration, General Education and electives",
+        "minimum": 19,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Course work to fulfill every program-specific requirement, every concentration requirement and all of UNM's General Education Program requirements; some program courses may also fulfill General Education, and additional elective credits may be needed",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5c50f854a8fecefa10e32c69",
+            "quote": "Earn at least 19 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-a7168ca4da1ddfc2f6555b45",
+            "quote": "In addition, students must fulfill all program-specific requirements, all concentration requirements"
+          }
+        ]
+      },
+      {
+        "id": "la",
+        "parent_id": "",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Language Arts concentration-teaching field",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0f1ea57154ee112a4c5fad94",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "la-foundation",
+        "parent_id": "la",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Language Arts: communication, composition and linguistics",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3d286cad2d3da0a00939d882",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "la-comm",
+        "parent_id": "la-foundation",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Language Arts: at least 3 credits from the listed courses",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9dbbfa5323af881c7d87c460",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-comm-comm1130",
+        "parent_id": "la-comm",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM1130 - Public Speaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1VCqNqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c0dfb86a62600e255e91d11d",
+            "quote": "COMM1130 - Public Speaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-comm-comm2150",
+        "parent_id": "la-comm",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2150 - Communication for Teachers (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hyz2jqV9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ac46395b5fc6d51ff674c487",
+            "quote": "COMM2150 - Communication for Teachers (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-comp",
+        "parent_id": "la-foundation",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Language Arts: at least 3 credits from the listed courses",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d3b8c7ded730ac60774271d8",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-comp-engl1110",
+        "parent_id": "la-comp",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110 - Composition I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByePcqV5ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5d8f0ff25b9208613d65b28",
+            "quote": "ENGL1110 - Composition I (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-comp-engl1110y",
+        "parent_id": "la-comp",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110Y - Composition I: Stretch II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkzE4cVcs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a236a354af243aecf3e11479",
+            "quote": "ENGL1110Y - Composition I: Stretch II (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-comp-engl1110z",
+        "parent_id": "la-comp",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1110Z - Enhanced Composition (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJZ1Gi49i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-eb0e3ee426880a410bc1d177",
+            "quote": "ENGL1110Z - Enhanced Composition (4)"
+          }
+        ]
+      },
+      {
+        "id": "la-required",
+        "parent_id": "la-foundation",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Language Arts: ENGL1120 and LING2110",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-55621dac667d7ec4ac787026",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-engl1120",
+        "parent_id": "la-required",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1120 - Composition II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1fVV5N5sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5de04c7cc4c63de65735072c",
+            "quote": "ENGL1120 - Composition II (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-ling2110",
+        "parent_id": "la-required",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LING2110 - Introduction to the Study of Language and Linguistics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryZKvq4coq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-54e1bcda210d2ed4ae651d7c",
+            "quote": "LING2110 - Introduction to the Study of Language and Linguistics (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-two",
+        "parent_id": "la",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "Language Arts: two of ENGL2110, LLSS430, a THEA course or a 200-level ENGL course",
+        "minimum": 2,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-75994b3ee3cd20241d3b2c1a",
+            "quote": "Complete 2 of the following"
+          }
+        ]
+      },
+      {
+        "id": "la-two-engl2110",
+        "parent_id": "la-two",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "ENGL2110",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-43f6f099b8d00b068108a13d",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-two-engl2110-engl2110",
+        "parent_id": "la-two-engl2110",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2110 - Traditional Grammar (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJfMsVciq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cc3e2d20217bb3a246980512",
+            "quote": "ENGL2110 - Traditional Grammar (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-two-llss430",
+        "parent_id": "la-two",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "LLSS430",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bd982fb3722dc525fb07d490",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-two-llss430-llss430",
+        "parent_id": "la-two-llss430",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS430 - Teaching Writing to Children and Adolescents (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyGiCtE9s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9bbc638a7f708b7604aefb47",
+            "quote": "LLSS430 - Teaching Writing to Children and Adolescents (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-two-thea",
+        "parent_id": "la-two",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "3 credits: Any THEA course",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any THEA course",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-63e765f4094bdbe65537fb11",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-756e5c9d579ed7bd5ac7b5f0",
+            "quote": "Any THEA course"
+          }
+        ]
+      },
+      {
+        "id": "la-two-engl",
+        "parent_id": "la-two",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "3 credits: Any 200-level ENGL course",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any 200-level ENGL course",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a27b2028a5e450d141091db1",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-4943a804ab075f147730f1c0",
+            "quote": "Any 200-level ENGL course"
+          }
+        ]
+      },
+      {
+        "id": "la-literature",
+        "parent_id": "la",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Language Arts: at least 3 credits from the listed literature courses",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d1d1ec793b734f2766ca612c",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "la-literature-engl1410",
+        "parent_id": "la-literature",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1410 - Introduction to Literature (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkbHu5Eqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-83e296b1c56eb503f650945f",
+            "quote": "ENGL1410 - Introduction to Literature (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-literature-engl2610",
+        "parent_id": "la-literature",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2610 - American Literature I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkHkoN9sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-41dc851ed422534371d2a34b",
+            "quote": "ENGL2610 - American Literature I (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-literature-engl2650",
+        "parent_id": "la-literature",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2650 - World Literature I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Syxt-s4ci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-08094ef566779edd6475b851",
+            "quote": "ENGL2650 - World Literature I (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-literature-engl2660",
+        "parent_id": "la-literature",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2660 - World Literature II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Byx5Zq49o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3fb777bc5cfa28db7877439f",
+            "quote": "ENGL2660 - World Literature II (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-literature-llss450",
+        "parent_id": "la-literature",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "LLSS450 - Books and Related Materials for Young Adults (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByM145V9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9136204ab35e999172b93dc4",
+            "quote": "LLSS450 - Books and Related Materials for Young Adults (3)"
+          }
+        ]
+      },
+      {
+        "id": "la-language",
+        "parent_id": "la",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Language Arts: at least 3 credits of Second Language",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "General Education Area VB: Second Language",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5b19c6ea5f6a1851b12f68fb",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-4ecc1331e82158ffc8dd6eba",
+            "quote": "General Education Area VB: Second Language"
+          }
+        ]
+      },
+      {
+        "id": "la-total",
+        "parent_id": "",
+        "entity_id": "specializations:r1MY87dosc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "24 credits",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "A 24 credit hour concentration-teaching field, required for State of New Mexico K-8 Elementary Licensure; an endorsement may be added; some courses may also fulfill General Education or program requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5d51785147e49716d6bc567",
+            "quote": "Grand Total Credits: 24"
+          },
+          {
+            "block_id": "b-36eb99dd33e71b228ecdf92e",
+            "quote": "Elementary Education students are required to complete a 24 credit hour concentration-teaching field in Language Arts, Mathematics, Science, or Social Studies"
+          }
+        ]
+      },
+      {
+        "id": "ma",
+        "parent_id": "",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Mathematics concentration-teaching field",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-802707c2d9f65c35ce43c70b",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "ma-required",
+        "parent_id": "ma",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Mathematics: MATH1118 and MATH2118",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4012b20acbf8397ed6c8d48d",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "ma-math1118",
+        "parent_id": "ma-required",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1118 - Mathematics for Elementary and Middle School Teachers I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skggf9N5o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-69cb819a8c44c5428109ab63",
+            "quote": "MATH1118 - Mathematics for Elementary and Middle School Teachers I (3)"
+          }
+        ]
+      },
+      {
+        "id": "ma-math2118",
+        "parent_id": "ma-required",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH2118 - Mathematics for Elementary and Middle School Teachers III (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJ-R3qNcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c5b79ea27a391d2f798f6d4b",
+            "quote": "MATH2118 - Mathematics for Elementary and Middle School Teachers III (3)"
+          }
+        ]
+      },
+      {
+        "id": "ma-any",
+        "parent_id": "ma",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Mathematics: at least 18 credits of MATH courses",
+        "minimum": 18,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any MATH courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-04436614511b5235a0c13db1",
+            "quote": "Earn at least 18 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-fee744d467f76efedc80f811",
+            "quote": "Any MATH courses"
+          }
+        ]
+      },
+      {
+        "id": "ma-total",
+        "parent_id": "",
+        "entity_id": "specializations:SyKIQ_ojq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "24 credits",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "A 24 credit hour concentration-teaching field, required for State of New Mexico K-8 Elementary Licensure; an endorsement may be added; some courses may also fulfill General Education or program requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c8faa6a5bceb927c3266b069",
+            "quote": "Grand Total Credits: 24"
+          },
+          {
+            "block_id": "b-21e8c9dc4ae352c30063325b",
+            "quote": "Elementary Education students are required to complete a 24 credit hour concentration-teaching field in Language Arts, Mathematics, Science, or Social Studies"
+          }
+        ]
+      },
+      {
+        "id": "sci",
+        "parent_id": "",
+        "entity_id": "specializations:rkKIXOsjq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Science concentration-teaching field",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4f1df7640516a5169bfa9462",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "sci-breadth",
+        "parent_id": "sci",
+        "entity_id": "specializations:rkKIXOsjq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Science: at least 12 credits, a course in each of three areas",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "At least one course from three of the listed areas: Astronomy; Earth and Planetary Science; Biology; Chemistry; Environmental Science; Physics",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5eba59e417bf153a6e37da2c",
+            "quote": "Earn at least 12 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-ffb2ea97e04171f335e04e3d",
+            "quote": "Choose at least one course from three of the following four areas: Astronomy; Earth and Planetary Science; Biology; Chemistry; Environmental Science; Physics."
+          }
+        ]
+      },
+      {
+        "id": "sci-areas",
+        "parent_id": "sci-breadth",
+        "entity_id": "specializations:rkKIXOsjq",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Three of four areas, or of the six listed?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The text says three of the following four areas and then lists six",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ffb2ea97e04171f335e04e3d",
+            "quote": "Choose at least one course from three of the following four areas"
+          }
+        ]
+      },
+      {
+        "id": "sci-depth",
+        "parent_id": "sci",
+        "entity_id": "specializations:rkKIXOsjq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Science: at least 12 credits at the 200 level or above",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses at 200-level or above in Biology; Chemistry; Earth and Planetary Science; Environmental Science; Natural Science; Physics",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-74b106a2fd8c8cf15608db41",
+            "quote": "Earn at least 12 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-29515e8bbf433e608d6e7bff",
+            "quote": "Choose from: Courses at 200-level or above in Biology; Chemistry; Earth and Planetary Science; Environmental Science; Natural Science; Physics."
+          }
+        ],
+        "minimum_course_number": 200
+      },
+      {
+        "id": "sci-total",
+        "parent_id": "",
+        "entity_id": "specializations:rkKIXOsjq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "24 credits",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "A 24 credit hour concentration-teaching field, required for State of New Mexico K-8 Elementary Licensure; an endorsement may be added; some courses may also fulfill General Education or program requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c28d134302cbfa0ad0c43c34",
+            "quote": "Grand Total Credits: 24"
+          },
+          {
+            "block_id": "b-e4ee9a343aa92e6aa4a35cf5",
+            "quote": "Elementary Education students are required to complete a 24 credit hour concentration-teaching field in Language Arts, Mathematics, Science, or Social Studies"
+          }
+        ]
+      },
+      {
+        "id": "ss",
+        "parent_id": "",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Social Studies concentration-teaching field",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cae30024baa8eb0c54fa6b67",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "ss-required",
+        "parent_id": "ss",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Social Studies: four named courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8b70318aaef3a7fe3c108fde",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "ss-hist1110",
+        "parent_id": "ss-required",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1110 - United States History I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1mSq4cic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dfd6d90cca533758ce4eac21",
+            "quote": "HIST1110 - United States History I (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-hist1120",
+        "parent_id": "ss-required",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1120 - United States History II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkQuv5Vcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f9c6d067b08c420b3fc5a7ed",
+            "quote": "HIST1120 - United States History II (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-hist2110",
+        "parent_id": "ss-required",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST2110 - Survey of New Mexico History (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkmGljVqoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3759eb15d334bc5790f7ee5f",
+            "quote": "HIST2110 - Survey of New Mexico History (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-pols1120",
+        "parent_id": "ss-required",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "POLS1120 - American National Government (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hy5BcEqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d4d601cfc726f2d99a57459e",
+            "quote": "POLS1120 - American National Government (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-west",
+        "parent_id": "ss",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Social Studies: at least 3 credits of Western Civilization",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c6b8d453735a17139f311609",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ss-west-hist1150",
+        "parent_id": "ss-west",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1150 - Western Civilization I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkQBq4qj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ac13e027c12270f66d2dcd97",
+            "quote": "HIST1150 - Western Civilization I (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-west-hist1160",
+        "parent_id": "ss-west",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "HIST1160 - Western Civilization II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skl5pcVqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7edd2d5c052ca251956d11dd",
+            "quote": "HIST1160 - Western Civilization II (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-geog",
+        "parent_id": "ss",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Social Studies: at least 3 credits of geography",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f26dfeb9dbd6913a869bc596",
+            "quote": "Earn at least 3 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "ss-geog-geog1165",
+        "parent_id": "ss-geog",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOG1165 - People and Place (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1VOEcV9sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1da4e8bdbbf84df0fe225788",
+            "quote": "GEOG1165 - People and Place (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-geog-geog1175",
+        "parent_id": "ss-geog",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOG1175 - World Regional Geography (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bk-4l54qiq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-690aab46b32b2563c085da71",
+            "quote": "GEOG1175 - World Regional Geography (3)"
+          }
+        ]
+      },
+      {
+        "id": "ss-econ",
+        "parent_id": "ss",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Social Studies: at least 3 credits: Any ECON course",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any ECON course",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-abab3de769d7373adbd9ce4f",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-28b5492ed4d989ce63ca7ed5",
+            "quote": "Any ECON course."
+          }
+        ]
+      },
+      {
+        "id": "ss-pols",
+        "parent_id": "ss",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Social Studies: at least 3 credits: Any POLS course",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Any POLS course",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-66db479f554e96ed7764be75",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-b6d6129893acc8b46fa2170a",
+            "quote": "Any POLS course."
+          }
+        ]
+      },
+      {
+        "id": "ss-total",
+        "parent_id": "",
+        "entity_id": "specializations:SketU7Osi5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "24 credits",
+        "minimum": 24,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "A 24 credit hour concentration-teaching field, required for State of New Mexico K-8 Elementary Licensure; an endorsement may be added; some courses may also fulfill General Education or program requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-94cccab3f9b56a3c39226428",
+            "quote": "Grand Total Credits: 24"
+          },
+          {
+            "block_id": "b-20cbc16c7044e6f05e9cf708",
+            "quote": "Elementary Education students are required to complete a 24 credit hour concentration-teaching field in Language Arts, Mathematics, Science, or Social Studies"
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-e98479fa7022247bbffa12a8",
+        "disposition": "requirements",
+        "node_ids": [
+          "concentration"
+        ],
+        "explanation": "The program description names the four concentration-teaching fields; the rest describes the program."
+      },
+      {
+        "block_id": "b-e1219bc8a2ba23ded4f8a07b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Students should see an advisor for admission: advice, not a condition."
+      },
+      {
+        "block_id": "b-d95b759c459ad8ba88ed394b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the application process; each condition is represented individually."
+      },
+      {
+        "block_id": "b-3c4955b5ebddf59b37377e4e",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-credits"
+        ],
+        "explanation": "Credit hours before admission."
+      },
+      {
+        "block_id": "b-4073ff965d58565547349117",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa"
+        ],
+        "explanation": "The admission grade point."
+      },
+      {
+        "block_id": "b-7a805fe067f934096c9f84f9",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-application"
+        ],
+        "explanation": "The application."
+      },
+      {
+        "block_id": "b-205d1dfa92133b0494382b0a",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-application"
+        ],
+        "explanation": "Heading of the deadlines."
+      },
+      {
+        "block_id": "b-908a5b6bbd8f261e855451a0",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-application"
+        ],
+        "explanation": "The application deadlines."
+      },
+      {
+        "block_id": "b-193d1558f83a165f5ad26edd",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "State requirements may change the curriculum and admission process: a caution, not a condition."
+      },
+      {
+        "block_id": "b-87107168f5e8f4c3c080d121",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description and licensure outcome; no condition."
+      },
+      {
+        "block_id": "b-75bb1ce9b1f704fb1f42c873",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the program overview."
+      },
+      {
+        "block_id": "b-e87b4e1b53ef3494460eedf6",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-9e366c9fbafda1e8b1fe8d85",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Licensure eligibility is the outcome of the degree, not a condition of it."
+      },
+      {
+        "block_id": "b-bacc5c124342cbde60284fe5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the course work requirements."
+      },
+      {
+        "block_id": "b-22e9e22357adb967f48314b0",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Introduction to the introductory and pre-professional sequence, represented below."
+      },
+      {
+        "block_id": "b-d1c06cd7fff22c6deacb1225",
+        "disposition": "requirements",
+        "node_ids": [
+          "sequence-order"
+        ],
+        "explanation": "The sequence order."
+      },
+      {
+        "block_id": "b-cfc6ebd9643167b01cfeed56",
+        "disposition": "requirements",
+        "node_ids": [
+          "advance-gpa"
+        ],
+        "explanation": "The grade point to advance."
+      },
+      {
+        "block_id": "b-36988b5ffbabb12864c14eca",
+        "disposition": "requirements",
+        "node_ids": [
+          "background-check"
+        ],
+        "explanation": "The background check."
+      },
+      {
+        "block_id": "b-162dc7766896cb8422fbf21d",
+        "disposition": "requirements",
+        "node_ids": [
+          "background-check"
+        ],
+        "explanation": "How the background check is done."
+      },
+      {
+        "block_id": "b-4b442e0f52a02a787e5d1cc7",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the Professional Education Sequences."
+      },
+      {
+        "block_id": "b-b1f4c06f09dde7d49dec98dc",
+        "disposition": "requirements",
+        "node_ids": [
+          "professional"
+        ],
+        "explanation": "The Professional Education Sequence courses are required."
+      },
+      {
+        "block_id": "b-dedc7e6b30cba6de21695167",
+        "disposition": "requirements",
+        "node_ids": [
+          "advance-gpa"
+        ],
+        "explanation": "The same grade point to advance, repeated."
+      },
+      {
+        "block_id": "b-9eff377eba32eed6049268c4",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the additional requirements."
+      },
+      {
+        "block_id": "b-514ec7be2b2e6a7c8045e558",
+        "disposition": "requirements",
+        "node_ids": [
+          "portfolio"
+        ],
+        "explanation": "The portfolio."
+      },
+      {
+        "block_id": "b-8d4bdd375b606ca879b193d8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Requirements are subject to change: a caution, not a condition."
+      },
+      {
+        "block_id": "b-03fb5a058f306421c9e0d47f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts, each represented individually."
+      },
+      {
+        "block_id": "b-decf6474c23355dee1481b6f",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-40023c21e3db560173bdb704",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-82eba2decc5629d7d425fde6",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-communication"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-7dc60b2fb8a43a58e97ee82b",
+        "disposition": "requirements",
+        "node_ids": [
+          "communication"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-5d84f1b0523243a07c4c1024",
+        "disposition": "requirements",
+        "node_ids": [
+          "communication"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-86d25f1434e07aa9d8459fd0",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-math"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-6a3de04f958585878df98614",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-math"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-cd21b94ea5b7592231c9028b",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-math1118"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-a3624bf1d9dd7b94ef5dd60f",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-math2118"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-aa1798018bfbee90a4010bcf",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-science"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-a1dec5980b3ce733d2b4b41c",
+        "disposition": "requirements",
+        "node_ids": [
+          "science"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-6a188da50ce6f42af7ec39ab",
+        "disposition": "requirements",
+        "node_ids": [
+          "science"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-4eb20198502969ef3203b41b",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-social"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-baeaed115509866d0faa16f3",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-social"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-af7fc08cc0747814ca063251",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-social-ling"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-02c49124d9e6afc150cc81b9",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-ling2110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-9ebdd3db6f839fc47fa7226d",
+        "disposition": "requirements",
+        "node_ids": [
+          "social"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-1e83010e76075118f2c20c8c",
+        "disposition": "requirements",
+        "node_ids": [
+          "social"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-8c439b22796c398ae6b81362",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-humanities"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-4f35a25bd49e34c1921e0ac1",
+        "disposition": "requirements",
+        "node_ids": [
+          "humanities"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-264a1afac5d907bb938b451e",
+        "disposition": "requirements",
+        "node_ids": [
+          "humanities"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-ae0d92b2b111d2ea76d6a343",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-language"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-27b9f9cb086c5af960715e9d",
+        "disposition": "requirements",
+        "node_ids": [
+          "language"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-28c8a56abda4fc993ad61052",
+        "disposition": "requirements",
+        "node_ids": [
+          "language"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-0feacd4c3c729d5cef0fe4f5",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-207858a08ebba186a2feaa0b",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-f8c6aef1d462c86341ef094b",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-f195745d3e499a8f52ea6b08",
+        "disposition": "requirements",
+        "node_ids": [
+          "introductory"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-01626b3ef67bc57dd0f5bea8",
+        "disposition": "requirements",
+        "node_ids": [
+          "introductory"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-6cdad6874db152d38cd60b64",
+        "disposition": "requirements",
+        "node_ids": [
+          "intro-edpy310"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-deac163d416dc9e2460b5c12",
+        "disposition": "requirements",
+        "node_ids": [
+          "intro-educ1120"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-60c7c5ca85d7c73a3a4fedb2",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-a9291b3c9c44781a5c551bf4",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-79ca5084fc57705ac67442c8",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-general"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-8f7498473a38bf9481020f8a",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-general"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-2b5f1e92a9d2f598605c70b3",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-llss1110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-205edd22d53ba58b78101ed5",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-llss315"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-6432bb4ea620dfdcfe05a0db",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-llss321"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-ab2a4d1cb49b164c0d6090ca",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-bilingual"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-9c0d4a790b374134b1a918bb",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-bilingual"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-bbfad6efee58676ded717ad5",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-bilingual"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-b732f633aa87903229934568",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-tesol"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-fdd4b3676258fcbf8af697fb",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-tesol"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-40d3aefb74ed921ff8170a82",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-tesol"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-a937d3486496fdcca6415b6f",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-sped"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-7de9a7767984890f425b3fa8",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-sped"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-fc56962d4ad471aaace24a65",
+        "disposition": "requirements",
+        "node_ids": [
+          "strand-sped"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-c09fa60342aed15c09efce23",
+        "disposition": "requirements",
+        "node_ids": [
+          "preprofessional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-1b802c9e7588908764871ef8",
+        "disposition": "requirements",
+        "node_ids": [
+          "preprofessional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-f4909471791c168fc4bd4c26",
+        "disposition": "requirements",
+        "node_ids": [
+          "prepro-edpy472"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-eeb128d39a45ca941f2f7abe",
+        "disposition": "requirements",
+        "node_ids": [
+          "prepro-educ330l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-e1e793fffa38b7b8c3fcc6c5",
+        "disposition": "requirements",
+        "node_ids": [
+          "prepro-llss443"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-fa70f7ca6c23d59744ffa473",
+        "disposition": "requirements",
+        "node_ids": [
+          "prepro-mset365"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-9a02d827c899cb829e854fe0",
+        "disposition": "requirements",
+        "node_ids": [
+          "professional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-cec1f2bf33f6c77ee3d4d0bb",
+        "disposition": "requirements",
+        "node_ids": [
+          "professional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-b5406b323a6829dfc9b9a078",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-665038c8df5657f863b8c1ae",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-00a471243e0b4fcaa68a3e9c",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-courses"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-31ffe87c669459cc2631b77f",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-educ333l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-f7f57de84944370f145a3749",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-educ353l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-d27cb038e79db2e786cbf0c7",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-educ361l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-26da104f5bb9e3a26848f2c9",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-educ401l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-7e76c0894ac63ed89090fe1a",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-field"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-bc304713e237cb180331b2fb",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps1-educ411l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-2d1f7cc39f77cd12c487e69b",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-250549de6818e9f222ab19f0",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-e67884da88b828c8443b1390",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-courses"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-2a47e93d36cf87ec6229e900",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-educ321l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-22e1a591f989a4992e835a9b",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-educ331l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-ee3495c76e42ebcaf1e66679",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-educ402l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-dfe63948caf9aae73e330f8c",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-field"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-377882a606453905e6f31b2a",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-educ412l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-bd8c94bfc1e5011ae2c3a7e0",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-inclusion"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-33298280cd268cf6830a55e8",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps2-spcd489"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-3c0a7c468e5701bee751150d",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-f17468476fb110806a6e5117",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-87d89f2424d2fbdc83ceb68c",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3-courses"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-c4c5176a57bfd1e2f920a318",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3-educ403l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-0237decbcbaaaf2b4ce21189",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3-teaching"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-fcf8ca1fbc7334eccfe06b98",
+        "disposition": "requirements",
+        "node_ids": [
+          "ps3-educ413l"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-3929eed901b8af8405f05b2c",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-974e641ab766b28fe48aeefb",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional"
+        ],
+        "explanation": "Heading or introduction of this group."
+      },
+      {
+        "block_id": "b-5c50f854a8fecefa10e32c69",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional-credits"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-a7168ca4da1ddfc2f6555b45",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional-credits"
+        ],
+        "explanation": "The pool and its qualification."
+      },
+      {
+        "block_id": "b-d87a78f9a9c29e402f3b0316",
+        "disposition": "requirements",
+        "node_ids": [
+          "portfolio"
+        ],
+        "explanation": "The same portfolio requirement, repeated with the additional requirements."
+      },
+      {
+        "block_id": "b-c2c292d43923939defb1d418",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-39a34bdd43022e67fbaf3c06",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-d1cd5fd7776c81796c8576d5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-fdc7e2d3731ac1a4b3a213c4",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-c283cc86fec6c9898deebba9",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-666ead28cb053af605fb39f4",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-621fce1a22544b27bdbea000",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-abe023332bb2e18024488085",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-107a97875f216cec7649ac57",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-015309feaa696234f86cca46",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-a62fc392095c02bd7fe45b4c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-965facb48c4f3ce8d46ea820",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-19102eb19d8c481b10b92a6b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The program is not offered online."
+      },
+      {
+        "block_id": "b-31d5f3db01e35e867d6e2338",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 120, agree with the stated total."
+      },
+      {
+        "block_id": "b-cb586d6f8c4aee0335a922a8",
+        "disposition": "requirements",
+        "node_ids": [
+          "concentration"
+        ],
+        "explanation": "The record requires a concentration."
+      },
+      {
+        "block_id": "b-0f1ea57154ee112a4c5fad94",
+        "disposition": "requirements",
+        "node_ids": [
+          "la"
+        ],
+        "explanation": "Every part of the field is required."
+      },
+      {
+        "block_id": "b-3d286cad2d3da0a00939d882",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-foundation"
+        ],
+        "explanation": "Every part of this group is required."
+      },
+      {
+        "block_id": "b-9dbbfa5323af881c7d87c460",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comm"
+        ],
+        "explanation": "Three credits from the listed courses."
+      },
+      {
+        "block_id": "b-c0dfb86a62600e255e91d11d",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comm-comm1130"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-ac46395b5fc6d51ff674c487",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comm-comm2150"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-d3b8c7ded730ac60774271d8",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comp"
+        ],
+        "explanation": "Three credits from the listed courses."
+      },
+      {
+        "block_id": "b-a5d8f0ff25b9208613d65b28",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comp-engl1110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-a236a354af243aecf3e11479",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comp-engl1110y"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-eb0e3ee426880a410bc1d177",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-comp-engl1110z"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-55621dac667d7ec4ac787026",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-required"
+        ],
+        "explanation": "Two named required courses."
+      },
+      {
+        "block_id": "b-5de04c7cc4c63de65735072c",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-engl1120"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-54e1bcda210d2ed4ae651d7c",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-ling2110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-75994b3ee3cd20241d3b2c1a",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two"
+        ],
+        "explanation": "Two of the four alternatives."
+      },
+      {
+        "block_id": "b-43f6f099b8d00b068108a13d",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-engl2110"
+        ],
+        "explanation": "One alternative: a named course."
+      },
+      {
+        "block_id": "b-cc3e2d20217bb3a246980512",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-engl2110-engl2110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-bd982fb3722dc525fb07d490",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-llss430"
+        ],
+        "explanation": "One alternative: a named course."
+      },
+      {
+        "block_id": "b-9bbc638a7f708b7604aefb47",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-llss430-llss430"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-63e765f4094bdbe65537fb11",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-thea"
+        ],
+        "explanation": "One alternative: 3 credits from a described pool."
+      },
+      {
+        "block_id": "b-756e5c9d579ed7bd5ac7b5f0",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-thea"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-a27b2028a5e450d141091db1",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-engl"
+        ],
+        "explanation": "One alternative: 3 credits from a described pool."
+      },
+      {
+        "block_id": "b-4943a804ab075f147730f1c0",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-two-engl"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-d1d1ec793b734f2766ca612c",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature"
+        ],
+        "explanation": "Three credits from the listed courses."
+      },
+      {
+        "block_id": "b-83e296b1c56eb503f650945f",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature-engl1410"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-41dc851ed422534371d2a34b",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature-engl2610"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-08094ef566779edd6475b851",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature-engl2650"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-3fb777bc5cfa28db7877439f",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature-engl2660"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-9136204ab35e999172b93dc4",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-literature-llss450"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-5b19c6ea5f6a1851b12f68fb",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-language"
+        ],
+        "explanation": "Three credits of a described pool."
+      },
+      {
+        "block_id": "b-4ecc1331e82158ffc8dd6eba",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-language"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-36eb99dd33e71b228ecdf92e",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-total"
+        ],
+        "explanation": "The concentration-teaching field is 24 credits; advisement and optional endorsements are described."
+      },
+      {
+        "block_id": "b-a5d51785147e49716d6bc567",
+        "disposition": "requirements",
+        "node_ids": [
+          "la-total"
+        ],
+        "explanation": "The field's total."
+      },
+      {
+        "block_id": "b-b8c430a719d16120232e5193",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-be4096600ffba2ed7e7f8311",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-7307094b4484ccf33da415c9",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-77759077a6d84d361232b6af",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-cd82b80e63ff888c56b2f606",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-802707c2d9f65c35ce43c70b",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma"
+        ],
+        "explanation": "Every part of the field is required."
+      },
+      {
+        "block_id": "b-4012b20acbf8397ed6c8d48d",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-required"
+        ],
+        "explanation": "Two named required courses."
+      },
+      {
+        "block_id": "b-69cb819a8c44c5428109ab63",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-math1118"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-c5b79ea27a391d2f798f6d4b",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-math2118"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-04436614511b5235a0c13db1",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-any"
+        ],
+        "explanation": "Eighteen credits of a described pool."
+      },
+      {
+        "block_id": "b-fee744d467f76efedc80f811",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-any"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-21e8c9dc4ae352c30063325b",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-total"
+        ],
+        "explanation": "The concentration-teaching field is 24 credits; advisement and optional endorsements are described."
+      },
+      {
+        "block_id": "b-c8faa6a5bceb927c3266b069",
+        "disposition": "requirements",
+        "node_ids": [
+          "ma-total"
+        ],
+        "explanation": "The field's total."
+      },
+      {
+        "block_id": "b-19f4bac7a5f241b6e54fc7d2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-7fcbced9dd59577621ea1210",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-fb22f03d800e560fdfa68874",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-449e2cf856331e2d893b30dc",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-008be2476d289e505b1de680",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-4f1df7640516a5169bfa9462",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci"
+        ],
+        "explanation": "Every part of the field is required."
+      },
+      {
+        "block_id": "b-5eba59e417bf153a6e37da2c",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci-breadth"
+        ],
+        "explanation": "Twelve credits across areas."
+      },
+      {
+        "block_id": "b-ffb2ea97e04171f335e04e3d",
+        "disposition": "unresolved",
+        "node_ids": [
+          "sci-breadth",
+          "sci-areas"
+        ],
+        "explanation": "The pool's qualification, whose count of areas conflicts with its list."
+      },
+      {
+        "block_id": "b-74b106a2fd8c8cf15608db41",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci-depth"
+        ],
+        "explanation": "Twelve credits by course level."
+      },
+      {
+        "block_id": "b-29515e8bbf433e608d6e7bff",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci-depth"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-e4ee9a343aa92e6aa4a35cf5",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci-total"
+        ],
+        "explanation": "The concentration-teaching field is 24 credits; advisement and optional endorsements are described."
+      },
+      {
+        "block_id": "b-c28d134302cbfa0ad0c43c34",
+        "disposition": "requirements",
+        "node_ids": [
+          "sci-total"
+        ],
+        "explanation": "The field's total."
+      },
+      {
+        "block_id": "b-0613456effdd27a2790b5ed3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-148715d529aff3f5cc33b15c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-060f2ae98412364248321b64",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-ad4f65a2a65f9cf460c23fcc",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-28d60ef9ec493b5f18ca4430",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-cae30024baa8eb0c54fa6b67",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss"
+        ],
+        "explanation": "Every part of the field is required."
+      },
+      {
+        "block_id": "b-8b70318aaef3a7fe3c108fde",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-required"
+        ],
+        "explanation": "Four named required courses."
+      },
+      {
+        "block_id": "b-dfd6d90cca533758ce4eac21",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-hist1110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-f9c6d067b08c420b3fc5a7ed",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-hist1120"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-3759eb15d334bc5790f7ee5f",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-hist2110"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-d4d601cfc726f2d99a57459e",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-pols1120"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-c6b8d453735a17139f311609",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-west"
+        ],
+        "explanation": "Three credits from the listed courses."
+      },
+      {
+        "block_id": "b-ac13e027c12270f66d2dcd97",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-west-hist1150"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-7edd2d5c052ca251956d11dd",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-west-hist1160"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-f26dfeb9dbd6913a869bc596",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-geog"
+        ],
+        "explanation": "Three credits from the listed courses."
+      },
+      {
+        "block_id": "b-1da4e8bdbbf84df0fe225788",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-geog-geog1165"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-690aab46b32b2563c085da71",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-geog-geog1175"
+        ],
+        "explanation": "A listed course."
+      },
+      {
+        "block_id": "b-abab3de769d7373adbd9ce4f",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-econ"
+        ],
+        "explanation": "Three credits of a described pool."
+      },
+      {
+        "block_id": "b-28b5492ed4d989ce63ca7ed5",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-econ"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-66db479f554e96ed7764be75",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-pols"
+        ],
+        "explanation": "Three credits of a described pool."
+      },
+      {
+        "block_id": "b-b6d6129893acc8b46fa2170a",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-pols"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-20cbc16c7044e6f05e9cf708",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-total"
+        ],
+        "explanation": "The concentration-teaching field is 24 credits; advisement and optional endorsements are described."
+      },
+      {
+        "block_id": "b-94cccab3f9b56a3c39226428",
+        "disposition": "requirements",
+        "node_ids": [
+          "ss-total"
+        ],
+        "explanation": "The field's total."
+      },
+      {
+        "block_id": "b-0f0e086a1f6978a4b9419cb3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-95e598aa907cb3cc863bf981",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-4a5e74a8bc24a496b9a55ebb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-6c1be2140370c44c4576a3fa",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-920f48efb90d70fae4a3cd75",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-ffb2ea97e04171f335e04e3d",
+        "question": "The Science field says \"at least one course from three of the following four areas\" and then lists six areas (Astronomy, Earth and Planetary Science, Biology, Chemistry, Environmental Science, Physics). Which areas count, and is it three of them?"
+      },
+      {
+        "block_id": "b-29515e8bbf433e608d6e7bff",
+        "question": "Science asks for 12 credits \"at 200-level or above\". Under the current numbering, does that mean 2000-level and above, or 300-level and above?"
+      },
+      {
+        "block_id": "b-a9291b3c9c44781a5c551bf4",
+        "question": "Three of the four Diversity/Specialty strands are 9 credits of endorsement or minor courses that the record does not list. Which courses count for the Bilingual Education, TESOL and Special Education strands?"
+      },
+      {
+        "block_id": "b-36eb99dd33e71b228ecdf92e",
+        "question": "How do the 24 credits of the concentration-teaching field count against the rest of the degree? Language Arts repeats core courses (COMM 1130, ENGL 1110, ENGL 1120, LING 2110), and the 19 additional credits name the concentration among the requirements they meet."
+      }
+    ]
+  }
+}
