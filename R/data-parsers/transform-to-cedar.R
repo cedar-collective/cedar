@@ -748,6 +748,53 @@ transform_students <- function(class_lists, data_dir, ext, maps) {
 }
 
 
+# ── Student ID spaces ─────────────────────────────────────────────────────────
+
+#' Check that every stored student table joins to the class lists, or stop
+#'
+#' Student IDs are hashed once, at parse. A pull that presented an ID in
+#' another surface form (a numeric read that dropped leading zeros) hashes to
+#' another value, and those rows can never be joined again; row counts, terms
+#' and every table on its own still look right (ISSUES.md I1). So each run
+#' checks the stored tables (`check_student_id_integrity()`), prints each
+#' table's verdict and every table-term to the log, and stops on a table that
+#' joins in some class-list terms and not at all in others: the source reports
+#' for those terms must be pulled again. This was the Admin > Join Integrity
+#' page until 2026-11-27.
+#'
+#' @param spine The stored class list (`cedar_registrations`), or NULL when it
+#'   has not been built, in which case nothing can be checked and the log says so.
+#' @param tables Named list of the other stored student tables; NULL for one
+#'   not built, which the log names.
+#' @return The check's result, invisibly, or NULL when nothing was checked.
+check_stored_student_ids <- function(spine, tables) {
+  message("\n──────────────────────────────────────────────────────")
+  if (is.null(spine)) {
+    message("Student IDs not checked: cedar_registrations has not been built.")
+    return(invisible(NULL))
+  }
+  absent <- names(tables)[vapply(tables, is.null, logical(1))]
+  if (length(absent)) message("Student IDs: not built, so not checked: ", paste(absent, collapse = ", "))
+  empty <- setdiff(names(tables)[vapply(tables, function(t) is.null(t) || !nrow(t), logical(1))], absent)
+  if (length(empty)) message("Student IDs: built with no rows, so not checked: ", paste(empty, collapse = ", "))
+  tables <- tables[setdiff(names(tables), c(absent, empty))]
+  if (!length(tables)) {
+    message("Student IDs not checked: no other student table has been built.")
+    return(invisible(NULL))
+  }
+  res <- check_student_id_integrity(spine, tables, list(spine_name = "cedar_registrations"))
+  for (line in format_student_id_integrity(res)) message("  ", line)
+  if (res$n_tables_split > 0L) {
+    split <- res$by_table$table[res$by_table$verdict == "split"]
+    none <- res$by_term[res$by_term$table %in% split & res$by_term$term_status == "none", ]
+    stop("[transform-to-cedar.R] ", paste(split, collapse = ", "),
+         if (length(split) == 1L) " holds" else " hold", " two student ID spaces: no student in ",
+         paste(none$table, none$term, collapse = ", "), " joins to the class lists. ",
+         "Pull the source reports for those terms again (ISSUES.md I1); the by-term table is above.", call. = FALSE)
+  }
+  invisible(res)
+}
+
 # ── 2b. transform_student_terms: students + programs + degrees → cedar_student_terms
 
 #' One row per student-term, built from the saved CEDAR tables (ADR-001 step 2;
@@ -1793,7 +1840,18 @@ transform_to_cedar <- function(data_dir = NULL, use_qs = NULL, tables = NULL,
     message(sprintf("    %-14s %-10s %s rows, %s", mapping_audit$kind[i], mapping_audit$value[i],
                     format(mapping_audit$rows[i], big.mark = ","), mapping_audit$context[i]))
   }
-  rm(audit_tables, audit_majors, mapping_audit); gc(verbose = FALSE)
+
+  # ── Student ID spaces ─────────────────────────────────────────────────────
+  # Every student table must join to the class lists on student_id, checked on
+  # the stored tables at every run (ISSUES.md I1); a table holding two ID
+  # spaces stops it. Reuses the class list, programs and degrees the audit read.
+  id_tables <- c(list(cedar_programs = audit_tables$programs, cedar_degrees = audit_tables$degrees),
+    lapply(c(cedar_applicants = "cedar_applicants", cedar_student_terms = "cedar_student_terms"), function(name) {
+      path <- file.path(data_dir, paste0(name, ext))
+      if (file.exists(path)) load_file(path, ext)[c("student_id", "term")]
+    }))
+  check_stored_student_ids(audit_tables$students, id_tables)
+  rm(audit_tables, audit_majors, mapping_audit, id_tables); gc(verbose = FALSE)
 
   # Write cedar-status.json for fast CLI queries
   status_file <- file.path(data_dir, "cedar-status.json")

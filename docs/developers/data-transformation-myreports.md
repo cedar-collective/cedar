@@ -142,7 +142,11 @@ scripts/update-data.sh --dry-run -s 202680 holds
 ```
 
 Then check that the student IDs join. A table hashed any other way matches
-no one, and nothing else will say so:
+no one. The transform checks programs, degrees, applicants and student-terms
+against the class lists at every run, prints each table's verdict and every
+term under **Student IDs** in its log, and stops on a table that joins in some
+class-list terms and not at all in others (ISSUES I1). A table with no term
+column, such as holds, is checked by hand:
 
 ```r
 source("scripts/cedar-repl.R")

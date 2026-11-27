@@ -43,7 +43,6 @@ test_that("freshness has no server output and app wiring parses", {
   expect_false(grepl('reactableOutput("data_status_table")', ui, fixed = TRUE))
   expect_match(ui, "dataStatusUI(cedar_data_summary, cedar_current_term)", fixed = TRUE)
   expect_match(server, "req(projection_tab_opened())", fixed = TRUE)
-  expect_match(server, "req(integrity_tab_opened())", fixed = TRUE)
   expect_silent(parse(file.path(cedar_base_dir, "ui.R")))
   expect_silent(parse(file.path(cedar_base_dir, "server.R")))
 })

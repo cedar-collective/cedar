@@ -53,6 +53,7 @@ test_ids_clean       <<- cedar_ids_clean         # IDS01: joins everywhere
 test_ids_split       <<- cedar_ids_split         # IDS01: two ID spaces, the real defect
 test_ids_partial     <<- cedar_ids_partial       # IDS01: wider population, never zero
 test_ids_orphan      <<- cedar_ids_orphan        # IDS01: no overlap in any term
+test_ids_ahead       <<- cedar_ids_ahead         # IDS01: a term after the spine, nobody registered
 test_students    <<- cedar_registrations
 test_students_reused_crn <<- cedar_registrations_reused_crn # EC-08: repeat attempts and extract duplicates
 test_students_audits <<- cedar_registrations_audits # EC-09: audit/status precedence

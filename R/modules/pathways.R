@@ -3192,15 +3192,14 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
       # Both denominators are stated here, in words, right above the table. They
       # are not the same number and they are not the same unit, and a reader who
       # assumes otherwise misreads every row.
-      # Say "matched", not "has coursework". A departure counted here can be a
-      # student who took a full load and simply cannot be joined to the class
-      # lists — see ISSUES.md I1. Reporting that as missing coursework blames the
-      # student record for a defect in the ID hashing.
+      # Say "matched", not "has coursework": a departure counted here can be a
+      # student with no class-list record CEDAR holds for that term. (A table
+      # whose student IDs do not join to the class lists at all stops the data
+      # refresh, ISSUES.md I1, so an unmatched departure is not a broken ID.)
       unseen <- pcc$n_switches - pcc$n_switches_with_courses
       unseen_note <- if (unseen > 0) {
         paste0(" The other ", fmt(unseen),
-               " could not be matched to any class-list record — check ",
-               "Data & Usage → Join Integrity before reading much into these shares.")
+               " have no class-list record CEDAR can match, so they are not in these shares.")
       } else {
         ""
       }

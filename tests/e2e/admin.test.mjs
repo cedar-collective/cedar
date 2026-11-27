@@ -80,7 +80,9 @@ try {
     sameTab: document.getElementById('usage_overview_ui').closest('.tab-pane') === document.getElementById('feature_usage_table').closest('.tab-pane'),
   }));
   check(`the dashboard and the event log share one tab (${usage.tabs.join(', ')})`,
-        usage.sameTab && usage.tabs.includes('Usage') && !usage.tabs.includes('Feature Details') && !usage.tabs.includes('Usage Overview'));
+        usage.sameTab && usage.tabs.includes('Usage') && !usage.tabs.includes('Feature Details') && !usage.tabs.includes('Usage Overview') &&
+        // Join Integrity was retired: the transform checks the IDs at every run.
+        !usage.tabs.includes('Join Integrity'));
   check(`one date range filters both (${usage.dates} date inputs)`, usage.dates === 2);
   // This session's own visit is in today's log: the dashboard counts it and
   // the event log lists it, so the two read the same range.
@@ -187,14 +189,19 @@ try {
     // A degree total the catalog states two ways is one of them, found by the
     // catalog scan and named by no reading (it replaced Extraction diagnostics).
     const questionSearch = '#catalog_review-questions-questions input.rt-search';
-    await page.type(questionSearch, 'gives this degree two totals');
+    const totalsQuery = 'gives this degree two totals';
+    await page.type(questionSearch, totalsQuery);
     await page.waitForFunction(() => document.querySelector('#catalog_review-questions-questions .rt-tbody')?.innerText.includes('two totals'));
     const totals = await readReactable(page, 'catalog_review-questions-questions');
     check('a degree total the catalog states two ways is a question for the catalog, changed on its page',
       totals.rows.length > 0 && totals.rows.every(row => row[who] === 'The catalog' &&
         row.join(' ').includes('the catalog page, then a new catalog scan')));
-    await page.click(questionSearch, { clickCount: 3 });
-    await page.keyboard.press('Backspace');
+    await page.focus(questionSearch);
+    await page.keyboard.press('End');
+    for (let i = 0; i < totalsQuery.length; i++) await page.keyboard.press('Backspace');
+    await page.waitForFunction((sel) => document.querySelector(sel)?.value === '', {}, questionSearch);
+    check('clearing the search shows every question the catalog can settle again',
+      (await readReactable(page, 'catalog_review-questions-questions')).rows.length === catalogOnly.rows.length);
     const boardList = await readReactable(page, 'catalog_review-questions-boards');
     check('each board compiled from a reading is listed with what it leaves out',
       boardList.rows.length > 0 && colIndex(boardList.headers, 'What the board leaves out') >= 0);

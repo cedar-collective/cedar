@@ -3356,8 +3356,9 @@ at DOM-ready; the forced collision and link/panel checks in `nav.test.mjs` guard
 **Status:** resolved 2026-08-12. Repulled `as` + `deg` for 201980–202460, then
 (after fixing I3) ran a full transform to land the tables in `data/`. Verified in
 the app's own data directory: `cedar_programs` is **one ID space across all 25
-terms**, and no table has a term that fails to join. Watch for a recurrence via
-Data & Usage → Join Integrity after any future refresh.
+terms**, and no table has a term that fails to join. Since 2026-11-27 every
+transform checks the stored tables and stops on a recurrence, with the by-term
+table under **Student IDs** in its log (`check_stored_student_ids()`).
 **Found:** 2026-08-12
 **Severity:** high — silently truncated every cross-table student analysis
 **Affects:** `academic_studies.qs` → `cedar_programs`, `degrees.qs` →
@@ -3454,15 +3455,17 @@ at read time.
 
 ### Reproduction
 
-In the running app: **Data & Usage → Join Integrity**. Every table should read
-`consistent`; any `split` verdict is this issue, and the by-term table lists
-exactly which terms need repulling.
+In any transform's log (the refresh's, or
+`Rscript --vanilla R/data-parsers/transform-to-cedar.R --tables programs`):
+the **Student IDs** section. Every table should read `consistent`; a `split`
+verdict is this issue, stops the run, and names exactly which terms need
+repulling.
 
 From RStudio:
 
 ```r
 check_student_id_integrity(
-  spine  = load_cedar_data("data/cedar_students.qs"),
+  spine  = load_cedar_data("data/cedar_registrations.qs"),
   tables = list(
     cedar_programs = load_cedar_data("data/cedar_programs.qs"),
     cedar_degrees  = load_cedar_data("data/cedar_degrees.qs")
@@ -5011,8 +5014,8 @@ But tables built under different salts no longer join, so the change must be
 one complete rebuild of every table holding student IDs (`cedar_programs`,
 `cedar_degrees`, `cedar_registrations`, `cedar_student_terms`,
 `cedar_applicants`, `cedar_holds`; the course-flow and enrollment caches hold none; `cedar_student_term_credits`
-and `cedar_next_term` are retired), checked afterwards on Admin >
-Join Integrity. Salting the parse stage too means a one-time migration of the
+and `cedar_next_term` are retired), checked afterwards in the rebuild's own
+log (the transform's **Student IDs** section; holds, with no term, by hand). Salting the parse stage too means a one-time migration of the
 stored exports' MD5s, not a re-pull.
 
 ---

@@ -905,7 +905,8 @@ ids_tables <- list(
   ids_clean   = test_ids_clean,
   ids_split   = test_ids_split,
   ids_partial = test_ids_partial,
-  ids_orphan  = test_ids_orphan
+  ids_orphan  = test_ids_orphan,
+  ids_ahead   = test_ids_ahead
 )
 
 # ── test-declaration-context.R ──────────────────────────────────────────────────
