@@ -18,6 +18,17 @@ CEDAR_DEGREE_AREA_LABELS <- c(entry = "Entering the program", core = "Required c
 CEDAR_DEGREE_OPERATORS <- c("all", "choose_n", "course", "credits", "condition", "none",
                            "prior", "concurrent", "prior_or_concurrent")
 
+# Who can settle an open question in a catalog reading. Each reading's `triage`
+# names one for every question and unresolved rule (degree_reading_question_rows()):
+#   catalog  the catalog contradicts itself, is unclear or names nothing: the
+#            department or the catalog office answers, and the catalog changes
+#   capture  the catalog says it on a linked page or footnote that CEDAR's copy
+#            did not keep: the catalog scan is fixed
+#   reading  the catalog leaves a choice and CEDAR's reading planned it one way:
+#            a reviewer confirms or changes the reading
+CATALOG_QUESTION_SETTLERS <- c(catalog = "The catalog", capture = "CEDAR's copy of the catalog",
+                               reading = "CEDAR's reading")
+
 .DEGREE_COURSE_CODE_PATTERN <- "^[A-Z]+ [0-9]+[A-Z]*$"
 .DEGREE_ID_PATTERN <- "^[a-z][a-z0-9_]*$"
 .DEGREE_PROGRAM_CODE_PATTERN <- "^[A-Z]+-[A-Z0-9]+-[A-Z]+$"
@@ -414,10 +425,12 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
       anyDuplicated(paste(math_routes$catalog_id, math_routes$start_id))) {
     stop("[degree_catalog.R] Invalid program math route")
   }
+  # A route can be empty: a program with no math requirement shows no math
+  # course for a start that needs no preparation; its Gen Ed card stands for the area.
   shared_math <- nodes$node_id[nodes$catalog_id == "*" & nodes$track == "math"]
   for (i in seq_len(nrow(math_routes))) {
     ids <- degree_split_ids(math_routes$node_ids[i])
-    if (!length(ids) || anyDuplicated(ids) || any(!ids %in% shared_math)) {
+    if (anyDuplicated(ids) || any(!ids %in% shared_math)) {
       stop("[degree_catalog.R] Unknown program math route course")
     }
   }
@@ -483,6 +496,25 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
   }
 }
 
+#' A plan's own Gen Ed area minimums
+#'
+#' A program page can ask for more than the University's Gen Ed in an area
+#' (Elementary Education: 9 credits of Communication where Gen Ed needs 6). Its
+#' plan records them as "I:9|III:8"; the board's Gen Ed cards then cover the
+#' larger of the two (degree_shared_coverage()). Empty means the University's.
+#' @param value One `gen_ed_area_minimums` string.
+#' @return Named numeric: credits by area code.
+degree_gen_ed_area_minimums <- function(value) {
+  if (length(value) != 1L || is.na(value)) stop("[degree_catalog.R] One gen_ed_area_minimums value expected")
+  if (!nzchar(value)) return(stats::setNames(numeric(), character()))
+  parts <- strsplit(strsplit(value, "|", fixed = TRUE)[[1]], ":", fixed = TRUE)
+  areas <- vapply(parts, function(x) x[1], ""); credits <- suppressWarnings(as.numeric(vapply(parts, function(x) x[2], "")))
+  if (any(lengths(parts) != 2L) || anyDuplicated(areas) || any(!nzchar(areas)) || any(!is.finite(credits) | credits <= 0)) {
+    stop("[degree_catalog.R] Invalid gen_ed_area_minimums: ", value)
+  }
+  stats::setNames(credits, areas)
+}
+
 .validate_roadmap_plans <- function(plans, catalog) {
   if (!setequal(plans$catalog_id, catalog$catalogs$catalog_id) || anyDuplicated(plans$catalog_id)) {
     stop("[degree_catalog.R] Roadmap needs one plan per catalog")
@@ -501,6 +533,7 @@ validate_degree_roadmaps <- function(roadmaps, catalog) {
       any(!grepl("^https://", plans$gen_ed_source_url))) {
     stop("[degree_catalog.R] Invalid allowance planning policy")
   }
+  for (value in plans$gen_ed_area_minimums) degree_gen_ed_area_minimums(value)
   if (any(as.numeric(plans$upper_level_from_semester) < 2)) {
     stop("[degree_catalog.R] Upper-level timing needs an early-coursework stage")
   }

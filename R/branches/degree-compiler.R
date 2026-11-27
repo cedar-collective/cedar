@@ -8,6 +8,8 @@
 #
 #   course   a required course                       -> one tile
 #   choice   choose-N, any-of, or N credits from a list -> one tile with options
+#            (a choice with an option that names no course is a slot:
+#            k of its smallest option's credits, I98)
 #   slot     a credit or course pool inside a major group with no listed
 #            courses ("12 upper-level HIST credits")  -> credits / 3 tiles, rounded,
 #            at the band of the lowest number its reading allows
@@ -141,6 +143,18 @@ compile_degree_interpretation <- function(proposal, courses) {
   # (a two-course survey sequence is two tiles).
   option_size <- function(children) max(vapply(seq_len(nrow(children)), function(i)
     length(degree_compiler_descendant_codes(base, children[i, ])), 1L))
+  # An option that names no course: a pool of credits with nothing listed
+  # under it ("at least 9 credits of endorsement courses").
+  names_no_course <- function(option) option$kind != "course" &&
+    !any(base$kind[base$id %in% degree_compiler_descendants(base, option$id)] == "course")
+  # What an option asks for, in credits: a course's, a bundle's courses', or an
+  # unlisted pool's own minimum; NA when the reading does not say.
+  option_credits <- function(option) {
+    if (option$kind == "course") return(option$credits_min)
+    under <- base[base$id %in% degree_compiler_descendants(base, option$id) & base$kind == "course", ]
+    if (nrow(under)) return(sum(under$credits_min))
+    if (option$kind == "credits" && option$unit == "credits") option$minimum else NA_real_
+  }
   walk <- function(id) {
     level <- kids(id)
     for (i in seq_len(nrow(level))) {
@@ -154,6 +168,13 @@ compile_degree_interpretation <- function(proposal, courses) {
       if (node$kind %in% c("choose_n", "any")) {
         k <- if (node$kind == "any" || is.na(node$minimum)) 1 else node$minimum
         options <- children[children$kind %in% c("course", structural_kinds), ]
+        # A choice among strands, one of them an unlisted pool, has no course
+        # list to offer: it is elective space for k of its smallest option (I98).
+        if (any(vapply(seq_len(nrow(options)), function(i) names_no_course(options[i, ]), TRUE))) {
+          each <- vapply(seq_len(nrow(options)), function(i) option_credits(options[i, ]), 0)
+          credits <- if (anyNA(each)) NA_real_ else k * min(each)
+          add_rule(node, "slot", if (is.na(credits)) k else degree_compiler_slot_tiles(credits), credits); next
+        }
         add_rule(node, "choice", k * option_size(options), choice_credits(options, k))
         add_options(node$id, options); next
       }
@@ -175,7 +196,9 @@ compile_degree_interpretation <- function(proposal, courses) {
     }
   }
   walk("")
-  chosen <- unlist(lapply(out$rules, function(r) if (r$role == "choice") degree_compiler_descendants(base, r$rule_id)))
+  # A choice's options, and a strand choice's drawn as elective space, are not
+  # credit rules of their own.
+  chosen <- unlist(lapply(out$rules, function(r) if (r$role %in% c("choice", "slot")) degree_compiler_descendants(base, r$rule_id)))
   in_choice <- function(ids) ids %in% chosen
   is_tile <- base$id %in% vapply(out$rules, function(r) r$rule_id, "")
   has_structure <- vapply(base$id, function(id) any(base$kind[base$parent_id == id] %in% c("course", structural_kinds)), TRUE)

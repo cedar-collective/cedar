@@ -151,6 +151,12 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # cannot tell Psychology's B.A. from its B.S.; the program code can.
   degree_catalogs = c("catalog_id", "program_name", "degree_label", "degree_code", "program_codes",
                       "catalog_year", "source_url", "retrieved_on", "coverage", "notes"),
+  # The catalog row of a program with a catalog reading and no hand-built
+  # board, in degree_catalogs' columns: read only by
+  # scripts/compile-degree-interpretations.R, which writes the compiled board
+  # with it to degree_drafts/. Its Banner codes are a decision, made here.
+  degree_reading_catalogs = c("catalog_id", "program_name", "degree_label", "degree_code", "program_codes",
+                              "catalog_year", "source_url", "retrieved_on", "coverage", "notes"),
   # A rule tree. Parent/child groups preserve alternatives and course bundles.
   degree_rules = c("rule_id", "catalog_id", "parent_id", "phase", "area",
                    "target_course", "label", "operator", "minimum", "min_grade",
@@ -161,6 +167,12 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # the catalog analysis it was compiled with.
   degree_drafts = c("catalog_id", "program_id", "reading", "packet_key", "unit_key", "proposal_key",
                     "reading_sha256", "analysis", "compiled_on"),
+  # Every open item of every latest reading, board or not, with its catalog
+  # passage and who can settle it (degree_reading_question_rows()); written
+  # beside the drafts. `reading_file_sha256` is the whole file's, triage included.
+  degree_reading_questions = c("reading", "reading_file_sha256", "program_id", "program_title", "catalog_url",
+                               "catalog_id", "item", "kind", "label", "question", "block_id", "section",
+                               "passage", "settled_by"),
   # Authored semester templates, selected prerequisite routes and starting points.
   degree_roadmap_nodes = c("catalog_id", "node_id", "track", "code", "title", "credits",
                             "semester", "kind", "bundle", "detail", "source_url", "course_level", "row_group", "requirement_summary"),
@@ -175,7 +187,10 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   degree_roadmap_plans = c("catalog_id", "degree_credit_target", "normal_load", "max_load",
                            "baseline_semesters", "evidence_id", "assumption", "upper_level_from_semester",
                            "senior_level_from_semester",
-                           "allowance_slot_credits", "gen_ed_source_url"),
+                           "allowance_slot_credits", "gen_ed_source_url",
+                           # A program's own Gen Ed area minimums where its page names them,
+                           # "I:9|III:8"; empty for the University's (degree_gen_ed_area_minimums()).
+                           "gen_ed_area_minimums"),
   # opens: TRUE on the one start of each track the Degree Explorer pickers open on.
   degree_roadmap_starts = c("track", "start_id", "label", "node_ids", "completed_degree_credits", "opens"),
   degree_roadmap_math_routes = c("catalog_id", "start_id", "label", "node_ids"),

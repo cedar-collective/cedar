@@ -1865,7 +1865,7 @@ nav_panel(
 
       nav_panel(
         title = "Catalog Review",
-        catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS)
+        catalogReviewUI("catalog_review", CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_DRAFTS)
       ),
 
       # ── Tab 2: Usage (lazy loaded) ─────────────────────────────────────
