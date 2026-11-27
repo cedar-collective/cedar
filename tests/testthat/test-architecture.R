@@ -646,7 +646,7 @@ test_that("colours written into R code do not grow, and the backlog shrinks on r
     "R/features/course-report.R" = 5L,
     "R/features/dept-dashboard.R" = 3L,
     "R/features/dept-trends.R" = 1L,
-    "R/features/dfw-dashboard-view.R" = 2L,
+    "R/features/dfw-dashboard-view.R" = 1L,
     "R/features/registration-watch.R" = 2L,
     "R/modules/cancellations.R" = 12L,
     "R/modules/dept-trends.R" = 1L,
@@ -757,7 +757,6 @@ test_that("a DFW count divided by hand does not grow (M54)", {
     "R/cones/stopout.R" = 2L,
     "R/features/course-report.R" = 1L,
     "R/features/course-topics.R" = 2L,
-    "R/features/dfw-dashboard-view.R" = 1L,
     "R/features/gen-ed.R" = 1L
   )
   architecture_expect_ratchet(measured, allowance, "line(s) dividing a DFW count by hand")
