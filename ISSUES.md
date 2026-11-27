@@ -38,7 +38,6 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I100](#i100--a-compiled-boards-catalog-note-is-shown-nowhere-for-a-program-with-no-hand-built-board) | Defect | A compiled board's catalog note (what the board leaves out) is shown nowhere for the eight programs whose board comes only from a reading |
 | [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
@@ -128,7 +127,11 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 ## I100 — A compiled board's catalog note is shown nowhere for a program with no hand-built board
 
-**Status:** open.
+**Status:** resolved 2026-11-26 (branch `degree/catalog-questions`). Degree
+Explorer's "Rules behind this plan" shows the board's note, for every board.
+Admin > Catalog Review > Catalog questions lists each compiled board with its
+reading's status and its note. The Visualization rules tab keeps the
+hand-built boards, the compiler's baseline, and now says so.
 **Found:** 2026-11-26, looking at the Secondary Education B.S.Ed. board
 (branch `degree/compiler-i98-i99`).
 **Severity:** low, Degree Explorer only. Nothing wrong is drawn, but a

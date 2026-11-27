@@ -6117,5 +6117,12 @@
       }
     ],
     "questions": []
-  }
+  },
+  "triage": [
+    {"item": "rule:automatic-admission-scope", "settled_by": "catalog"},
+    {"item": "rule:core-total", "settled_by": "catalog"},
+    {"item": "rule:elective-total", "settled_by": "catalog"},
+    {"item": "rule:concentration-metadata", "settled_by": "catalog"},
+    {"item": "rule:accounting-old-number", "settled_by": "catalog"}
+  ]
 }

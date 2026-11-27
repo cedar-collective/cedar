@@ -6892,5 +6892,10 @@
         "question": "Social Studies Education asks for 40 credits from six areas. Is there a minimum in any one area, or in the emphasis the table names (Anthropology, Economics, Geography, History, Political Science or Sociology)?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
 }

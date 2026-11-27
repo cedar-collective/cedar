@@ -144,23 +144,72 @@ validate_catalog_normalization_state <- function(state, request) {
   invisible(state)
 }
 
+#' The open cases of a review: what must be settled before sign-off
+#'
+#' @return Data frame, one row per case: `type` ("nodes" or "blocks"), `id`
+#'   (the node or block), `label`, `reason`, `item` (the case's key within the
+#'   reading, which a reading's `triage` names: "rule:<node id>",
+#'   "passage:<block id>", "question:<n>" for its n-th question) and
+#'   `block_id` (the passage it rests on: a rule's first citation).
 catalog_normalization_issues <- function(state) {
   rows <- list()
-  add <- function(type, id, label, reason) {
-    rows[[length(rows) + 1L]] <<- data.frame(type = type, id = id, label = label, reason = reason)
+  add <- function(type, id, label, reason, item, block_id) {
+    rows[[length(rows) + 1L]] <<- data.frame(type = type, id = id, label = label, reason = reason, item = item, block_id = block_id)
   }
   for (node in state$proposal$nodes) {
-    if (node$kind == "unresolved") add("nodes", node$id, node$label, node$value)
-    else if (state$nodes[[node$id]] == "needs_clarification") add("nodes", node$id, node$label, state$notes[[paste0("nodes:", node$id)]])
+    first <- node$citations[[1]]$block_id
+    if (node$kind == "unresolved") add("nodes", node$id, node$label, node$value, paste0("rule:", node$id), first)
+    else if (state$nodes[[node$id]] == "needs_clarification") add("nodes", node$id, node$label, state$notes[[paste0("nodes:", node$id)]], paste0("rule:", node$id), first)
   }
   for (block in state$proposal$coverage) {
     represented <- any(vapply(state$proposal$nodes, function(x) x$id %in% unlist(block$node_ids) && x$kind == "unresolved", logical(1)))
-    if (block$disposition == "unresolved" && !represented) add("blocks", block$block_id, "Unresolved source treatment", block$explanation)
-    else if (state$blocks[[block$block_id]] == "needs_clarification") add("blocks", block$block_id, "Flagged source passage", state$notes[[paste0("blocks:", block$block_id)]])
+    item <- paste0("passage:", block$block_id)
+    if (block$disposition == "unresolved" && !represented) add("blocks", block$block_id, "Unresolved source treatment", block$explanation, item, block$block_id)
+    else if (state$blocks[[block$block_id]] == "needs_clarification") add("blocks", block$block_id, "Flagged source passage", state$notes[[paste0("blocks:", block$block_id)]], item, block$block_id)
   }
-  for (question in state$proposal$questions) add("blocks", question$block_id, "Interpretation question", question$question)
-  if (!length(rows)) return(data.frame(type = character(), id = character(), label = character(), reason = character()))
-  unique(do.call(rbind, rows))
+  for (i in seq_along(state$proposal$questions)) {
+    question <- state$proposal$questions[[i]]
+    add("blocks", question$block_id, "Interpretation question", question$question, paste0("question:", i), question$block_id)
+  }
+  if (!length(rows)) return(data.frame(type = character(), id = character(), label = character(), reason = character(),
+                                       item = character(), block_id = character()))
+  do.call(rbind, rows)
+}
+
+#' A reading's open items, each with its catalog passage and who can settle it
+#'
+#' The items are the open cases of the reading as drafted, before anyone
+#' reviews it (`catalog_normalization_issues()` on a fresh review state): each
+#' unresolved rule, each passage left unresolved with no rule, each question.
+#' The reading file's `triage`, beside its `proposal` and outside what staging
+#' reads, names who can settle each item (`CATALOG_QUESTION_SETTLERS`): a list
+#' of `{"item": ..., "settled_by": ...}`.
+#'
+#' @param reading A reading file, parsed (`read_source_json()`).
+#' @param packet The prepared packet it was read from: its unit holds the passages.
+#' @return Tibble, one row per item: `item`, `kind` ("rule", "passage" or
+#'   "question"), `label`, `question`, `block_id`, `section`, `passage` (the
+#'   catalog text), `settled_by` (a `CATALOG_QUESTION_SETTLERS` name, or ""
+#'   when the triage does not name the item). A triage entry that names no
+#'   open item, names one twice or gives an unknown settler stops.
+degree_reading_question_rows <- function(reading, packet) {
+  unit <- Filter(function(u) identical(u$key, reading$unit_key), packet$units)
+  if (length(unit) != 1L) stop("[catalog-normalization.R] The packet has no unit ", reading$unit_key, " for ", packet$title)
+  blocks <- unit[[1]]$request$source_blocks
+  open <- catalog_normalization_issues(catalog_normalization_review_state(reading$proposal))
+  at <- match(open$block_id, catalog_normalization_ids(blocks))
+  if (anyNA(at)) stop("[catalog-normalization.R] ", packet$title, ": an open item cites a passage the packet does not hold")
+  items <- vapply(reading$triage, function(t) t$item, "")
+  who <- vapply(reading$triage, function(t) t$settled_by, "")
+  wrong <- unique(c(setdiff(items, open$item), items[duplicated(items)]))
+  if (length(wrong)) stop("[catalog-normalization.R] ", packet$title, ": the triage names no open item, or names one twice: ", paste(wrong, collapse = ", "))
+  if (!all(who %in% names(CATALOG_QUESTION_SETTLERS))) {
+    stop("[catalog-normalization.R] ", packet$title, ": settled_by must be one of ", paste(names(CATALOG_QUESTION_SETTLERS), collapse = ", "))
+  }
+  settled <- who[match(open$item, items)]
+  tibble::tibble(item = open$item, kind = sub(":.*$", "", open$item), label = open$label, question = open$reason,
+    block_id = open$block_id, section = vapply(blocks[at], function(b) b$section, ""),
+    passage = vapply(blocks[at], function(b) b$text, ""), settled_by = ifelse(is.na(settled), "", settled))
 }
 
 # The reviewer signs off the complete interpretation once. Mechanical coverage

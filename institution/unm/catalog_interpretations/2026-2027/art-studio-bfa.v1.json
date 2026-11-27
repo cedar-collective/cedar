@@ -1298,5 +1298,10 @@
         "question": "What does the portfolio review require, and when is it taken relative to ARTS1220 and ARTS1230? The record says only to contact the department."
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "capture"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
 }

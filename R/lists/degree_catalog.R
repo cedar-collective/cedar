@@ -18,6 +18,17 @@ CEDAR_DEGREE_AREA_LABELS <- c(entry = "Entering the program", core = "Required c
 CEDAR_DEGREE_OPERATORS <- c("all", "choose_n", "course", "credits", "condition", "none",
                            "prior", "concurrent", "prior_or_concurrent")
 
+# Who can settle an open question in a catalog reading. Each reading's `triage`
+# names one for every question and unresolved rule (degree_reading_question_rows()):
+#   catalog  the catalog contradicts itself, is unclear or names nothing: the
+#            department or the catalog office answers, and the catalog changes
+#   capture  the catalog says it on a linked page or footnote that CEDAR's copy
+#            did not keep: the catalog scan is fixed
+#   reading  the catalog leaves a choice and CEDAR's reading planned it one way:
+#            a reviewer confirms or changes the reading
+CATALOG_QUESTION_SETTLERS <- c(catalog = "The catalog", capture = "CEDAR's copy of the catalog",
+                               reading = "CEDAR's reading")
+
 .DEGREE_COURSE_CODE_PATTERN <- "^[A-Z]+ [0-9]+[A-Z]*$"
 .DEGREE_ID_PATTERN <- "^[a-z][a-z0-9_]*$"
 .DEGREE_PROGRAM_CODE_PATTERN <- "^[A-Z]+-[A-Z0-9]+-[A-Z]+$"

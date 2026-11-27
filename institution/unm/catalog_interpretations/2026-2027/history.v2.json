@@ -1349,5 +1349,8 @@
       }
     ],
     "questions": []
-  }
+  },
+  "triage": [
+    {"item": "rule:east-missing", "settled_by": "catalog"}
+  ]
 }

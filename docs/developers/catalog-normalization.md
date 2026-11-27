@@ -343,6 +343,68 @@ staged, it isn't signed off, or it was signed off after edits (recompile from
 the edited reading). The status is read once at startup, so a sign-off shows
 after the next restart.
 
+### Open questions and who can settle them
+
+A reading lists what it could not settle from the catalog: its `questions`,
+each citing a passage, and its `unresolved` rules. Each such open item has a
+key within its reading: `rule:<node id>`, `passage:<block id>` (a passage
+left unresolved with no rule) or `question:<n>` (its n-th question). These
+are the open cases Catalog Review lists for the reading before anyone reviews
+it (`catalog_normalization_issues()`).
+
+Each reading says who can settle each item, in a `triage` beside its
+`proposal`:
+
+```json
+"triage": [
+  {"item": "rule:core-total", "settled_by": "catalog"},
+  {"item": "question:1", "settled_by": "capture"}
+]
+```
+
+| `settled_by` | On the page | When |
+|---|---|---|
+| `catalog` | The catalog | the catalog contradicts itself, is unclear or names nothing; the department or the catalog office answers, and the catalog changes |
+| `capture` | CEDAR's copy of the catalog | the catalog says it on a linked page or footnote CEDAR's copy did not keep; the scan is fixed |
+| `reading` | CEDAR's reading | the catalog leaves a choice and the reading planned it one way; a reviewer confirms or changes the reading |
+
+The triage is outside the proposal. Staging reads only the proposal, so
+changing the triage changes no packet, staged key or sign-off. An item the
+triage does not name is listed as "Not sorted yet", and the compile script
+prints it. A triage entry that names no open item, names one twice or gives
+another value stops the compile.
+
+`--write` lists every open item of every program's latest reading, with or
+without a board, in `degree_drafts/degree_reading_questions.csv`. Each row
+holds the item, the passage's section and full text from the packet, who can
+settle it, the program's catalog page, and the reading file with its hash.
+The app reads the list at startup (`read_degree_drafts()`); it never needs
+the review store. A reading edited since the list was compiled is named
+above the list until the boards are recompiled.
+
+**Admin > Data & Usage > Catalog Review > Catalog questions** shows the list
+(`R/features/catalog-questions.R`, `R/modules/catalog-questions.R`):
+
+- **The list:** filtered by who can settle each item and by program. Each row
+  names the file and item to change.
+- **"Download these questions":** the list as shown, as a Markdown document
+  for the department or the catalog office (`format_catalog_questions()`),
+  with each question, the start of its passage and the program's catalog
+  page.
+- **Boards compiled from a reading:** each draft board, whether its reading
+  is signed off, and its catalog row's note (what the board leaves out).
+  Degree Explorer's "Rules behind this plan" shows the same note.
+
+**To settle an item:**
+
+- When the catalog or the scan changes, prepare the new edition's packets and
+  read them again. For the current edition, write a new version of the reading
+  (`<name>.v<n+1>.json`) that drops the question or resolves the rule.
+- To change only who can settle an item, edit the reading's `triage` in place.
+- Then stage the readings and recompile with `--write`.
+- A mapping decision a question raises, such as which Banner codes a board
+  claims, is made in `degree_reading_catalogs.csv` or `programs.csv`.
+
 ## Where draft interpretations live
 
 Moved from `AGENTS.md` on 2026-11-07.

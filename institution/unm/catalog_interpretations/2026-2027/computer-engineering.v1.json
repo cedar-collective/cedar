@@ -2047,5 +2047,11 @@
         "question": "Which courses make up the 18 credits of freshman-year technical subjects the School of Engineering requires for admission, beyond MATH 1512 and MATH 1522? The School of Engineering policy is linked, not captured."
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "rule:pending-list", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "capture"}
+  ]
 }

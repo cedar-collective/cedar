@@ -1654,5 +1654,10 @@
         "question": "The record's admission field is empty. Are there School of Engineering or departmental admission requirements for the B.S.C.E. that a board should show?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "capture"}
+  ]
 }
