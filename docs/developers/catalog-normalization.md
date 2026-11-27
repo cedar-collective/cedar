@@ -121,10 +121,28 @@ Rscript --vanilla scripts/normalize-degree-catalog.R stage \
   --capture-root "$CEDAR_DATA_DIR"/catalog-scans/unm
 ```
 
-Staging validates the source archive, schema, citations, coverage and graph;
-missing/mismatched source packets fail explicitly. Each validated version enters
+Staging validates the source archive, schema, citations, coverage and graph,
+and names every problem in a proposal at once; missing/mismatched source
+packets fail explicitly. Each validated version enters
 the immutable proposal store. Staging never writes a human decision. Previous
 responses and review receipts survive; approvals belong to the exact proposal.
+
+**Check a reading before committing it.** The same checks, on one file or a
+directory of them, with nothing staged:
+
+```bash
+Rscript --vanilla scripts/normalize-degree-catalog.R check \
+  --reading institution/unm/catalog_interpretations/2026-2027/history.v2.json
+```
+
+It lists every problem staging and the board compiler would refuse, each
+naming its node, block or question: a quote its block does not contain, a block
+with no coverage or covered twice, a course outside the packet's registry, a
+group with no children, a triage entry naming no open item. It exits 1 when any
+reading has one. A reading ready to commit is listed with its open items by who
+can settle them. The store and archive default to the institution's under
+`$CEDAR_DATA_DIR` (`--root`, `--capture-root` and `--institution` override)
+(`check_catalog_reading()`).
 
 The retained CLI `import --root ROOT --program PACKET_KEY --unit UNIT_KEY
 --response FILE --model NAME` supports maintenance and future API automation.

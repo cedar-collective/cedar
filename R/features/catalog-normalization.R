@@ -222,9 +222,12 @@ list_catalog_normalization_proposals <- function(root, unit) {
 #' @param root The institution's catalog-normalization store.
 #' @param directory The committed readings (`catalog_interpretations/`).
 #' @param capture_root The institution's catalog archive.
-#' @return One list per reading: `path`, `draft` and its packet's `unit`.
-catalog_normalization_draft_units <- function(root, directory, capture_root) {
-  paths <- sort(list.files(directory, pattern = "[.]json$", recursive = TRUE, full.names = TRUE))
+#' @param paths The reading files, when not every one in `directory`
+#'   (`check_catalog_reading()` matches one).
+#' @return One list per reading: `path`, `draft`, its packet's `program` and
+#'   the packet's `unit` it was read from.
+catalog_normalization_draft_units <- function(root, directory, capture_root,
+    paths = sort(list.files(directory, pattern = "[.]json$", recursive = TRUE, full.names = TRUE))) {
   if (!length(paths)) return(list())
   programs <- lapply(list_catalog_normalization_programs(root)$key, function(key) load_catalog_normalization_program(root, key))
   short <- character()
@@ -248,12 +251,63 @@ catalog_normalization_draft_units <- function(root, directory, capture_root) {
       short <<- c(short, paste0(path, ": ", missing))
       return(NULL)
     }
-    list(path = path, draft = draft, unit = unit)
+    list(path = path, draft = draft, program = program, unit = unit)
   })
   if (length(short)) stop("[catalog-normalization.R] ", length(short), " of ", length(paths),
     " catalog readings are missing their source packet or captured pages here. Copy them from the machine ",
     "that prepared them with scripts/sync-catalog-store.sh.\n", paste(short, collapse = "\n"), call. = FALSE)
   drafts
+}
+
+#' Every problem in one catalog reading, found before it is committed
+#'
+#' What staging and the board compiler would refuse, all in one pass, so a
+#' reading is fixed in one round rather than one error at a time: the file's
+#' own fields and its source packet and captured pages
+#' (`catalog_normalization_draft_units()`), every problem in its proposal
+#' (`catalog_normalization_problems()`, each naming its node, block or
+#' question), and its triage against the open items
+#' (`degree_reading_question_rows()`). A problem that stops the rest from
+#' being read (no packet, a proposal of the wrong shape) is reported alone.
+#'
+#' @param path The reading file.
+#' @param root The institution's catalog-normalization store.
+#' @param capture_root The institution's catalog archive.
+#' @return List: `path`, `problems` (character, empty when the reading is
+#'   ready to commit) and `open` (its open items, `degree_reading_question_rows()`,
+#'   or NULL when problems keep them from being read).
+check_catalog_reading <- function(path, root, capture_root) {
+  result <- function(problems, open = NULL) list(path = path, problems = problems, open = open)
+  # Collected, not recovered: a reading that cannot be matched is reported as its one problem.
+  matched <- tryCatch(catalog_normalization_draft_units(root, capture_root = capture_root, paths = path)[[1]],
+    error = function(e) conditionMessage(e))
+  if (is.character(matched)) return(result(sub("^\\[catalog-normalization\\.R\\] ", "", matched)))
+  proposal <- matched$draft$proposal; request <- matched$unit$request
+  problems <- catalog_normalization_problems(proposal, request)
+  # A proposal of the wrong shape has no open items to check the triage against.
+  if (length(catalog_json_schema_problems(proposal, request$response_schema))) return(result(problems))
+  # Collected, not recovered: the triage's problem is the reading's.
+  open <- tryCatch(degree_reading_question_rows(matched$draft, matched$program$packet), error = function(e) conditionMessage(e))
+  if (is.character(open)) return(result(c(problems, sub("^\\[catalog-normalization\\.R\\] ", "", open))))
+  result(problems, if (!length(problems)) open)
+}
+
+#' A reading check as lines for the terminal
+#'
+#' @param check `check_catalog_reading()` output.
+#' @return Character vector: the file and its verdict, then one line per
+#'   problem, or the reading's open items by who can settle them.
+format_catalog_reading_check <- function(check) {
+  if (length(check$problems)) {
+    return(c(paste0(check$path, ": ", length(check$problems), if (length(check$problems) == 1L) " problem" else " problems"),
+             paste0("  ", gsub("\n", "\n  ", check$problems, fixed = TRUE))))
+  }
+  who <- catalog_question_settler_label(check$open$settled_by)
+  counts <- table(factor(who, levels = unique(c(unname(CATALOG_QUESTION_SETTLERS), CATALOG_QUESTION_NOT_SORTED))))
+  counts <- counts[counts > 0]
+  c(paste0(check$path, ": ready to commit; ", nrow(check$open), if (nrow(check$open) == 1L) " open item" else " open items",
+           if (length(counts)) paste0(" (", paste(paste0(names(counts), " ", counts), collapse = ", "), ")")),
+    if (nrow(check$open)) paste0("  ", check$open$item, " [", who, "]: ", check$open$label))
 }
 
 # Maintainer-authored AI drafts live in Git beside the institution's data. Stage
