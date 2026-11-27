@@ -42,11 +42,11 @@ Run from the repository root with the existing pinned dependencies:
 ```bash
 # Degrees, embedded specializations, and the closure of linked course records.
 Rscript --vanilla scripts/scan-degree-catalog.R scan --institution unm \
-  --output data/catalog-scans/unm/current-full
+  --output "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full
 
 # Program records only; no course-page acquisition.
 Rscript --vanilla scripts/scan-degree-catalog.R scan --institution unm \
-  --programs-only --output data/catalog-scans/unm/current-programs
+  --programs-only --output "$CEDAR_DATA_DIR"/catalog-scans/unm/current-programs
 ```
 
 `capture` runs acquisition alone. `scan` captures, then analyzes offline. Output
@@ -56,7 +56,7 @@ Resume with the same configuration and scope:
 
 ```bash
 Rscript --vanilla scripts/scan-degree-catalog.R scan --institution unm \
-  --output data/catalog-scans/unm/current-full --resume
+  --output "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full --resume
 ```
 
 Resume verifies and reuses saved bytes; it does not refresh earlier requests.
@@ -215,10 +215,12 @@ Program/course `pid` supplies identity. Conflicting revisions for the same
 comparison identity stop analysis for review. All nodes remain unreviewed even
 when their explicit list structure was recognized.
 
-Captures default to local, Git-ignored `data/`. Preserve the **whole capture
-directory**, including manifests and `sources/`, in the institution's durable
-archive. A hash cannot reconstruct an old source. `--output` can name that archive
-directly. Capture directories can be copied together without changing source bytes.
+Captures default to `catalog-scans/<institution>/` in the app's data directory
+(`CEDAR_DATA_DIR`, which the scanner requires when `--output` is not given), not
+the repository. Preserve the **whole capture directory**, including manifests
+and `sources/`, in the institution's durable archive. A hash cannot reconstruct
+an old source. Capture directories can be copied together without changing
+source bytes; `scripts/sync-catalog-store.sh` copies the archive to production.
 
 ## Reviewing inside CEDAR
 
@@ -230,8 +232,8 @@ The interfaces below are **Extraction diagnostics**. Unsupported-language flags
 are parser limitations, not failures in the running chart or requests to approve
 every clause manually.
 
-**Admin > Data & Usage > Catalog Review** reads completed local analyses under
-`data/catalog-scans/<institution>/`. Select a saved analysis, then filter by degree,
+**Admin > Data & Usage > Catalog Review** reads completed analyses under the
+data directory's `catalog-scans/<institution>/`. Select a saved analysis, then filter by degree,
 record type or requirement type. A degree scope includes its concentrations and
 the transitive closure of captured course references; it does not claim every
 linked course is required. Cycles are visited once. Program-only scans have no
@@ -289,9 +291,8 @@ Download the filtered queue as CSV to coordinate review. Like Mappings, this pag
 is an inspection surface: decisions belong in reviewed, versioned files. It does
 not save approval states, edit archives or compile runtime degree plans.
 
-Production Compose mounts repository-local `data/catalog-scans/` read-only over
-the corresponding app data subdirectory, separate from the external Banner data
-mount. Keep each analysis with its capture's `source-manifest.json` and `sources/`
+Production Compose mounts the data directory's `catalog-scans/` read-only over
+the app's copy of it, so the app never modifies its evidence. Keep each analysis with its capture's `source-manifest.json` and `sources/`
 so archives remain portable across host/container paths. Refresh scans to discover
 new completed analyses without restarting Shiny.
 
@@ -301,13 +302,13 @@ Re-extract frozen inputs into a new analysis directory without network calls:
 
 ```bash
 Rscript --vanilla scripts/scan-degree-catalog.R analyze \
-  --input data/catalog-scans/unm/current-full \
-  --output data/catalog-scans/unm/current-full/analysis-new
+  --input "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full \
+  --output "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full/analysis-new
 
 Rscript --vanilla scripts/scan-degree-catalog.R compare \
-  --before data/catalog-scans/unm/previous-full/analysis \
-  --after data/catalog-scans/unm/current-full/analysis \
-  --output data/catalog-scans/unm/annual-comparison
+  --before "$CEDAR_DATA_DIR"/catalog-scans/unm/previous-full/analysis \
+  --after "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full/analysis \
+  --output "$CEDAR_DATA_DIR"/catalog-scans/unm/annual-comparison
 ```
 
 Make a fresh capture for the new edition, preserving the old baseline. Comparisons

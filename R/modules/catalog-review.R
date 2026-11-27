@@ -165,7 +165,7 @@ catalogReviewServer <- function(id, root, active, catalog, roadmaps,
       if (!is.null(failure())) return(div(class = "alert alert-danger", tags$strong("Catalog review unavailable. "), failure()))
       if (is.null(scans())) return(p(class = "text-hint", "Open this tab to load local catalog scans."))
       if (!nrow(scans())) return(div(class = "alert alert-info", tags$strong("No catalog scans are available. "),
-        "Run scripts/scan-degree-catalog.R and keep the full archive under data/catalog-scans/<institution>/. Refresh scans when it is ready."))
+        "Run scripts/scan-degree-catalog.R and keep the full archive under catalog-scans/<institution>/ in the app's data directory (CEDAR_DATA_DIR). Refresh scans when it is ready."))
       if (is.null(payload())) return(p(class = "text-hint", "Verifying the saved catalog evidence…"))
       data <- payload(); n <- data$meta$counts
       div(class = "alert alert-info", tags$strong("All extracted requirements are unreviewed. "),

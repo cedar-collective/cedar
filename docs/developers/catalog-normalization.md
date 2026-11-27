@@ -35,9 +35,9 @@ From the repository root:
 
 ```bash
 Rscript --vanilla scripts/normalize-degree-catalog.R prepare \
-  --analysis data/catalog-scans/unm/2026-2027-undergraduate-complete-20261018/analysis-milestones-1.2.0 \
+  --analysis "$CEDAR_DATA_DIR"/catalog-scans/unm/2026-2027-undergraduate-complete-20261018/analysis-milestones-1.2.0 \
   --programs HkzhQeX5iq,SkWn7eQ9o9,HJlTXxQcic,HJZpXxQ9s9 \
-  --output data/catalog-normalizations/unm
+  --output "$CEDAR_DATA_DIR"/catalog-normalizations/unm
 ```
 
 This pilot selects History, Philosophy, Business Administration and Computer
@@ -116,9 +116,9 @@ The app stages matching files automatically, idempotently. For maintenance:
 
 ```bash
 Rscript --vanilla scripts/normalize-degree-catalog.R stage \
-  --root data/catalog-normalizations/unm \
+  --root "$CEDAR_DATA_DIR"/catalog-normalizations/unm \
   --drafts institution/unm/catalog_interpretations \
-  --capture-root data/catalog-scans/unm
+  --capture-root "$CEDAR_DATA_DIR"/catalog-scans/unm
 ```
 
 Staging validates the source archive, schema, citations, coverage and graph;
@@ -149,7 +149,9 @@ validated. Passing these checks establishes a reviewable structure, not a correc
 academic interpretation. Humans must catch incorrect meaning, missing scope,
 and passages incorrectly called informational.
 
-Storage under `data/catalog-normalizations/<institution>/` is Git-ignored:
+The store is `catalog-normalizations/<institution>/` in the app's data
+directory (`CEDAR_DATA_DIR`, beside the Banner tables and the catalog archive),
+not in Git:
 
 | Location | Contents |
 |---|---|
@@ -158,9 +160,19 @@ Storage under `data/catalog-normalizations/<institution>/` is Git-ignored:
 | `reviews/<proposal-key>/` | Complete, hash-linked, attributed review revisions |
 
 Review stores must be writable by the Shiny worker for staging and decisions;
-keep those directories owned by the application's deployment user. Compose
-mounts this store read/write separately from the read-only catalog archive.
-Preserve the whole review store and capture archive together in durable storage.
+keep those directories owned by the application's deployment user. The store
+is inside the data directory's read/write mount; Compose mounts the catalog
+archive over it read-only. Preserve the whole review store and capture archive
+together in durable storage.
+
+**A committed reading needs its packet and its captured pages on every server
+that runs the app** (ISSUES I101). Copy both from the machine that prepared
+them with `bash scripts/sync-catalog-store.sh` (`--dry-run` first lists what
+it would copy) before merging the reading. It only adds and updates, so the
+server's own proposals and reviews are kept. The deploy runs
+`scripts/check-catalog-store.R` in the new image before it replaces the app,
+and stops, naming every reading short of its files, when one is; staging names
+them all the same way instead of stopping at the first.
 The app verifies packet/proposal hashes and review-history links. Source bytes
 are verified when opening a unit/passage, saving a decision and exporting.
 A directory lock and expected review head reject simultaneous/stale writes.

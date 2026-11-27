@@ -15,6 +15,18 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
+// The app's data directory (CEDAR_DATA_DIR), which holds the catalog store and
+// archive (ISSUES I101): from the environment, else from ./.env.
+export function cedarDataDir() {
+  let dir = process.env.CEDAR_DATA_DIR;
+  if (!dir && fs.existsSync('.env')) {
+    const line = fs.readFileSync('.env', 'utf8').split('\n').filter(l => l.startsWith('CEDAR_DATA_DIR=')).pop();
+    if (line) dir = line.slice('CEDAR_DATA_DIR='.length).trim().replace(/^["']|["']$/g, '');
+  }
+  if (!dir) throw new Error("Set CEDAR_DATA_DIR to the app's data directory, or run from the checkout that holds .env");
+  return dir.replace(/^~(?=\/|$)/, process.env.HOME);
+}
+
 export const CHROME = process.env.CHROME_PATH ||
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 export const BASE = process.env.CEDAR_URL || 'http://localhost:3838/';

@@ -394,7 +394,7 @@ it lacks:
 |---|---|---|
 | `config/config.R`, `config/shiny_config.R` | an image built from the worktree starts and the app stops | copy them in |
 | `tests/e2e/node_modules` | "warm up app" fails with `Cannot find package 'puppeteer-core'` | link the main checkout's (a link is not matched by the ignore rule: never `git add` it) |
-| `data/` | the `admin` suite ends with ENOENT on `data/catalog-normalizations/…` | link the main checkout's `data`, and add `data` to `.git/info/exclude` |
+| `.env` | the `admin` suite stops with "Set CEDAR_DATA_DIR to the app's data directory" | export `CEDAR_DATA_DIR` (the main checkout's `.env` value) before the run |
 
 **No image build is needed to browser-test a branch.** The app image runs any
 checkout's source when it is mounted over the baked copy. From the main

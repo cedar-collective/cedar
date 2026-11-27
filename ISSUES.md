@@ -39,7 +39,6 @@ fix each needs, and which of them are one piece of work, are under
 | ID | Kind | Summary |
 |---|---|---|
 | [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
-| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -64,6 +63,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | Resolved 2026-11-27: One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
 | [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | Resolved 2026-11-27: A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
 | [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
@@ -244,7 +244,18 @@ bytes changed) and the suite passes; the staging pass is the same as I101's.
 
 ## I101 — One reading without its source packet on a server empties Catalog Review's Draft interpretations tab
 
-**Status:** open.
+**Status:** resolved 2026-11-27 (branch `catalog/store-in-data-dir`).
+Production lacked every packet, not only the ten new ones: its store was an
+empty directory owned by root, which the app's user could not have written
+either. The packets and the catalog archive were copied into production's data
+directory, owned by the app's user. The store and the archive now live in the
+data directory (`CEDAR_DATA_DIR`) on every machine, mounted from there by
+Compose, so one directory holds everything a server needs that is not in Git.
+`catalog_normalization_draft_units()` names every reading short of its packet
+or captured pages in one error, before anything is staged. The deploy runs
+`scripts/check-catalog-store.R` in the new image before it replaces the app
+and stops when any reading is short, so a reading cannot ship without its
+files. `scripts/sync-catalog-store.sh` copies them.
 **Found:** 2026-11-27, by the user on production, after #434 deployed.
 **Severity:** moderate, Admin only. No program can be opened in Draft
 interpretations; Degree Explorer is unaffected (its compiled boards are
