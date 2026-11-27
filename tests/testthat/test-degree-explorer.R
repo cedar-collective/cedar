@@ -217,6 +217,37 @@ test_that("every reading short of its packet or captured pages is named at once,
     "(?s)1 of 1 catalog readings.*biology[.]v1[.]json: .*source capture is unavailable", perl = TRUE)
 })
 
+test_that("checking a reading names every problem at once, by node or block, before it is committed", {
+  root <- tempfile("catalog-check-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); directory <- file.path(root, "drafts"); dir.create(directory)
+  reading <- list(schema_version = "1.0.0", version = 1L, producer = "Designed maintainer draft",
+    program_id = f$program$packet$program_id, catalog_id = f$program$packet$catalog_id,
+    unit_key = f$unit$key, proposal = normalization_proposal(f$unit$request))
+  path <- file.path(directory, "biology.v1.json")
+  write_source_json(reading, path)
+  clean <- check_catalog_reading(path, f$root, dirname(f$capture))
+  expect_length(clean$problems, 0L)
+  # Change: a quote the catalog never printed, a block with no coverage, a
+  # course outside the registry, and a triage entry naming no open item.
+  broken <- reading
+  broken$proposal$nodes[[1]]$citations[[1]]$quote <- "A quotation the catalog never published"
+  broken$proposal$coverage <- broken$proposal$coverage[-2]
+  broken$proposal$nodes[[3]]$course_refs <- list("courses:not-captured")
+  broken$triage <- list(list(item = "rule:no-such-rule", settled_by = "catalog"))
+  write_source_json(broken, path)
+  check <- check_catalog_reading(path, f$root, dirname(f$capture))
+  expect_length(check$problems, 4L)
+  expect_null(check$open)
+  # Staging refuses the same reading, naming all four.
+  expect_error(validate_catalog_normalization(broken$proposal, f$unit$request), "3 problems in the proposal")
+  testthat::local_edition(3)
+  clean$path <- check$path <- basename(path)
+  expect_snapshot({
+    cat(format_catalog_reading_check(clean), sep = "\n")
+    cat(format_catalog_reading_check(check), sep = "\n")
+  })
+})
+
 test_that("catalog extraction preserves OR options containing AND course bundles", {
   fixture <- scan_fixture
   tree <- extract_catalog_rule_tree(fixture$programs$biology$degreeRequirements)

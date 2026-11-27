@@ -36,10 +36,10 @@ catalog_normalization_blocks <- function(html, section, record) {
   rows
 }
 
-# Validate the shipped JSON schema locally too, including imported external AI
+# Check the shipped JSON schema locally too, including imported external AI
 # output. No additional dependency and no trust in the producer's JSON mode.
-validate_catalog_json_schema <- function(value, schema, path = "proposal", root = schema) {
-  fail <- function(message) stop("[catalog-normalization.R] ", path, ": ", message, call. = FALSE)
+# Every problem is returned, each with its JSON path.
+catalog_json_schema_problems <- function(value, schema, path = "proposal") {
   types <- unlist(schema$type, use.names = FALSE)
   type_ok <- function(type) switch(type,
     object = is.list(value) && !is.null(names(value)),
@@ -47,81 +47,139 @@ validate_catalog_json_schema <- function(value, schema, path = "proposal", root 
     string = is.character(value) && length(value) == 1L && !is.na(value),
     number = is.numeric(value) && length(value) == 1L && is.finite(value),
     null = is.null(value), FALSE)
-  if (!any(vapply(types, type_ok, logical(1)))) fail(paste("expected", paste(types, collapse = " or ")))
-  if (!is.null(schema$enum) && !value %in% unlist(schema$enum)) fail("value is outside the allowed vocabulary")
-  if ("object" %in% types && !is.null(value)) {
-    if (anyDuplicated(names(value))) fail("duplicate fields")
+  if (!any(vapply(types, type_ok, logical(1)))) return(paste0(path, ": expected ", paste(types, collapse = " or ")))
+  problems <- character()
+  if (!is.null(schema$enum) && !value %in% unlist(schema$enum)) problems <- c(problems, paste0(path, ": value is outside the allowed vocabulary"))
+  if ("object" %in% types && is.list(value) && !is.null(names(value))) {
+    if (anyDuplicated(names(value))) return(c(problems, paste0(path, ": duplicate fields")))
     missing <- setdiff(unlist(schema$required), names(value))
     extra <- setdiff(names(value), names(schema$properties))
-    if (length(missing) || length(extra)) fail(paste("missing/extra fields:", paste(c(missing, extra), collapse = ", ")))
-    for (name in names(value)) validate_catalog_json_schema(value[[name]], schema$properties[[name]], paste0(path, ".", name), root)
+    if (length(missing) || length(extra)) problems <- c(problems, paste0(path, ": missing/extra fields: ", paste(c(missing, extra), collapse = ", ")))
+    for (name in intersect(names(value), names(schema$properties))) {
+      problems <- c(problems, catalog_json_schema_problems(value[[name]], schema$properties[[name]], paste0(path, ".", name)))
+    }
   }
-  if ("array" %in% types) for (i in seq_along(value)) {
-    validate_catalog_json_schema(value[[i]], schema$items, paste0(path, "[", i, "]"), root)
+  if ("array" %in% types && is.list(value) && is.null(names(value))) for (i in seq_along(value)) {
+    problems <- c(problems, catalog_json_schema_problems(value[[i]], schema$items, paste0(path, "[", i, "]")))
   }
-  invisible(value)
+  problems
 }
 
 catalog_normalization_ids <- function(rows, field = "id") vapply(rows, function(x) x[[field]], character(1))
 
-#' Reject invented references, unsupported evidence and malformed AND/OR graphs
-validate_catalog_normalization <- function(proposal, request) {
-  validate_catalog_json_schema(proposal, request$response_schema)
+#' Every problem in a proposal: invented references, unsupported evidence, malformed AND/OR graphs
+#'
+#' Each problem names where it is (a node, a block's coverage, a question) so
+#' that one pass lists everything a reading needs fixed. A proposal of the
+#' wrong shape gets only its schema problems: nothing else can be read safely.
+#'
+#' @param proposal A proposal (a reading's `proposal`), parsed.
+#' @param request The unit's request: its schema, blocks, entities and registry.
+#' @return Character vector, empty when the proposal is valid.
+catalog_normalization_problems <- function(proposal, request) {
+  problems <- catalog_json_schema_problems(proposal, request$response_schema)
+  if (length(problems)) return(problems)
+  add <- function(...) problems <<- c(problems, paste0(...))
   nodes <- proposal$nodes; ids <- catalog_normalization_ids(nodes)
   blocks <- request$source_blocks; block_ids <- catalog_normalization_ids(blocks)
-  if (any(!grepl("^[A-Za-z0-9_-]+$", ids)) || anyDuplicated(ids)) stop("[catalog-normalization.R] Node IDs must be unique simple identifiers")
-  parents <- vapply(nodes, function(x) x$parent_id, character(1))
-  if (any(!parents %in% c("", ids))) stop("[catalog-normalization.R] Invalid parent reference")
+  for (id in unique(ids[!grepl("^[A-Za-z0-9_-]+$", ids)])) add("node \"", id, "\": Node IDs must be unique simple identifiers")
+  for (id in unique(ids[duplicated(ids)])) add("node ", id, ": Node IDs must be unique simple identifiers (it is used twice)")
   registry <- catalog_normalization_ids(request$reference_registry)
   groups <- c("all", "any", "choose_n", "credits", "grade")
+  cites <- function(node, block_id) block_id %in% vapply(node$citations, function(x) x$block_id, character(1))
   for (node in nodes) {
-    if (!nzchar(trimws(node$label)) || !node$entity_id %in% unlist(request$target_entities)) stop("[catalog-normalization.R] A node lacks a label or targets a context-only entity")
+    at <- paste0("node ", node$id, ": ")
+    if (!nzchar(trimws(node$label))) add(at, "A node lacks a label")
+    if (!node$entity_id %in% unlist(request$target_entities)) add(at, "it targets ", node$entity_id, ", a context-only entity")
     if (nzchar(node$parent_id)) {
       parent <- match(node$parent_id, ids)
-      if (is.na(parent) || !nodes[[parent]]$kind %in% groups ||
-          nodes[[parent]]$entity_id != node$entity_id || nodes[[parent]]$phase != node$phase) {
-        stop("[catalog-normalization.R] Invalid parent, entity or phase boundary")
-      }
-      ancestors <- node$id; current <- node$parent_id
-      while (nzchar(current)) {
-        if (current %in% ancestors) stop("[catalog-normalization.R] Requirement graph contains a cycle")
-        ancestors <- c(ancestors, current); current <- nodes[[match(current, ids)]]$parent_id
+      if (is.na(parent)) {
+        add(at, "Invalid parent reference: ", node$parent_id, " is not a node")
+      } else {
+        if (!nodes[[parent]]$kind %in% groups) add(at, "Invalid parent: ", node$parent_id, " is a ", nodes[[parent]]$kind, ", not a group")
+        if (nodes[[parent]]$entity_id != node$entity_id || nodes[[parent]]$phase != node$phase) {
+          add(at, "Invalid parent, entity or phase boundary: its parent ", node$parent_id, " has another entity or phase")
+        }
+        # Each node on a cycle reports it once; a node leading into one does not.
+        path <- node$id; current <- node$parent_id
+        while (nzchar(current) && !is.na(match(current, ids)) && !current %in% path) {
+          path <- c(path, current); current <- nodes[[match(current, ids)]]$parent_id
+        }
+        if (identical(current, node$id)) add(at, "Requirement graph contains a cycle: ", paste(c(path, node$id), collapse = " > "))
       }
     }
-    for (bound in c("minimum", "maximum")) if (!is.null(node[[bound]]) && node[[bound]] < 0) stop("[catalog-normalization.R] Bounds cannot be negative")
-    if (!is.null(node$minimum) && !is.null(node$maximum) && node$maximum < node$minimum) stop("[catalog-normalization.R] Maximum is below minimum")
+    for (bound in c("minimum", "maximum")) if (!is.null(node[[bound]]) && node[[bound]] < 0) add(at, "Bounds cannot be negative (", bound, ")")
+    if (!is.null(node$minimum) && !is.null(node$maximum) && node$maximum < node$minimum) add(at, "Maximum is below minimum")
     children <- sum(vapply(nodes, function(x) x$parent_id == node$id, logical(1)))
-    if (node$kind %in% c("all", "any", "grade") && children == 0L) stop("[catalog-normalization.R] Logical/grade group has no children")
-    if (node$kind == "choose_n" && (is.null(node$minimum) || node$minimum < 1 || node$minimum != floor(node$minimum) || node$minimum > children || node$unit != "courses")) stop("[catalog-normalization.R] Invalid choice count or unit")
-    if (node$kind %in% c("credits", "gpa", "course_pool") && (is.null(node$minimum) || node$minimum <= 0 || node$unit != switch(node$kind, credits = "credits", gpa = "gpa", course_pool = "courses"))) stop("[catalog-normalization.R] Missing or invalid minimum/unit")
-    if (node$kind == "course_pool" && (node$minimum != floor(node$minimum) || !nzchar(node$value))) stop("[catalog-normalization.R] Course pool needs an integer count and explicit qualification")
+    if (node$kind %in% c("all", "any", "grade") && children == 0L) add(at, "Logical/grade group has no children")
+    if (node$kind == "choose_n" && (is.null(node$minimum) || node$minimum < 1 || node$minimum != floor(node$minimum) ||
+        node$minimum > children || node$unit != "courses")) add(at, "Invalid choice count or unit")
+    if (node$kind %in% c("credits", "gpa", "course_pool") && (is.null(node$minimum) || node$minimum <= 0 ||
+        node$unit != switch(node$kind, credits = "credits", gpa = "gpa", course_pool = "courses"))) add(at, "Missing or invalid minimum/unit")
+    if (node$kind == "course_pool" && ((!is.null(node$minimum) && node$minimum != floor(node$minimum)) || !nzchar(node$value))) {
+      add(at, "Course pool needs an integer count and explicit qualification")
+    }
     refs <- vapply(node$course_refs, identity, character(1))
-    if (anyDuplicated(refs) || any(!refs %in% registry) || any(!startsWith(refs, "courses:"))) stop("[catalog-normalization.R] Unknown or duplicate course reference")
-    if (node$kind == "course" && length(refs) != 1L) stop("[catalog-normalization.R] A course node names exactly one course")
-    if (nzchar(node$program_ref) && (!node$program_ref %in% registry || !startsWith(node$program_ref, "programs:"))) stop("[catalog-normalization.R] Unknown admission program reference")
-    if (node$kind == "program_admission" && !nzchar(node$program_ref)) stop("[catalog-normalization.R] Admission milestone needs a program reference")
-    if (node$kind %in% c("class_standing", "permission", "restriction", "unresolved", "information", "gpa") && !nzchar(trimws(node$value))) stop("[catalog-normalization.R] Predicate/scope text is required")
-    if (node$kind == "class_standing" && node$comparison == "none") stop("[catalog-normalization.R] Standing needs an explicit comparison")
-    if (!length(node$citations)) stop("[catalog-normalization.R] Every node needs source evidence")
+    bad <- unique(c(refs[duplicated(refs)], refs[!refs %in% registry | !startsWith(refs, "courses:")]))
+    if (length(bad)) add(at, "Unknown or duplicate course reference: ", paste(bad, collapse = ", "))
+    if (node$kind == "course" && length(refs) != 1L) add(at, "A course node names exactly one course")
+    if (nzchar(node$program_ref) && (!node$program_ref %in% registry || !startsWith(node$program_ref, "programs:"))) {
+      add(at, "Unknown admission program reference: ", node$program_ref)
+    }
+    if (node$kind == "program_admission" && !nzchar(node$program_ref)) add(at, "Admission milestone needs a program reference")
+    if (node$kind %in% c("class_standing", "permission", "restriction", "unresolved", "information", "gpa") && !nzchar(trimws(node$value))) {
+      add(at, "Predicate/scope text is required")
+    }
+    if (node$kind == "class_standing" && node$comparison == "none") add(at, "Standing needs an explicit comparison")
+    if (!length(node$citations)) add(at, "Every node needs source evidence")
     for (citation in node$citations) {
       index <- match(citation$block_id, block_ids)
-      if (is.na(index) || blocks[[index]]$entity_id != node$entity_id || !nzchar(trimws(citation$quote)) ||
-          !grepl(citation$quote, blocks[[index]]$text, fixed = TRUE)) stop("[catalog-normalization.R] Citation does not match its requested source block")
+      wrong <- if (is.na(index)) paste(citation$block_id, "is not a requested block") else
+        if (blocks[[index]]$entity_id != node$entity_id) paste(citation$block_id, "belongs to", blocks[[index]]$entity_id) else
+        if (!nzchar(trimws(citation$quote))) paste("its quote from", citation$block_id, "is empty") else
+        if (!grepl(citation$quote, blocks[[index]]$text, fixed = TRUE)) paste0(citation$block_id, " does not contain \"",
+          substr(citation$quote, 1L, 60L), if (nchar(citation$quote) > 60L) "...", "\"")
+      if (!is.null(wrong)) add(at, "Citation does not match its requested source block: ", wrong)
     }
   }
   coverage_ids <- catalog_normalization_ids(proposal$coverage, "block_id")
-  if (anyDuplicated(coverage_ids) || !setequal(coverage_ids, block_ids)) stop("[catalog-normalization.R] Coverage must account for every requested block exactly once")
+  exactly_once <- "Coverage must account for every requested block exactly once"
+  for (id in unique(coverage_ids[duplicated(coverage_ids)])) add("block ", id, ": ", exactly_once, " (it is covered twice)")
+  for (id in setdiff(block_ids, coverage_ids)) add("block ", id, ": ", exactly_once, " (it has no coverage)")
+  for (id in setdiff(coverage_ids, block_ids)) add("block ", id, ": ", exactly_once, " (it is not a requested block)")
   for (coverage in proposal$coverage) {
+    at <- paste0("coverage of block ", coverage$block_id, ": ")
     mapped <- unlist(coverage$node_ids, use.names = FALSE)
-    if (anyDuplicated(mapped) || any(!mapped %in% ids)) stop("[catalog-normalization.R] Coverage refers to missing/duplicate nodes")
-    if (coverage$disposition != "information" && !length(mapped)) stop("[catalog-normalization.R] Requirement/unresolved coverage needs nodes")
-    if (!nzchar(trimws(coverage$explanation))) stop("[catalog-normalization.R] Every coverage decision needs an explanation")
-    for (id in mapped) if (!coverage$block_id %in% vapply(nodes[[match(id, ids)]]$citations, function(x) x$block_id, character(1))) stop("[catalog-normalization.R] Coverage mapping lacks a matching citation")
-    cited <- ids[vapply(nodes, function(x) coverage$block_id %in% vapply(x$citations, function(y) y$block_id, character(1)), logical(1))]
-    if (!setequal(mapped, cited)) stop("[catalog-normalization.R] Coverage must list every node citing the passage")
-    if (coverage$disposition == "information" && any(vapply(nodes[match(mapped, ids)], function(x) x$kind != "information", logical(1)))) stop("[catalog-normalization.R] A requirement cannot be classified as information")
+    unknown <- unique(c(mapped[duplicated(mapped)], setdiff(mapped, ids)))
+    if (length(unknown)) add(at, "Coverage refers to missing/duplicate nodes: ", paste(unknown, collapse = ", "))
+    mapped <- unique(intersect(mapped, ids))
+    if (coverage$disposition != "information" && !length(mapped)) add(at, "Requirement/unresolved coverage needs nodes")
+    if (!nzchar(trimws(coverage$explanation))) add(at, "Every coverage decision needs an explanation")
+    listed <- nodes[match(mapped, ids)]
+    uncited <- mapped[!vapply(listed, cites, logical(1), coverage$block_id)]
+    if (length(uncited)) add(at, "Coverage mapping lacks a matching citation: ", paste(uncited, collapse = ", "), " do not cite it")
+    unlisted <- setdiff(ids[vapply(nodes, cites, logical(1), coverage$block_id)], mapped)
+    if (length(unlisted)) add(at, "Coverage must list every node citing the passage: add ", paste(unlisted, collapse = ", "))
+    required <- mapped[vapply(listed, function(x) x$kind != "information", logical(1))]
+    if (coverage$disposition == "information" && length(required)) {
+      add(at, "A requirement cannot be classified as information: ", paste(required, collapse = ", "))
+    }
   }
-  for (question in proposal$questions) if (!question$block_id %in% block_ids || !nzchar(trimws(question$question))) stop("[catalog-normalization.R] Question lacks a source block or text")
+  for (i in seq_along(proposal$questions)) {
+    question <- proposal$questions[[i]]
+    if (!question$block_id %in% block_ids) add("question ", i, ": Question lacks a source block: ", question$block_id, " is not a requested block")
+    if (!nzchar(trimws(question$question))) add("question ", i, ": Question lacks text")
+  }
+  problems
+}
+
+#' Stop on a proposal with any problem, listing every one
+validate_catalog_normalization <- function(proposal, request) {
+  problems <- catalog_normalization_problems(proposal, request)
+  if (length(problems)) {
+    stop("[catalog-normalization.R] ", if (length(problems) == 1L) problems else
+      paste0(length(problems), " problems in the proposal:\n", paste0("  ", problems, collapse = "\n")), call. = FALSE)
+  }
   invisible(proposal)
 }
 
