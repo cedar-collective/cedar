@@ -1,0 +1,1302 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "Hkgamxm9jq",
+  "unit_key": "7be7e9697cb28b767ecafc95bf6e8a4f1434a28e679b7ddc93cd896d2bf99fd9",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "admit-courses",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "admission",
+        "kind": "all",
+        "label": "ARTS1220 and ARTS1230, each with C or better, before admission or readmission to the College of Fine Arts as a declared major",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "For all B.F.A. and B.A. Art Studio students: ARTS 1220 and ARTS 1230, grades of C or better, completed before admission or readmission to the College of Fine Arts as a declared major",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-07cc741b576596b475f9340e",
+            "quote": "completion of ARTS 1220 Art Practices I, and ARTS 1230 Art Practices II (with grades of \"C\" or better) are required prior to their admission or readmission to the College of Fine Arts as a declared major"
+          }
+        ]
+      },
+      {
+        "id": "admit-arts1220",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "admission",
+        "kind": "course",
+        "label": "ARTS 1220 Art Practices I",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:Bkb1W5Eqjc"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-07cc741b576596b475f9340e",
+            "quote": "ARTS 1220 Art Practices I"
+          }
+        ]
+      },
+      {
+        "id": "admit-arts1230",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "admission",
+        "kind": "course",
+        "label": "ARTS 1230 Art Practices II",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:H1Q0qEqiq"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-07cc741b576596b475f9340e",
+            "quote": "ARTS 1230 Art Practices II"
+          }
+        ]
+      },
+      {
+        "id": "admit-portfolio",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "admission",
+        "kind": "permission",
+        "label": "Admission to the B.F.A. is by portfolio",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Admission to the Bachelor of Fine Arts is by portfolio; the department gives the specifics of the portfolio process",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-737d3823b7c6e9cffa74d7f4",
+            "quote": "Admission to the Bachelor of Fine Arts is by portfolio."
+          }
+        ]
+      },
+      {
+        "id": "major-field-gpa",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "policy",
+        "kind": "gpa",
+        "label": "The faculty may exclude a student whose grade point average in the major field falls below 3.20",
+        "minimum": 3.2,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Grade point average in the major field of study, Art Studio and Art History courses together; the College of Fine Arts Scholastic Standards permit the faculty to exclude from the program a student below it",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-737d3823b7c6e9cffa74d7f4",
+            "quote": "permits the faculty to exclude from the program any student whose grade point average in his or her major field of study falls below 3.20"
+          },
+          {
+            "block_id": "b-737d3823b7c6e9cffa74d7f4",
+            "quote": "Art Studio courses and Art History courses are both part of the major field of study."
+          }
+        ]
+      },
+      {
+        "id": "gened-total",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Complete at least 31 credits of General Education coursework",
+        "minimum": 31,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "UNM General Education Program courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8851e4dc51e5b528f3bd6c75",
+            "quote": "Earn at least 31 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-34d98c8c8b0a067fecc3d68d",
+            "quote": "General Education Curriculum"
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM's General Education curriculum; courses in the program's requirements may also fulfill it",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "All undergraduate students fulfill UNM's General Education Program requirements; some courses in a program's requirements may also fulfill a General Education requirement.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2be514104a044abe20db2e4c",
+            "quote": "all undergraduate students are required to fulfill UNM"
+          }
+        ]
+      },
+      {
+        "id": "major",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete all of the Art Studio B.F.A. major requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-03ce4af97f79fb32a5adefa8",
+            "quote": "Major Requirements"
+          },
+          {
+            "block_id": "b-870271f60fb90ee28bdedb50",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "art-history",
+        "parent_id": "major",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Art History: complete all of the following",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7f1ad1b8d89d989f98dc4b93",
+            "quote": "Art History"
+          },
+          {
+            "block_id": "b-d653d1b036bdc3e7015ae5c4",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "arth-any",
+        "parent_id": "art-history",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 3 credits of Art History coursework",
+        "minimum": 3,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Art History coursework",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-63beec21f6f5014874ab73fe",
+            "quote": "Earn at least 3 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-f044fad32c6e72a632be6387",
+            "quote": "Art History coursework"
+          }
+        ]
+      },
+      {
+        "id": "arth-lower",
+        "parent_id": "art-history",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits in ARTH 200–299",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTH courses numbered 200 to 299, as the record states the range",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ac89bba0102741bf65898b00",
+            "quote": "Earned at least 6 credits from ARTH 200 - 299"
+          }
+        ],
+        "minimum_course_number": 200
+      },
+      {
+        "id": "arth-upper",
+        "parent_id": "art-history",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits in ARTH 400–499",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTH courses numbered 400 to 499",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-154e1550a6c94f99319fc921",
+            "quote": "Earned at least 6 credits from ARTH 400 - 499"
+          }
+        ],
+        "minimum_course_number": 400
+      },
+      {
+        "id": "art-studio",
+        "parent_id": "major",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Art Studio: complete all of the following",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-810fe3861a6de07e087bd828",
+            "quote": "Art Studio"
+          },
+          {
+            "block_id": "b-80f90026bc3cf5a5b408970e",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "core",
+        "parent_id": "art-studio",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete ARTS1220, ARTS1230 and ARTS1610",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c01ebe5b5d4b1e1e479659eb",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1220",
+        "parent_id": "core",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1220 - Art Practices I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bkb1W5Eqjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-904c282c3a0c64d76e0c4017",
+            "quote": "ARTS1220 - Art Practices I (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1230",
+        "parent_id": "core",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1230 - Art Practices II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1Q0qEqiq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4946f63bce57e8026c5d750a",
+            "quote": "ARTS1230 - Art Practices II (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-arts1610",
+        "parent_id": "core",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1610 - Drawing I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1S1iVqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b8df533f2bb0209796be6188",
+            "quote": "ARTS1610 - Drawing I (3)"
+          }
+        ]
+      },
+      {
+        "id": "intro-studios",
+        "parent_id": "art-studio",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 12 credits from the listed introductory studio courses",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5b3e8fd7108e97d7833d9390",
+            "quote": "Earn at least 12 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1310",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1310 - Introduction to Ceramics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SylAejVcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-82c70a6485af49327895bdb5",
+            "quote": "ARTS1310 - Introduction to Ceramics (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1143",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1143 - Introduction to Art & Ecology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkWa8qNco5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8d977a26437693e238287596",
+            "quote": "ARTS1143 - Introduction to Art & Ecology (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1410",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1410 - Introduction to Photography (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bklaq45o9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-76212d26c5a34808441eba1d",
+            "quote": "ARTS1410 - Introduction to Photography (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1510",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1510 - Introduction to Electronic Arts (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skwkc4qs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-836d1861da7e8ab2a280d6f0",
+            "quote": "ARTS1510 - Introduction to Electronic Arts (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1630",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1630 - Painting I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1e_y545sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7bfef22a2eb2ad2fdcbd9148",
+            "quote": "ARTS1630 - Painting I (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1710",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1710 - Introduction to Printmaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1WdcqVcoc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b9b048743d60c1c831fd3017",
+            "quote": "ARTS1710 - Introduction to Printmaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1810",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1810 - Jewelry and Small Metal Construction I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1ekY9V9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5bfbe1c3532dd18304681399",
+            "quote": "ARTS1810 - Jewelry and Small Metal Construction I (3)"
+          }
+        ]
+      },
+      {
+        "id": "studio-arts1840",
+        "parent_id": "intro-studios",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS1840 - Sculpture I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJmwL9Eqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e6cacd1b858c7da6d64804e8",
+            "quote": "ARTS1840 - Sculpture I (3)"
+          }
+        ]
+      },
+      {
+        "id": "arts-senior",
+        "parent_id": "art-studio",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 12 credits in ARTS 400–499",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "ARTS courses numbered 400 to 499",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cdb70fd709c14af3edb80601",
+            "quote": "Earned at least 12 credits from ARTS 400 - 499"
+          }
+        ],
+        "minimum_course_number": 400
+      },
+      {
+        "id": "capstone",
+        "parent_id": "art-studio",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete ARTS498",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dc0f74cc77e7d3b96f2ad717",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "capstone-arts498",
+        "parent_id": "capstone",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ARTS498 - Senior Seminar: Art Studio Capstone (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1ldk94ci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2f681384fb211793f36d8519",
+            "quote": "ARTS498 - Senior Seminar: Art Studio Capstone (3)"
+          }
+        ]
+      },
+      {
+        "id": "arts-any",
+        "parent_id": "art-studio",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 15 more credits of Art Studio courses",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Art Studio courses",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d5786cc3c43f3a6ce2704522",
+            "quote": "Earn at least 15 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-54dfb7e913766414ace0ea9c",
+            "quote": "Art Studio courses"
+          }
+        ]
+      },
+      {
+        "id": "electives",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete both elective pools",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d5285d23819bc37d8f0661e2",
+            "quote": "Electives"
+          },
+          {
+            "block_id": "b-5b5954e965a82f54e4cae214",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "elective-outside",
+        "parent_id": "electives",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 9 elective credits outside Art History and Art Studio",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses in any field, excluding Art History and Art Studio",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2fbb04207ba19bec5ca56b78",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-9c130f970967d70581a2b707",
+            "quote": "Courses in any field, excluding Art History and Art Studio"
+          }
+        ]
+      },
+      {
+        "id": "elective-any",
+        "parent_id": "electives",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 14 elective credits in any field",
+        "minimum": 14,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses in any field, including Art History and Art Studio",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7f9eeebc96814b6521c8a29e",
+            "quote": "Earn at least 14 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-3427cf0753551573d6fa217d",
+            "quote": "Courses in any field, including Art History and Art Studio."
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:Hkgamxm9jq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f2bfd310ba7becf6d9f616b0",
+            "quote": "Grand Total Credits: 120"
+          },
+          {
+            "block_id": "b-4c9c2d35a25b9a83a8fe8f28",
+            "quote": "\"120\""
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-04f16f243ade8c3561303442",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description. It names seven studio areas, but the record requires no concentration and lists no concentration requirements."
+      },
+      {
+        "block_id": "b-737d3823b7c6e9cffa74d7f4",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-portfolio",
+          "major-field-gpa"
+        ],
+        "explanation": "Admission by portfolio, and the major-field grade point below which the faculty may exclude a student; the rest describes the program."
+      },
+      {
+        "block_id": "b-07cc741b576596b475f9340e",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-courses",
+          "admit-arts1220",
+          "admit-arts1230"
+        ],
+        "explanation": "Admission course work with its grade threshold and timing."
+      },
+      {
+        "block_id": "b-8f4fd5849d82006b25d73b0f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts (General Education, major, electives), each represented individually."
+      },
+      {
+        "block_id": "b-34d98c8c8b0a067fecc3d68d",
+        "disposition": "requirements",
+        "node_ids": [
+          "gened-total"
+        ],
+        "explanation": "Heading of the General Education credits."
+      },
+      {
+        "block_id": "b-8851e4dc51e5b528f3bd6c75",
+        "disposition": "requirements",
+        "node_ids": [
+          "gened-total"
+        ],
+        "explanation": "The General Education credit minimum."
+      },
+      {
+        "block_id": "b-2be514104a044abe20db2e4c",
+        "disposition": "requirements",
+        "node_ids": [
+          "general-education"
+        ],
+        "explanation": "General Education applies to every undergraduate; program courses may count toward it."
+      },
+      {
+        "block_id": "b-03ce4af97f79fb32a5adefa8",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "Heading of the major."
+      },
+      {
+        "block_id": "b-870271f60fb90ee28bdedb50",
+        "disposition": "requirements",
+        "node_ids": [
+          "major"
+        ],
+        "explanation": "Both parts of the major are required."
+      },
+      {
+        "block_id": "b-7f1ad1b8d89d989f98dc4b93",
+        "disposition": "requirements",
+        "node_ids": [
+          "art-history"
+        ],
+        "explanation": "Heading of the Art History part."
+      },
+      {
+        "block_id": "b-d653d1b036bdc3e7015ae5c4",
+        "disposition": "requirements",
+        "node_ids": [
+          "art-history"
+        ],
+        "explanation": "Every Art History pool is required."
+      },
+      {
+        "block_id": "b-63beec21f6f5014874ab73fe",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-any"
+        ],
+        "explanation": "Art History credits at any level."
+      },
+      {
+        "block_id": "b-f044fad32c6e72a632be6387",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-any"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-ac89bba0102741bf65898b00",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-lower"
+        ],
+        "explanation": "Lower-division ARTH credits by course number; the range is a question."
+      },
+      {
+        "block_id": "b-154e1550a6c94f99319fc921",
+        "disposition": "requirements",
+        "node_ids": [
+          "arth-upper"
+        ],
+        "explanation": "400-level ARTH credits by course number."
+      },
+      {
+        "block_id": "b-810fe3861a6de07e087bd828",
+        "disposition": "requirements",
+        "node_ids": [
+          "art-studio"
+        ],
+        "explanation": "Heading of the Art Studio part."
+      },
+      {
+        "block_id": "b-80f90026bc3cf5a5b408970e",
+        "disposition": "requirements",
+        "node_ids": [
+          "art-studio"
+        ],
+        "explanation": "Every Art Studio part is required."
+      },
+      {
+        "block_id": "b-c01ebe5b5d4b1e1e479659eb",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "Three named required courses."
+      },
+      {
+        "block_id": "b-904c282c3a0c64d76e0c4017",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1220"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-4946f63bce57e8026c5d750a",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1230"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-b8df533f2bb0209796be6188",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-arts1610"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-5b3e8fd7108e97d7833d9390",
+        "disposition": "requirements",
+        "node_ids": [
+          "intro-studios"
+        ],
+        "explanation": "Twelve credits from the eight listed studio courses."
+      },
+      {
+        "block_id": "b-82c70a6485af49327895bdb5",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1310"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-8d977a26437693e238287596",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1143"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-76212d26c5a34808441eba1d",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1410"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-836d1861da7e8ab2a280d6f0",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1510"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-7bfef22a2eb2ad2fdcbd9148",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1630"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-b9b048743d60c1c831fd3017",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1710"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-5bfbe1c3532dd18304681399",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1810"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-e6cacd1b858c7da6d64804e8",
+        "disposition": "requirements",
+        "node_ids": [
+          "studio-arts1840"
+        ],
+        "explanation": "One of the listed studio courses."
+      },
+      {
+        "block_id": "b-cdb70fd709c14af3edb80601",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts-senior"
+        ],
+        "explanation": "400-level ARTS credits by course number."
+      },
+      {
+        "block_id": "b-dc0f74cc77e7d3b96f2ad717",
+        "disposition": "requirements",
+        "node_ids": [
+          "capstone"
+        ],
+        "explanation": "The named capstone."
+      },
+      {
+        "block_id": "b-2f681384fb211793f36d8519",
+        "disposition": "requirements",
+        "node_ids": [
+          "capstone-arts498"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-d5786cc3c43f3a6ce2704522",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts-any"
+        ],
+        "explanation": "Art Studio credits at any level."
+      },
+      {
+        "block_id": "b-54dfb7e913766414ace0ea9c",
+        "disposition": "requirements",
+        "node_ids": [
+          "arts-any"
+        ],
+        "explanation": "The pool's qualification."
+      },
+      {
+        "block_id": "b-d5285d23819bc37d8f0661e2",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Heading of the electives."
+      },
+      {
+        "block_id": "b-5b5954e965a82f54e4cae214",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Both elective pools are required."
+      },
+      {
+        "block_id": "b-2fbb04207ba19bec5ca56b78",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-outside"
+        ],
+        "explanation": "The first elective pool's credits."
+      },
+      {
+        "block_id": "b-9c130f970967d70581a2b707",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-outside"
+        ],
+        "explanation": "The first elective pool's qualification."
+      },
+      {
+        "block_id": "b-7f9eeebc96814b6521c8a29e",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-any"
+        ],
+        "explanation": "The second elective pool's credits."
+      },
+      {
+        "block_id": "b-3427cf0753551573d6fa217d",
+        "disposition": "requirements",
+        "node_ids": [
+          "elective-any"
+        ],
+        "explanation": "The second elective pool's qualification."
+      },
+      {
+        "block_id": "b-f2bfd310ba7becf6d9f616b0",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-d4cf0810de7c2f33147de73b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-cff07f2b218c9741ddd986c5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-fe36e6a856afc3c140411dac",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-9a4a536cea94dac1cf84bf31",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-cc69a45305a1acf8c48b3628",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-c510c9f8cdc6ece162a5afa8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-a9a771972a4c99fb3bbbeabd",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-4c9c2d35a25b9a83a8fe8f28",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 120, agree with the stated total."
+      },
+      {
+        "block_id": "b-6a47cf8bb3b9f11696dd8b54",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-c753fd63e51a8aee3dd5c6c9",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-5f51343ba97d3d428017401d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-d65b2971b57048df70f15eb1",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "No concentration is required; the studio areas in the description are not separate requirements here."
+      },
+      {
+        "block_id": "b-98e7630bf8aa784e3b811544",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-ac89bba0102741bf65898b00",
+        "question": "The B.F.A. states its lower-division Art History credits as \"ARTH 200 - 299\"; the B.A. in Art Studio states \"ARTH 2000 - 2999\", the current numbering. Is 200–299 meant as 2000–2999?"
+      },
+      {
+        "block_id": "b-737d3823b7c6e9cffa74d7f4",
+        "question": "The B.F.A. record captures no College of Fine Arts graduation requirements (cumulative and college grade point, residency, upper-division credits), which the B.A. record states. Do the same College requirements apply to the B.F.A.?"
+      },
+      {
+        "block_id": "b-737d3823b7c6e9cffa74d7f4",
+        "question": "What does the portfolio review require, and when is it taken relative to ARTS1220 and ARTS1230? The record says only to contact the department."
+      }
+    ]
+  }
+}

@@ -38,6 +38,9 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I99](#i99--degree-hours-stated-in-words-stop-a-compiled-board-a-minimum-of-128-hours-is-read-as-na) | Defect | Secondary Education B.S.Ed.'s board cannot be built: its record gives degree hours as "A minimum of 128 hours", read as NA |
+| [I98](#i98--one-reading-whose-choice-has-an-option-with-no-listed-course-stops-the-compile-script-for-every-program) | Defect | A reading whose choice has an option with no listed course stops the compile script for every program; the Elementary Education reading waits on its own branch |
+| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: Civil Engineering's board exceeds its 122 credits and cannot be built |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -123,6 +126,83 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I99 — Degree hours stated in words stop a compiled board: "A minimum of 128 hours" is read as NA
+
+**Status:** open.
+**Found:** 2026-11-26, compiling the readings for the largest unmapped
+programs (branch `degree/largest-unmapped-readings`).
+**Severity:** low, Degree Explorer only. Secondary Education B.S.Ed.'s board
+cannot be built, so its row is held out of `degree_reading_catalogs.csv`.
+Nothing wrong is shown.
+**Cause:** `degree_packet_program_facts()` (`R/branches/degree-compiler-board.R`)
+reads the record's `degreeHours` with `as.numeric()`. The B.S.Ed. record gives
+"A minimum of 128 hours", which becomes NA with only a coercion warning. The
+board's "Minimum degree credits" rule then stops `validate_degree_catalog()`
+with "Degree rules has NA fields", which names neither the program nor the
+field. The coercion is silent, against the no-fallback rule; the reading's own
+`degree-total` node already says 128.
+**Reproduction:** add a row for program HJeOjy_ji9
+(`secondary-education-bsed-2026`, `BSED`,
+`BSED-SED-EH|BSED-FSEC-EH|BSED-SED-ED|BSED-FSEC-ED`) to
+`institution/unm/degree_reading_catalogs.csv` and run
+`scripts/compile-degree-interpretations.R --root … --analysis …`.
+**Fix:** take the degree total from the reading's `degree-total` node, or stop
+at the read with the program and the text.
+
+## I98 — One reading whose choice has an option with no listed course stops the compile script for every program
+
+**Status:** open.
+**Found:** 2026-11-26, as I99.
+**Severity:** moderate, Degree Explorer only. Such a reading in
+`catalog_interpretations/` stops `compile-degree-interpretations.R` before any
+board is written, with or without a catalog row. The Elementary Education
+reading is therefore kept off `main`, on branch
+`degree/elementary-education-reading`. It requires one Diversity/Specialty
+strand, and three of the four strands are "at least 9 credits of endorsement
+courses" that the record does not list.
+**Cause:** `degree_compiler_descendant_codes()` (`R/branches/degree-compiler.R`)
+stops with "Option strand-bilingual lists no course". The schema allows such
+an option (a `credits` node with no courses), and staging accepts it.
+**Reproduction:** on that branch, run the compile script.
+**Fix:** draw the choice as elective space of its smallest option's credits,
+naming the options in its detail. Failing that, list it for the reviewer. In
+neither case may one reading stop the others.
+
+## I97 — A compiled board counts a reading's Gen Ed credits twice: as elective tiles and as the starting routes' courses
+
+**Status:** open.
+**Found:** 2026-11-26, as I99.
+**Severity:** moderate, Degree Explorer only.
+- **Civil Engineering:** the board cannot be built. The compile stops with
+  "Shown degree courses exceed the planning credit target", so its row is held
+  out of `degree_reading_catalogs.csv`.
+- **Where the total leaves room:** the area is planned twice. Secondary
+  Education B.A.Ed. shows a Mathematics and Statistics Gen Ed tile beside the
+  math route's MATH 1350.
+
+**Cause:** the compiler makes an unlisted credit pool inside a group into
+elective space. That includes a pool that is the record's own Gen Ed
+remainder:
+- **Civil Engineering:** "Additional coursework to meet remaining University
+  requirements", 9 credits, under the record's Electives heading.
+- **Secondary Education B.A.Ed.:** its four Gen Ed area pools.
+
+Every board also shows the starting routes' tiles (ENGL 1110, ENGL 1120,
+MATH 1350, …). These are illustrative Gen Ed that the reading does not
+require (`assemble_compiled_degree_board()`, basis `general`).
+`allocate_degree_semester_credits()` counts both against
+`degree_credit_target`. CE's own tiles reach its 122 credits before ENGL 1110
+is added. Composition I counted twice (I68) is the same mismatch, for one
+course.
+
+**Reproduction:** add a row for program SypQxQ9j5
+(`civil-engineering-bs-2026`, `BSCE`, `BSCE-CE-EN|BSCE-FCE-EN`) to
+`institution/unm/degree_reading_catalogs.csv` and compile.
+**Fix:** needs a decision about which stands for the area. Either a reading's
+Gen Ed pool takes the place of the route's illustrative tiles for that area,
+or such a pool stays a listed credit rule and the plan's Gen Ed space covers
+it, as on the hand-built boards.
 
 ## I92 — Classification changed meaning from Summer 2025: a student now sits a step lower, and every reading by classification crosses the change unmarked
 

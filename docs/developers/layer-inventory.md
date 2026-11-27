@@ -251,12 +251,13 @@ files; no model calls or runtime compilation. See [catalog-normalization.md](cat
 
 `features/degree-drafts.R` publishes compiled boards:
 `write_degree_drafts(boards, manifest, dir, authored_evidence)` (the compile
-script's `--write`), `read_degree_drafts(dir)`,
+script's `--write`), `read_degree_drafts(dir, programs)` (each draft's Banner
+program codes checked against the programs file),
 `degree_reading_proposal_key(root, program, reading)`,
 `degree_board_review_status(drafts, review_root)` (draft or reviewed, from the
 Catalog Review store) and `publish_degree_drafts(catalog, roadmaps, drafts,
 status)`, which puts each draft in place of the authored board with its id for
-Degree Explorer. See [catalog-normalization.md](catalog-normalization.md#publishing-a-compiled-board).
+Degree Explorer, or after the authored boards for a program with none. See [catalog-normalization.md](catalog-normalization.md#publishing-a-compiled-board).
 
 `features/degree-explorer.R`: `build_degree_course_history(sections, course_terms, edges, roadmaps, catalog_id, node_id)` resolves exact tile
 components and assembles one typed popup table without guessing historical equivalences, over `cedar_course_terms`.

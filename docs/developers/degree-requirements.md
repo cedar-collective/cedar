@@ -15,6 +15,7 @@ by `R/lists/degree_catalog.R` at startup:
 | Table | Grain and purpose |
 |---|---|
 | `degree_catalogs.csv` | Snapshot: program name, degree label, Banner degree code and the degree's own Banner program codes, year, source, retrieval date, coverage and caveats |
+| `degree_reading_catalogs.csv` | Optional. The catalog row, in `degree_catalogs.csv`'s columns, of a program with a catalog reading and no hand-built board: its compiled board is written with it and joins the degree list ([publishing](catalog-normalization.md#publishing-a-compiled-board)). Read only by the compile script |
 | `degree_rules.csv` | Rule node, parent, catalog, phase, common area, target course, operator, minimum, grade, review status and detail |
 | `degree_rule_courses.csv` | One course per leaf rule, with catalog title and credits |
 | `degree_roadmap_nodes.csv` | Authored planning slots, course/group labels, explicit lower/upper course level, credits, type, paired flag, source and `row_group` course-family alignment; `*` holds shared entry routes |

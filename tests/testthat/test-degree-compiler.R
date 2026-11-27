@@ -368,4 +368,6 @@ test_that("the board comparison reads as a semester-by-semester checklist", {
   placed <- build_degree_roadmap(draft$catalog, draft$roadmaps, "demo-biology-draft", "calculus", "composition")
   hand <- build_degree_roadmap(test_degree_catalog, test_degree_roadmaps, BIOLOGY, "calculus", "composition")
   expect_snapshot(cat(format_degree_board_comparison("Biology B.S.", "calculus", placed, hand, draft$held)))
+  # A program with no hand-built board: the draft listed on its own.
+  expect_snapshot(cat(format_degree_board_comparison("Biology B.S.", "calculus", placed, NULL, draft$held)))
 })

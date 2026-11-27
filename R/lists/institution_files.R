@@ -151,6 +151,12 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # cannot tell Psychology's B.A. from its B.S.; the program code can.
   degree_catalogs = c("catalog_id", "program_name", "degree_label", "degree_code", "program_codes",
                       "catalog_year", "source_url", "retrieved_on", "coverage", "notes"),
+  # The catalog row of a program with a catalog reading and no hand-built
+  # board, in degree_catalogs' columns: read only by
+  # scripts/compile-degree-interpretations.R, which writes the compiled board
+  # with it to degree_drafts/. Its Banner codes are a decision, made here.
+  degree_reading_catalogs = c("catalog_id", "program_name", "degree_label", "degree_code", "program_codes",
+                              "catalog_year", "source_url", "retrieved_on", "coverage", "notes"),
   # A rule tree. Parent/child groups preserve alternatives and course bundles.
   degree_rules = c("rule_id", "catalog_id", "parent_id", "phase", "area",
                    "target_course", "label", "operator", "minimum", "min_grade",

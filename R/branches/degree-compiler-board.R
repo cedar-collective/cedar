@@ -505,20 +505,34 @@ compare_degree_board_semesters <- function(draft, board) {
 #' A draft board beside the hand-built one, as text
 #'
 #' @param title Program name. @param math The math starting point both used.
-#' @param draft,board `build_degree_roadmap()` output. @param held The requisites the draft did not draw.
+#' @param draft,board `build_degree_roadmap()` output; `board` NULL for a
+#'   program with no hand-built board, when the draft is listed on its own.
+#' @param held The requisites the draft did not draw.
 format_degree_board_comparison <- function(title, math, draft, board, held) {
-  rows <- compare_degree_board_semesters(draft, board)
-  same <- sum(rows$draft_semester == rows$board_semester, na.rm = TRUE)
-  both <- sum(!is.na(rows$draft_semester) & !is.na(rows$board_semester))
   show <- function(x) ifelse(is.na(x), "\u2014", as.character(x))
+  conditions <- paste0("  Conditions: ", sum(draft$conditions$kind == "course_count"), " course-count (",
+    sum(startsWith(draft$conditions$condition_id, "after-")), " wait on a choice), ",
+    sum(draft$conditions$kind == "permission"), " standing, admission or permission")
+  body <- if (is.null(board)) {
+    tiles <- draft$nodes[draft$nodes$kind != "choice", ]
+    tiles <- tiles[order(tiles$semester, tiles$code), ]
+    c(paste0("  Semesters: ", nrow(draft$terms), " draft; no hand-built board to compare"),
+      paste0("  Arrows: ", nrow(draft$links), " draft; ", nrow(held), " held for a reviewer"),
+      conditions,
+      paste0("  Courses: ", nrow(tiles), "; choices: ", sum(draft$nodes$kind == "choice")),
+      paste0("    ", formatC(tiles$code, width = -12), " draft ", show(tiles$semester)))
+  } else {
+    rows <- compare_degree_board_semesters(draft, board)
+    same <- sum(rows$draft_semester == rows$board_semester, na.rm = TRUE)
+    both <- sum(!is.na(rows$draft_semester) & !is.na(rows$board_semester))
+    c(paste0("  Semesters: ", nrow(draft$terms), " draft, ", nrow(board$terms), " on the board"),
+      paste0("  Arrows: ", nrow(draft$links), " draft, ", nrow(board$links), " on the board; ", nrow(held), " held for a reviewer"),
+      paste0(conditions, "; ", nrow(board$conditions), " on the board"),
+      paste0("  Courses on both: ", both, ", same semester for ", same),
+      paste0("    ", formatC(rows$code, width = -12), " draft ", show(rows$draft_semester), " \u00b7 board ", show(rows$board_semester)))
+  }
   c(paste0(title, " \u00b7 math start: ", math),
-    paste0("  Semesters: ", nrow(draft$terms), " draft, ", nrow(board$terms), " on the board"),
-    paste0("  Arrows: ", nrow(draft$links), " draft, ", nrow(board$links), " on the board; ", nrow(held), " held for a reviewer"),
-    paste0("  Conditions: ", sum(draft$conditions$kind == "course_count"), " course-count (", sum(startsWith(draft$conditions$condition_id, "after-")),
-           " wait on a choice), ", sum(draft$conditions$kind == "permission"), " standing, admission or permission; ",
-           nrow(board$conditions), " on the board"),
-    paste0("  Courses on both: ", both, ", same semester for ", same),
-    paste0("    ", formatC(rows$code, width = -12), " draft ", show(rows$draft_semester), " \u00b7 board ", show(rows$board_semester)),
+    body,
     if (nrow(held)) {
       # CAMPUS_ROLLUP: catalog course codes and their listed requisites; no
       # enrollment row and no campus is read here.

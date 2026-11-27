@@ -11,8 +11,10 @@
 #   --write      replace institution/<id>/degree_drafts/ with every compiled board.
 #                Each takes the place of the hand-built board for its program on
 #                the page (labelled a draft until its reading is signed off); the
-#                hand-built files are not touched. Each reading must be staged in
-#                REVIEW_ROOT (scripts/normalize-degree-catalog.R stage).
+#                hand-built files are not touched. A program with no hand-built
+#                board is written when degree_reading_catalogs.csv gives its
+#                catalog row, and joins the degree list. Each reading must be
+#                staged in REVIEW_ROOT (scripts/normalize-degree-catalog.R stage).
 args <- commandArgs(trailingOnly = TRUE)
 usage <- "Usage: Rscript --vanilla scripts/compile-degree-interpretations.R --root REVIEW_ROOT [--analysis DIR [--write]] [--institution ID]"
 if (!length(args) || args[1] %in% c("--help", "-h")) { cat(usage, "\n"); quit(status = 0) }
@@ -52,6 +54,16 @@ if (!is.null(opts[["--analysis"]])) {
   general_math <- names(sort(table(general), decreasing = TRUE))[1]
 }
 readings <- list.files(file.path(cedar_institution_dir(), "catalog_interpretations"), "\\.json$", recursive = TRUE, full.names = TRUE)
+# A program with a reading and no hand-built board takes its catalog row (names,
+# Banner program codes) from degree_reading_catalogs.csv; an institution with
+# no such file has none.
+reading_catalogs <- if (file.exists(file.path(cedar_institution_dir(), "degree_reading_catalogs.csv"))) {
+  read_institution_file("degree_reading_catalogs", cedar_institution_dir())
+} else {
+  CEDAR_DEGREE_CATALOG$catalogs[0, ]
+}
+both <- intersect(reading_catalogs$catalog_id, CEDAR_DEGREE_CATALOG$catalogs$catalog_id)
+if (length(both)) stop("degree_reading_catalogs.csv repeats a hand-built board's catalog id: ", paste(both, collapse = ", "))
 boards <- list(); manifest <- list()
 if (!length(readings)) stop("No catalog interpretations under ", file.path(cedar_institution_dir(), "catalog_interpretations"))
 # Earlier versions are kept for the record; each program compiles from its latest.
@@ -68,20 +80,32 @@ for (path in readings) {
   packet <- packets[[key]]
   compiled <- compile_degree_interpretation(reading$proposal, degree_packet_course_facts(packet))
   board <- CEDAR_DEGREE_CATALOG$catalogs$catalog_id[grepl(reading$program_id, CEDAR_DEGREE_CATALOG$catalogs$source_url, fixed = TRUE)]
+  listed <- reading_catalogs$catalog_id[grepl(reading$program_id, reading_catalogs$source_url, fixed = TRUE)]
+  if (length(board) > 1L || length(listed) > 1L) stop("Several catalog rows name the program page of ", basename(path))
   comparison <- if (length(board) == 1L) compare_compiled_degree(compiled, CEDAR_DEGREE_ROADMAPS, board)
   cat(format_compiled_degree_preview(packet$title, compiled, comparison), "\n\n")
-  if (write && length(board) != 1L) cat("Not written:", packet$title, "has no hand-built board (and so no catalog row) for a draft to take the place of.\n\n")
-  if (is.null(opts[["--analysis"]]) || length(board) != 1L) next
+  if (write && length(board) + length(listed) == 0L) {
+    cat("Not written:", packet$title, "has no hand-built board and no row in degree_reading_catalogs.csv.\n\n")
+  }
+  if (is.null(opts[["--analysis"]]) || length(board) + length(listed) == 0L) next
   courses <- degree_packet_course_facts(packet)
-  # The draft takes its hand-built board's catalog id: it replaces that board on the page.
-  row <- CEDAR_DEGREE_CATALOG$catalogs[CEDAR_DEGREE_CATALOG$catalogs$catalog_id == board, ]
-  row$notes <- "Compiled from the catalog reading; a draft until the reading is signed off in Catalog Review."
+  # The draft takes its hand-built board's catalog id, and replaces that board on
+  # the page; a program with none takes its degree_reading_catalogs.csv row.
+  draft_note <- "Compiled from the catalog reading; a draft until the reading is signed off in Catalog Review."
+  if (length(board) == 1L) {
+    row <- CEDAR_DEGREE_CATALOG$catalogs[CEDAR_DEGREE_CATALOG$catalogs$catalog_id == board, ]
+    row$notes <- draft_note
+  } else {
+    board <- listed
+    row <- reading_catalogs[reading_catalogs$catalog_id == board, ]
+    row$notes <- paste(row$notes, draft_note)
+  }
   draft <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(packet),
     degree_course_requisites(rule_nodes, courses), row, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_CATALOG$evidence, general_math,
     degree_course_conditions(rule_nodes, courses), reading$proposal)
   for (math in c("calculus", "intermediate")) {
     placed <- build_degree_roadmap(draft$catalog, draft$roadmaps, row$catalog_id, math, "composition")
-    hand <- build_degree_roadmap(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, board, math, "composition")
+    hand <- if (!is.null(comparison)) build_degree_roadmap(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, board, math, "composition")
     cat(format_degree_board_comparison(packet$title, math, placed, hand, draft$held), "\n\n")
   }
   if (write) {

@@ -286,9 +286,12 @@ optional styling suggestions. The data/API contract is in
   revisions separately. Edits reset approvals; new source/prompt/schema inputs
   need new review. No unreviewed proposal enters projections. A reading enters
   the planner only as a compiled board that takes the place of the program's
-  authored board and is labelled a draft, in the degree list and on the board,
-  until the exact reading it was compiled from is signed off; nothing approves
-  it automatically, and the authored files are not edited. Contract:
+  authored board, or, for a program with none, joins the degree list with a
+  catalog row authored in `degree_reading_catalogs.csv` (its Banner program
+  codes a decision made there, checked like any board's). It is labelled a
+  draft, in the degree list and on the board, until the exact reading it was
+  compiled from is signed off; nothing approves it automatically, and the
+  authored files are not edited. Contract:
   [catalog-normalization.md](catalog-normalization.md#publishing-a-compiled-board).
 
 - The catalog is the authority. Program pages establish degree requirements;
@@ -329,7 +332,8 @@ optional styling suggestions. The data/API contract is in
   requirements, invent prerequisite edges or regenerate authored semester
   suggestions without the applicable review. A compiled draft board's arrows
   and conditions come only from the course pages' structured requisites, and
-  it replaces an authored board on the page, never in its files. Contract: [catalog-scanning.md](catalog-scanning.md).
+  it replaces an authored board on the page, never in its files, or joins the
+  list for a program with none. Contract: [catalog-scanning.md](catalog-scanning.md).
 - Admin catalog review must show each flagged excerpt with its full captured
   section, next review action, field pointer and verified source hash. Preserve
   list nesting; never send a fragment to an interpreter without its context.

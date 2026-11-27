@@ -310,13 +310,23 @@ every compiled board. A board's own rows are written in the same files and
 columns as the authored boards, and `degree_drafts.csv` records where it came
 from: the reading, its packet, unit and staged proposal, the reading's hash,
 and the analysis. Each reading must be staged first
-(`scripts/normalize-degree-catalog.R stage`). A reading whose program has no
-authored board is not written: the draft takes that board's catalog row.
+(`scripts/normalize-degree-catalog.R stage`). A draft takes its authored
+board's catalog row. A program with no authored board takes its row from
+`institution/<id>/degree_reading_catalogs.csv` (the same columns as
+`degree_catalogs.csv`): its names, and the Banner program codes of the
+students it describes, which no reading can supply and are decided in that
+file. A reading with neither is listed and not written. With no hand-built
+board to compare, the script lists the draft's semesters, arrows, conditions
+and courses on their own.
 
 At startup (`R/features/degree-drafts.R`) the app reads the folder and puts
 each draft in place of the authored board with the same catalog id, keeping
-the degree list's order and every link to the board. The result passes the
-same validators. Catalog Review keeps the authored boards, the baseline the
+the degree list's order and every link to the board; a draft for a program
+with no authored board follows the authored ones. The result passes the same
+validators: each draft's Banner program codes are checked against
+`programs.csv` like an authored board's, a code on two boards stops startup,
+and so does a draft whose codes differ from its authored board's (codes
+decided after it was compiled: recompile). Catalog Review keeps the authored boards, the baseline the
 compiler is compared with; their files are not edited.
 
 A compiled board is labelled in the degree list ("· draft") and on the board's

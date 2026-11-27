@@ -1,0 +1,1658 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "SypQxQ9j5",
+  "unit_key": "c3baaa2bef8aa56c3f4b33299b2ec2b70484501cb02ece7bb907f7f9df1ceb47",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "fe-exam",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Take the Fundamentals of Engineering (FE) exam before graduating",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The Fundamentals of Engineering (FE) exam is required of all B.S. Civil Engineering and B.S. Construction Engineering students before graduating; the text describes passing it as a first step toward licensure, not as a degree condition",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4efd99bb45e11d02fed42688",
+            "quote": "The Fundamentals of Engineering (FE) is required of all BS Civil Engineering and BS Construction Engineering students before graduating."
+          },
+          {
+            "block_id": "b-391a9fb45fdbbfc658b0d097",
+            "quote": "Fundamentals of Engineering Exam (FE)"
+          }
+        ]
+      },
+      {
+        "id": "required",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete every required course",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9fb2aa2f053cafe6fd57564b",
+            "quote": "Required courses"
+          },
+          {
+            "block_id": "b-9ee03e0381bdf6bdfa3e7bcd",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "req-ce160l",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE160L - Civil Engineering Design (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJeAUcN5i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-421638c9118d68d4f5a12dd5",
+            "quote": "CE160L - Civil Engineering Design (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1215",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215 - General Chemistry I for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyFq5N9i9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f052097d1c7de82390acf076",
+            "quote": "CHEM1215 - General Chemistry I for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1215l",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJxj7cVqo9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9bf178883d7599ad50c92424",
+            "quote": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-engl1120",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1120 - Composition II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1fVV5N5sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5fa8d2ed45f1d46632acfbd9",
+            "quote": "ENGL1120 - Composition II (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math1512",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1512 - Calculus I (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hkf4V545s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ea7c732540f386d3c23062dc",
+            "quote": "MATH1512 - Calculus I (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1225",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225 - General Chemistry II for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJLYX5N9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-338a4270eaa716cec865a95e",
+            "quote": "CHEM1225 - General Chemistry II for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1225l",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1yh54qs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-530d3b9d185fcfe560aa04ba",
+            "quote": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-eng130l",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENG130L - Introduction to Engineering Computing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkXP-5N9j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-18e753bf7937e078e3a3fce3",
+            "quote": "ENG130L - Introduction to Engineering Computing (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math1522",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1522 - Calculus II (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyyUq45s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-580d93f930c5db52efd817d1",
+            "quote": "MATH1522 - Calculus II (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-phys1310",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1310 - Calculus-Based Physics I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJws9N9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1643433d771ee1081aafe1a7",
+            "quote": "PHYS1310 - Calculus-Based Physics I (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce202",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE202 - Engineering Statics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJGCy9Ecjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-81ebf4f2153184da1c89e0d6",
+            "quote": "CE202 - Engineering Statics (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce283",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE283 - Surveying and Geomatics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BygiCqVqo9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f34eea23d1ec9585a6fd6eb6",
+            "quote": "CE283 - Surveying and Geomatics (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math2531",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH2531 - Calculus III (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SybO_545oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-edcbc0fdd7ecceecb5a2e856",
+            "quote": "MATH2531 - Calculus III (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-phys1320",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1320 - Calculus-Based Physics II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkAa545oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d72cc8c77553543a93fb15a5",
+            "quote": "PHYS1320 - Calculus-Based Physics II (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-engl2210",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL2210 - Professional and Technical Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByliloVqjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-22dc58acc002df6fded95ccb",
+            "quote": "ENGL2210 - Professional and Technical Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math316",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH316 - Applied Ordinary Differential Equations (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hy-iMcV9s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-22e6b6b6c83033873f92e923",
+            "quote": "MATH316 - Applied Ordinary Differential Equations (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-stat345",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkgPvcV5sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0ac0a48885daed6c98c2b424",
+            "quote": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce302",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE302 - Mechanics of Materials (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ry-cE9N9i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2456274b43e461b252ddea3f",
+            "quote": "CE302 - Mechanics of Materials (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce305",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE305 - Infrastructure Materials Science (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1xu1sVcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2f625cd13cbda20d5992a2ca",
+            "quote": "CE305 - Infrastructure Materials Science (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-me306",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ME306 - Dynamics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1gbjq4co9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-31be4a02831e691ac5616b4d",
+            "quote": "ME306 - Dynamics (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce331",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE331 - Fluid Mechanics (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SygA1qN9s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9a337b91dcdcda9ecfa4160b",
+            "quote": "CE331 - Fluid Mechanics (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce372",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE372 - Principles of Construction (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryz3cV5oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6c1bb7f02ed807c0d107fb5d",
+            "quote": "CE372 - Principles of Construction (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce382",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE382 - Transportation Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyW6cqVcj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5377794e460656585914788b",
+            "quote": "CE382 - Transportation Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce308",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE308 - Structural Analysis (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hy7AJ9V9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-168a505ac7d463eeef988570",
+            "quote": "CE308 - Structural Analysis (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce335",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE335 - Environmental and Water Resources Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJxz8qEcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-83457cd2d16c10ffb1c14317",
+            "quote": "CE335 - Environmental and Water Resources Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce350",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE350 - Engineering Economy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryZEyjEcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5a086fddd753a8c890c6bde3",
+            "quote": "CE350 - Engineering Economy (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce360",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE360 - Soil Mechanics (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryefv9Vci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f0caae3bbf6c4d6a114ae198",
+            "quote": "CE360 - Soil Mechanics (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce442",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE442 - Hydraulic Engineering and Hydrology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HywE65Ncs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4e627003332a9ce86a2857de",
+            "quote": "CE442 - Hydraulic Engineering and Hydrology (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce499",
+        "parent_id": "required",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE499 - Design of Civil Engineering Systems (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkX_McEci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5ed50a58d953c04a5a9a461f",
+            "quote": "CE499 - Design of Civil Engineering Systems (3)"
+          }
+        ]
+      },
+      {
+        "id": "science-choice",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "One of BIOL1110 or GEOL1110",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-637176b614faf5cf77e2be4d",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "science-biol1110",
+        "parent_id": "science-choice",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL1110 - General Biology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkGXx5Vcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-af3584648df156313ea4f3e8",
+            "quote": "BIOL1110 - General Biology (3)"
+          }
+        ]
+      },
+      {
+        "id": "science-geol1110",
+        "parent_id": "science-choice",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "GEOL1110 - Physical Geology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryM7Gq45s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ce5971ffbe19cfbbdf275499",
+            "quote": "GEOL1110 - Physical Geology (3)"
+          }
+        ]
+      },
+      {
+        "id": "econ-choice",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "choose_n",
+        "label": "One of ECON2110 or ECON2120",
+        "minimum": 1,
+        "maximum": null,
+        "unit": "courses",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-980d4b6e5da7cd7eaa7f473c",
+            "quote": "Complete at least 1 of the following:"
+          }
+        ]
+      },
+      {
+        "id": "econ-econ2110",
+        "parent_id": "econ-choice",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ECON2110 - Macroeconomic Principles (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Byg-R9V5s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dc2cfdcefc029ba2d88cec17",
+            "quote": "ECON2110 - Macroeconomic Principles (3)"
+          }
+        ]
+      },
+      {
+        "id": "econ-econ2120",
+        "parent_id": "econ-choice",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ECON2120 - Microeconomic Principles (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryfhgiEqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-88d15d4688646bb50732f593",
+            "quote": "ECON2120 - Microeconomic Principles (3)"
+          }
+        ]
+      },
+      {
+        "id": "electives",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete the breadth, depth and additional General Education credits",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-349688f1df3d5ccb419bd960",
+            "quote": "Electives"
+          },
+          {
+            "block_id": "b-5d5b165cfba3ab0684908748",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "breadth",
+        "parent_id": "electives",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 12 credits of CE courses numbered 400 or higher, in four of six sub-disciplines",
+        "minimum": 12,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Civil Engineering courses numbered 400 or higher in four of the six sub-disciplines: construction, environmental, geotech, structures, transportation, or water resources",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5401e96ebf90b8bd7c94bd00",
+            "quote": "Earn at least 12 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-1039c7a045e89a54ea7bb541",
+            "quote": "Civil Engineering courses numbered 400 or higher in four of the possible six sub-disciplines"
+          },
+          {
+            "block_id": "b-2e9d584f5c1f5543042e2608",
+            "quote": "Breadth Electives"
+          }
+        ],
+        "minimum_course_number": 400
+      },
+      {
+        "id": "depth",
+        "parent_id": "electives",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits of CE courses numbered 400 or higher, in sub-disciplines of the breadth electives",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Civil Engineering courses numbered 400 or higher within any of the sub-disciplines in which the breadth electives were taken",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b4aefd641024e28f01dd2bea",
+            "quote": "Earn at least 6 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-83983f1528d47fa48a3f93b7",
+            "quote": "Civil Engineering courses numbered 400 or higher within any of the sub-disciplines in which they took Breadth Requirement Electives."
+          },
+          {
+            "block_id": "b-607761b7b80250558c3a9974",
+            "quote": "Depth Electives"
+          }
+        ],
+        "minimum_course_number": 400
+      },
+      {
+        "id": "additional-gened",
+        "parent_id": "electives",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 9 credits of additional course work toward the remaining University requirements",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Additional course work to meet remaining University requirements, including UNM General Education",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-745076a3d5b512dcb90008d6",
+            "quote": "Earn at least 9 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-f411dac09f5c234272065c28",
+            "quote": "Additional coursework to meet remaining University requirements."
+          },
+          {
+            "block_id": "b-b21b83a8d6e3d7118e9daaaa",
+            "quote": "Additional General Education Credits"
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM's General Education and other general undergraduate degree requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "All undergraduate students fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits; some courses in a program's requirements may also fulfill General Education.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f411dac09f5c234272065c28",
+            "quote": "all undergraduate students are required to fulfill UNM"
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:SypQxQ9j5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 122 degree credits",
+        "minimum": 122,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5197e56e88515bb16a5e28d",
+            "quote": "Grand Total Credits: 122"
+          },
+          {
+            "block_id": "b-36f2fc7e9b38f453dc90a696",
+            "quote": "\"122\""
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-a872b50b747c861f228ab272",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description and educational objectives; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-8dd8407678fc606714789267",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Accreditation and the introduction to the educational objectives; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-8bb8692ce5cc070a274e2aed",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description and educational objectives; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-2b1c49b15b30c7dea49ba6ec",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description and educational objectives; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-db03f0e598a42d16f386e7ab",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description and educational objectives; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-391a9fb45fdbbfc658b0d097",
+        "disposition": "requirements",
+        "node_ids": [
+          "fe-exam"
+        ],
+        "explanation": "Heading of the FE exam requirement."
+      },
+      {
+        "block_id": "b-4efd99bb45e11d02fed42688",
+        "disposition": "requirements",
+        "node_ids": [
+          "fe-exam"
+        ],
+        "explanation": "The FE exam before graduating; the rest describes licensure."
+      },
+      {
+        "block_id": "b-ba7a18d425bde77ef6b5d466",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts (required courses, two choices, electives), each represented individually."
+      },
+      {
+        "block_id": "b-9fb2aa2f053cafe6fd57564b",
+        "disposition": "requirements",
+        "node_ids": [
+          "required"
+        ],
+        "explanation": "Heading of the required courses."
+      },
+      {
+        "block_id": "b-9ee03e0381bdf6bdfa3e7bcd",
+        "disposition": "requirements",
+        "node_ids": [
+          "required"
+        ],
+        "explanation": "Every listed course is required."
+      },
+      {
+        "block_id": "b-421638c9118d68d4f5a12dd5",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce160l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-f052097d1c7de82390acf076",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1215"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-9bf178883d7599ad50c92424",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1215l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-5fa8d2ed45f1d46632acfbd9",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-engl1120"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-ea7c732540f386d3c23062dc",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math1512"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-338a4270eaa716cec865a95e",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1225"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-530d3b9d185fcfe560aa04ba",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1225l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-18e753bf7937e078e3a3fce3",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-eng130l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-580d93f930c5db52efd817d1",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math1522"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-1643433d771ee1081aafe1a7",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-phys1310"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-81ebf4f2153184da1c89e0d6",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce202"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-f34eea23d1ec9585a6fd6eb6",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce283"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-edcbc0fdd7ecceecb5a2e856",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math2531"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-d72cc8c77553543a93fb15a5",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-phys1320"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-22dc58acc002df6fded95ccb",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-engl2210"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-22e6b6b6c83033873f92e923",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math316"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-0ac0a48885daed6c98c2b424",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-stat345"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-2456274b43e461b252ddea3f",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce302"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-2f625cd13cbda20d5992a2ca",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce305"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-31be4a02831e691ac5616b4d",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-me306"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-9a337b91dcdcda9ecfa4160b",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce331"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-6c1bb7f02ed807c0d107fb5d",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce372"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-5377794e460656585914788b",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce382"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-168a505ac7d463eeef988570",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce308"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-83457cd2d16c10ffb1c14317",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce335"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-5a086fddd753a8c890c6bde3",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce350"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-f0caae3bbf6c4d6a114ae198",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce360"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-4e627003332a9ce86a2857de",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce442"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-5ed50a58d953c04a5a9a461f",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce499"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-637176b614faf5cf77e2be4d",
+        "disposition": "requirements",
+        "node_ids": [
+          "science-choice"
+        ],
+        "explanation": "One course from the two listed."
+      },
+      {
+        "block_id": "b-af3584648df156313ea4f3e8",
+        "disposition": "requirements",
+        "node_ids": [
+          "science-biol1110"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-ce5971ffbe19cfbbdf275499",
+        "disposition": "requirements",
+        "node_ids": [
+          "science-geol1110"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-980d4b6e5da7cd7eaa7f473c",
+        "disposition": "requirements",
+        "node_ids": [
+          "econ-choice"
+        ],
+        "explanation": "One course from the two listed."
+      },
+      {
+        "block_id": "b-dc2cfdcefc029ba2d88cec17",
+        "disposition": "requirements",
+        "node_ids": [
+          "econ-econ2110"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-88d15d4688646bb50732f593",
+        "disposition": "requirements",
+        "node_ids": [
+          "econ-econ2120"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-349688f1df3d5ccb419bd960",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Heading of the electives."
+      },
+      {
+        "block_id": "b-5d5b165cfba3ab0684908748",
+        "disposition": "requirements",
+        "node_ids": [
+          "electives"
+        ],
+        "explanation": "Every elective part is required."
+      },
+      {
+        "block_id": "b-2e9d584f5c1f5543042e2608",
+        "disposition": "requirements",
+        "node_ids": [
+          "breadth"
+        ],
+        "explanation": "Heading of the breadth electives."
+      },
+      {
+        "block_id": "b-5401e96ebf90b8bd7c94bd00",
+        "disposition": "requirements",
+        "node_ids": [
+          "breadth"
+        ],
+        "explanation": "The breadth credits."
+      },
+      {
+        "block_id": "b-1039c7a045e89a54ea7bb541",
+        "disposition": "requirements",
+        "node_ids": [
+          "breadth"
+        ],
+        "explanation": "The breadth pool's qualification, with its sub-discipline rule."
+      },
+      {
+        "block_id": "b-607761b7b80250558c3a9974",
+        "disposition": "requirements",
+        "node_ids": [
+          "depth"
+        ],
+        "explanation": "Heading of the depth electives."
+      },
+      {
+        "block_id": "b-b4aefd641024e28f01dd2bea",
+        "disposition": "requirements",
+        "node_ids": [
+          "depth"
+        ],
+        "explanation": "The depth credits."
+      },
+      {
+        "block_id": "b-83983f1528d47fa48a3f93b7",
+        "disposition": "requirements",
+        "node_ids": [
+          "depth"
+        ],
+        "explanation": "The depth pool's qualification, tied to the breadth electives."
+      },
+      {
+        "block_id": "b-b21b83a8d6e3d7118e9daaaa",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional-gened"
+        ],
+        "explanation": "Heading of the additional General Education credits."
+      },
+      {
+        "block_id": "b-745076a3d5b512dcb90008d6",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional-gened"
+        ],
+        "explanation": "The additional credits."
+      },
+      {
+        "block_id": "b-f411dac09f5c234272065c28",
+        "disposition": "requirements",
+        "node_ids": [
+          "additional-gened",
+          "general-education"
+        ],
+        "explanation": "The pool's qualification, and General Education for every undergraduate."
+      },
+      {
+        "block_id": "b-a5197e56e88515bb16a5e28d",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-b2eb951d062918c9f2b96f5b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The record's admission requirements field is empty: not supplied, not \"no requirements\"."
+      },
+      {
+        "block_id": "b-16e8c11d506db8c0e1d62115",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-a07911830e69d982812509a9",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-6e3fc8638287b8acaa92f2ac",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-2cfb03bd48538b2aa20f5624",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-2fba04ff4acc258ffcf6152c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-30a13bb6e8f98a01891ebac5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-1f853be3fe5ac572f79e8e8d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-36f2fc7e9b38f453dc90a696",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 122, agree with the stated total."
+      },
+      {
+        "block_id": "b-4c60236c94ac8c58c99ed67b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-466d4dc456dab2029acdd2e3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-933e1e0a00e8fc5386916106",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-24a3afa24fac8e2f452f0e36",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "No concentration is required."
+      },
+      {
+        "block_id": "b-6aecf17e78ffde298959cd48",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-4efd99bb45e11d02fed42688",
+        "question": "Is the FE exam a degree condition to take, or to pass? The text says it is required before graduating and describes passing it as the first step toward licensure."
+      },
+      {
+        "block_id": "b-1039c7a045e89a54ea7bb541",
+        "question": "Which CE courses numbered 400 or higher belong to each of the six sub-disciplines? The capture does not list them, so neither the four-of-six breadth rule nor the depth rule can be checked against courses."
+      },
+      {
+        "block_id": "b-b2eb951d062918c9f2b96f5b",
+        "question": "The record's admission field is empty. Are there School of Engineering or departmental admission requirements for the B.S.C.E. that a board should show?"
+      }
+    ]
+  }
+}
