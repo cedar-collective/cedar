@@ -405,6 +405,36 @@ above the list until the boards are recompiled.
 - A mapping decision a question raises, such as which Banner codes a board
   claims, is made in `degree_reading_catalogs.csv` or `programs.csv`.
 
+### Gen Ed and remainder pools
+
+A program page lists some credit without naming courses: Gen Ed by area
+("Humanities: 3 credit hours chosen from the General Education curriculum
+list") or what remains of the University's requirements ("Additional
+coursework to meet remaining University requirements"). Its wording cannot
+tell these from a pool with a real restriction ("12 credits outside the
+major"), so a reading names them in `gen_ed_pools`, beside its `proposal`:
+
+```json
+"gen_ed_pools": [
+  {"rule": "add-math", "area": "II"},
+  {"rule": "additional-gened", "area": ""}
+]
+```
+
+`rule` is an unlisted pool of the reading; `area` is a Gen Ed area of the
+edition's shared rules, or empty for the remainder. A named pool draws no
+tiles (`degree_reading_gen_ed_pools()`): the board's Gen Ed cards cover the
+areas and its elective cards the rest, and an area pool's credits become the
+plan's `gen_ed_area_minimums` (`III:8|VA:6`), which raise that area's Gen Ed
+cards where they ask for more than the University. Every other unlisted pool
+stays an elective tile. A pool that is not an unlisted pool of the reading,
+is named twice, names an unknown area or, for an area, states no credits
+stops the compile. So does naming pools for a board with no profile in the
+edition's `bundle.json`, which would get no Gen Ed cards to cover them. Like
+the triage, the pools are outside the proposal, so naming one changes no
+packet, staged key or sign-off. The rule they implement:
+[degree-explorer-rules.md](degree-explorer-rules.md#what-students-should-see).
+
 ## Where draft interpretations live
 
 Moved from `AGENTS.md` on 2026-11-07.

@@ -67,10 +67,16 @@ test_that("shipped annual shared-rule files are coherent without a private sourc
     expect_false(reference$source_bytes_verified)
     institution <- dirname(dirname(dirname(path)))
     catalogs <- read.csv(file.path(institution, "degree_catalogs.csv"), colClasses = "character")
-    active_ids <- catalogs$catalog_id[catalogs$catalog_year == reference$bundle$catalog_year]
-    if (length(active_ids)) {
-      expect_setequal(vapply(reference$bundle$profiles, function(profile) profile$catalog_id, character(1)), active_ids)
-    }
+    drafts <- file.path(institution, "degree_drafts", "degree_catalogs.csv")
+    if (file.exists(drafts)) catalogs <- rbind(catalogs, read.csv(drafts, colClasses = "character")[names(catalogs)])
+    catalogs <- catalogs[catalogs$catalog_year == reference$bundle$catalog_year, ]
+    profile_ids <- vapply(reference$bundle$profiles, function(profile) profile$catalog_id, character(1))
+    # Every hand-built board has a profile, and every profile names a board. A
+    # compiled board has none only when its college has no rule set; the
+    # compile then refuses its Gen Ed pools (degree_reading_gen_ed_pools()).
+    authored <- read.csv(file.path(institution, "degree_catalogs.csv"), colClasses = "character")
+    expect_equal(setdiff(authored$catalog_id[authored$catalog_year == reference$bundle$catalog_year], profile_ids), character())
+    expect_equal(setdiff(profile_ids, catalogs$catalog_id), character())
     colleges <- read.csv(file.path(institution, "colleges.csv"), colClasses = "character")
     expect_true(all(vapply(reference$bundle$profiles, function(profile) profile$college_code %in% colleges$college_code, logical(1))))
     for (set in reference$sets) {
@@ -120,6 +126,72 @@ test_that("planned coverage consumes each course once and never resolves an open
   expect_equal(missing$areas$remaining[missing$areas$area == "C"], 4)
   reference$bundle$catalog_year <- "1900-1901"
   expect_error(degree_shared_coverage(base, test_degree_roadmaps, reference), "different editions")
+})
+
+test_that("a lecture and its own lab drawn as two tiles meet a science area together, as a bundle does (I97)", {
+  reference <- planning_reference
+  # Change: Biology draws General Chemistry I as two tiles, the lecture and its
+  # lab, as a compiled board does.
+  r <- test_degree_roadmaps
+  lab <- r$nodes[r$nodes$catalog_id == "demo-biology-bs-2026" & r$nodes$node_id == "chem1", ]
+  lab$node_id <- "chem1l"; lab$code <- "CHEM 1215L"; lab$credits <- "1"; lab$bundle <- "0"
+  r$nodes$credits[r$nodes$catalog_id == "demo-biology-bs-2026" & r$nodes$node_id == "chem1"] <- "3"
+  r$nodes <- rbind(r$nodes, lab)
+  basis <- r$basis[r$basis$catalog_id == "demo-biology-bs-2026" & r$basis$node_id == "chem1", ]
+  basis$node_id <- "chem1l"
+  r$basis <- rbind(r$basis, basis)
+  r$courses$node_id[r$courses$catalog_id == "demo-biology-bs-2026" & r$courses$subject_course == "CHEM 1215L"] <- "chem1l"
+  view <- build_degree_roadmap_view(test_degree_catalog, r, "demo-biology-bs-2026", "calculus", "composition", shared = reference)
+  science <- view$shared$assigned[view$shared$assigned$area == "C", ]
+  expect_equal(science$node_id, "chem1|chem1l")
+  expect_equal(science$courses, "CHEM 1215 + CHEM 1215L")
+  expect_equal(view$shared$areas$remaining[view$shared$areas$area == "C"], 0)
+  expect_match(view$nodes$coverage_label[view$nodes$node_id == "chem1"], "Science", fixed = TRUE)
+  expect_match(view$nodes$coverage_label[view$nodes$node_id == "chem1l"], "Science", fixed = TRUE)
+  # Change: the lab tile is another lecture's lab. It is never paired.
+  r$courses$subject_course[r$courses$catalog_id == "demo-biology-bs-2026" & r$courses$node_id == "chem1l"] <- "PHYS 1230L"
+  r$nodes$code[r$nodes$node_id == "chem1l"] <- "PHYS 1230L"
+  view <- build_degree_roadmap_view(test_degree_catalog, r, "demo-biology-bs-2026", "calculus", "composition", shared = reference)
+  expect_false(any(grepl("|", view$shared$assigned$node_id, fixed = TRUE)))
+  expect_equal(view$shared$areas$remaining[view$shared$areas$area == "C"], 4)
+})
+
+test_that("a program that asks for more of an area gets those Gen Ed cards, which also fill the flexible choices (I97)", {
+  reference <- planning_reference
+  # Change: Biology's page asks for 6 math credits and 8 of science, where the
+  # University asks for 3 and 4.
+  r <- test_degree_roadmaps
+  r$plans$gen_ed_area_minimums[r$plans$catalog_id == "demo-biology-bs-2026"] <- "B:6|C:8"
+  view <- build_degree_roadmap_view(test_degree_catalog, r, "demo-biology-bs-2026", "calculus", "composition", shared = reference)
+  areas <- view$shared$areas
+  expect_equal(areas$minimum, c(6, 6, 8, 6))
+  expect_equal(areas$university_minimum, c(6, 3, 4, 6))
+  # Calculus and the paired chemistry cover the University's part; one more math
+  # and one more science course are cards. ENGL 1110 fills one flexible choice
+  # and the added math the other, so no flexible card is left.
+  expect_equal(areas$planned, c(3, 3, 4, 6))
+  expect_equal(areas$remaining, c(3, 3, 4, 0))
+  needs <- view$shared$needs
+  expect_equal(needs$credits[needs$area %in% c("B", "C")], c(3, 4))
+  expect_true(all(needs$source_url[needs$area %in% c("B", "C")] == test_degree_catalog$catalogs$source_url[
+    test_degree_catalog$catalogs$catalog_id == "demo-biology-bs-2026"]))
+  expect_equal(view$shared$flexible_areas_used, c("A", "B"))
+  # The flexible choice the added math meets is inside the math cards: counted
+  # in neither total (26 minimum and 16 planned, less those 3).
+  testthat::local_edition(3)
+  expect_snapshot(view$coverage_note)
+  # A minimum for an area the rules lack, or for the flexible area, stops.
+  r$plans$gen_ed_area_minimums[r$plans$catalog_id == "demo-biology-bs-2026"] <- "Z:3"
+  expect_error(build_degree_roadmap_view(test_degree_catalog, r, "demo-biology-bs-2026", "calculus", "composition", shared = reference),
+               "area the shared rules do not: Z")
+  r$plans$gen_ed_area_minimums[r$plans$catalog_id == "demo-biology-bs-2026"] <- "F:9"
+  expect_error(build_degree_roadmap_view(test_degree_catalog, r, "demo-biology-bs-2026", "calculus", "composition", shared = reference),
+               "flexible area is not planned: F")
+  # The plan's value is read strictly.
+  expect_equal(degree_gen_ed_area_minimums(""), stats::setNames(numeric(), character()))
+  expect_equal(degree_gen_ed_area_minimums("I:9|III:8"), c(I = 9, III = 8))
+  for (bad in c("I:9|I:3", "I:x", "I", ":3", "I:0")) expect_error(degree_gen_ed_area_minimums(bad), "Invalid gen_ed_area_minimums", info = bad)
+  expect_equal(degree_shared_gen_ed_areas(reference), c("A", "B", "C"))
 })
 
 test_that("placement does not award preparation coverage and absent profiles stay generic", {

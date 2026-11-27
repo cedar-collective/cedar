@@ -5062,5 +5062,11 @@
     {"item": "question:1", "settled_by": "catalog"},
     {"item": "question:2", "settled_by": "catalog"},
     {"item": "question:3", "settled_by": "catalog"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "add-math", "area": "II"},
+    {"rule": "add-science", "area": "III"},
+    {"rule": "add-social", "area": "IV"},
+    {"rule": "add-humanities", "area": "VA"}
   ]
 }

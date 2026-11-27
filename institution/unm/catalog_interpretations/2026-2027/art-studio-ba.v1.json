@@ -1463,5 +1463,8 @@
   "triage": [
     {"item": "question:1", "settled_by": "catalog"},
     {"item": "question:2", "settled_by": "catalog"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "elective-any", "area": ""}
   ]
 }

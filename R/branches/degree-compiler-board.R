@@ -251,6 +251,75 @@ degree_course_conditions <- function(rule_nodes, courses) {
   dplyr::distinct(out[c("subject_course", "kind", "label", "minimum", "subject_name", "quote", "section", "source_url", "why")])
 }
 
+#' A reading's Gen Ed and open pools
+#'
+#' A program page lists some of its credit as Gen Ed by area ("Humanities: 3
+#' credit hours chosen from the General Education curriculum list") or as what
+#' remains of the University's requirements ("Additional coursework to meet
+#' remaining University requirements"). Wording alone cannot tell these from a
+#' pool with a real restriction ("12 credits outside the major"), so each
+#' reading names them beside its proposal:
+#' `"gen_ed_pools": [{"rule": "add-math", "area": "II"}, {"rule": "additional-gened", "area": ""}]`,
+#' an empty area for the remainder. They draw no tiles: the board's Gen Ed cards
+#' cover the areas (at the program's own minimum where it asks for more) and
+#' its elective cards the rest. Every other unlisted pool stays a card.
+#'
+#' @param reading The reading file's contents.
+#' @param compiled `compile_degree_interpretation()` output.
+#' @param areas The Gen Ed areas a program can name a minimum for
+#'   (`degree_shared_gen_ed_areas()`), or NULL when the board has no profile in
+#'   the edition's shared rules: it would get no Gen Ed cards, so naming a pool
+#'   there stops rather than leave its credits off the board.
+#' @return data.frame: `rule_id`, `area` ("" for the remainder), `credits`.
+degree_reading_gen_ed_pools <- function(reading, compiled, areas) {
+  out <- data.frame(rule_id = character(), area = character(), credits = numeric())
+  if (is.null(reading$gen_ed_pools)) return(out)
+  if (is.null(areas)) {
+    stop("[degree-compiler-board.R] The reading names Gen Ed pools, but its board has no profile in the edition's shared rules, so no Gen Ed cards would cover them")
+  }
+  ids <- vapply(reading$gen_ed_pools, function(p) p$rule, "")
+  area <- vapply(reading$gen_ed_pools, function(p) p$area, "")
+  slots <- compiled$rules[compiled$rules$role == "slot", ]
+  wrong <- unique(c(setdiff(ids, slots$rule_id), ids[duplicated(ids)]))
+  if (length(wrong)) {
+    stop("[degree-compiler-board.R] gen_ed_pools names no unlisted pool of the reading, or names one twice: ", paste(wrong, collapse = ", "))
+  }
+  if (any(nzchar(area) & !area %in% areas)) {
+    stop("[degree-compiler-board.R] gen_ed_pools names an area that is not one of ", paste(areas, collapse = ", "), ": ",
+         paste(unique(area[nzchar(area) & !area %in% areas]), collapse = ", "))
+  }
+  credits <- slots$credits[match(ids, slots$rule_id)]
+  if (any(nzchar(area) & is.na(credits))) {
+    stop("[degree-compiler-board.R] A Gen Ed area pool states no credits: ", paste(ids[nzchar(area) & is.na(credits)], collapse = ", "))
+  }
+  rbind(out, data.frame(rule_id = ids, area = area, credits = credits))
+}
+
+#' The math routes of a program with no math course of its own
+#'
+#' Each start's preparation and nothing more: the routes most hand-built
+#' boards with no math requirement use (nothing for a student ready for
+#' college-level math; MATH 1215 for one starting at intermediate algebra,
+#' which every Mathematics and Statistics Gen Ed course needs). The program's
+#' own courses or a Gen Ed card meet the area. A tie between patterns stops.
+#'
+#' @param roadmaps The hand-built boards (`read_degree_roadmaps()`).
+#' @return Their `math_routes` rows for one such board.
+degree_general_math_routes <- function(roadmaps) {
+  shared <- roadmaps$nodes[roadmaps$nodes$catalog_id == "*", ]
+  preparation <- shared$node_id[shared$track == "math" & shared$kind == "preparation"]
+  routes <- roadmaps$math_routes
+  by_board <- split(routes, routes$catalog_id)
+  only <- vapply(by_board, function(r) all(unlist(lapply(r$node_ids, degree_split_ids)) %in% preparation), TRUE)
+  if (!any(only)) stop("[degree-compiler-board.R] No hand-built board plans its math as preparation only")
+  pattern <- vapply(by_board[only], function(r) { r <- r[order(r$start_id), ]; paste(r$start_id, r$node_ids, sep = "=", collapse = ";") }, "")
+  counts <- sort(table(pattern), decreasing = TRUE)
+  if (length(counts) > 1L && counts[[1]] == counts[[2]]) stop("[degree-compiler-board.R] Hand-built boards split evenly on the preparation-only math routes")
+  out <- by_board[[names(pattern)[pattern == names(counts)[1]][1]]]
+  rownames(out) <- NULL
+  out
+}
+
 #' A compiled reading as a validated draft board
 #'
 #' @param compiled `compile_degree_interpretation()` output.
@@ -262,15 +331,17 @@ degree_course_conditions <- function(rule_nodes, courses) {
 #' @param shared The institution's boards (`read_degree_roadmaps()`), read for
 #'   its shared rows (`catalog_id` "*"), program math routes and planning defaults.
 #' @param evidence The institution's `degree_catalog_evidence`, for the shared routes' citations.
-#' @param general_math The shared math node a program with no math requirement plans toward.
+#' @param general_routes The math routes of a program with no math course of its
+#'   own (`degree_general_math_routes()`).
 #' @param course_conditions `degree_course_conditions()`.
 #' @param proposal The reading's `proposal`, for its rules (`degree_reading_rules()`).
+#' @param gen_ed_pools `degree_reading_gen_ed_pools()`: the pools that draw no tiles.
 #' @return List: `catalog`, `roadmaps` (validated; a course that needs a
 #'   choice's option carries a course-count condition on its tiles), `held`
 #'   (requisites and conditions among the board's courses neither drawn nor
 #'   shown, with why). Every evidence id the draft adds starts "compiled-".
-assemble_compiled_degree_board <- function(compiled, courses, program, requisites, catalog_row, shared, evidence, general_math,
-                                           course_conditions, proposal) {
+assemble_compiled_degree_board <- function(compiled, courses, program, requisites, catalog_row, shared, evidence, general_routes,
+                                           course_conditions, proposal, gen_ed_pools) {
   id <- catalog_row$catalog_id
   if (catalog_row$source_url != program$catalog_url) stop("[degree-compiler-board.R] The draft's source must be its program page")
   degree_hours <- degree_reading_degree_hours(proposal, program)
@@ -322,6 +393,8 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
       add_basis(nid, "degree", rule_evidence(r), "Degree requirement in the draft reading.")
       next
     }
+    # A Gen Ed or remainder pool is covered by the board's Gen Ed and elective cards.
+    if (r$role == "slot" && r$rule_id %in% gen_ed_pools$rule_id) next
     eid <- rule_evidence(r)
     if (r$role == "slot") {
       siblings <- rules$subject_course[rules$role == "course" & rules$parent_id == r$parent_id & nzchar(r$parent_id)]
@@ -369,16 +442,20 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     }
   }
 
-  # Math: the program's required shared math course, or the general target.
+  # Math: the routes to the program's required shared math course; with none,
+  # each start's preparation only, and the area is a Gen Ed card.
   routes <- shared$math_routes
-  ends <- vapply(routes$node_ids, function(x) utils::tail(degree_split_ids(x), 1), "")
+  ends <- vapply(routes$node_ids, function(x) utils::tail(c("", degree_split_ids(x)), 1), "")
   required_math <- unname(shared_codes[required_shared][shared_nodes$track[match(shared_codes[required_shared], shared_nodes$node_id)] == "math"])
-  target <- if (length(required_math)) required_math else general_math
-  if (length(target) != 1L) stop("[degree-compiler-board.R] The reading requires several shared math courses: ", paste(target, collapse = ", "))
-  template <- sort(unique(routes$catalog_id[ends == target]))
-  template <- template[vapply(template, function(t) all(ends[routes$catalog_id == t] == target), TRUE)]
-  if (!length(template)) stop("[degree-compiler-board.R] No program's math routes end at ", target)
-  math_routes <- routes[routes$catalog_id == template[1], ]
+  if (length(required_math) > 1L) stop("[degree-compiler-board.R] The reading requires several shared math courses: ", paste(required_math, collapse = ", "))
+  if (length(required_math)) {
+    template <- sort(unique(routes$catalog_id[ends == required_math]))
+    template <- template[vapply(template, function(t) all(ends[routes$catalog_id == t] == required_math), TRUE)]
+    if (!length(template)) stop("[degree-compiler-board.R] No program's math routes end at ", required_math)
+    math_routes <- routes[routes$catalog_id == template[1], ]
+  } else {
+    math_routes <- general_routes
+  }
   math_routes$catalog_id <- id
 
   # Shared tiles this board shows: required ones cite the reading; preparation
@@ -490,7 +567,8 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     evidence_id = plan_evidence, assumption = DEGREE_BOARD_DRAFT_NOTE, upper_level_from_semester = upper_from,
     senior_level_from_semester = senior_from,
     allowance_slot_credits = as.character(degree_board_plan_default(shared$plans, "allowance_slot_credits")),
-    gen_ed_source_url = as.character(degree_board_plan_default(shared$plans, "gen_ed_source_url")))
+    gen_ed_source_url = as.character(degree_board_plan_default(shared$plans, "gen_ed_source_url")),
+    gen_ed_area_minimums = degree_reading_area_minimums(gen_ed_pools))
   reading <- degree_reading_rules(proposal, courses, id)
   catalog <- validate_degree_catalog(list(
     catalogs = as.data.frame(catalog_row),
@@ -506,6 +584,14 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
     courses = rbind(shared$courses[shared$courses$catalog_id == "*", ], do.call(rbind, components)),
     options = if (length(options)) do.call(rbind, options) else empty(CEDAR_CONFIG_FILE_SPECS$degree_roadmap_options)), catalog)
   list(catalog = catalog, roadmaps = roadmaps, held = held)
+}
+
+# The program's own Gen Ed area minimums, as its plan records them: "I:9|III:8".
+degree_reading_area_minimums <- function(gen_ed_pools) {
+  named <- gen_ed_pools[nzchar(gen_ed_pools$area), ]
+  if (!nrow(named)) return("")
+  totals <- tapply(named$credits, factor(named$area, unique(named$area)), sum)
+  paste(names(totals), totals, sep = ":", collapse = "|")
 }
 
 # A planning default: the value most authored boards use (every board plans 15

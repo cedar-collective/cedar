@@ -6124,5 +6124,11 @@
     {"item": "rule:elective-total", "settled_by": "catalog"},
     {"item": "rule:concentration-metadata", "settled_by": "catalog"},
     {"item": "rule:accounting-old-number", "settled_by": "catalog"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "natural-science", "area": "III"},
+    {"rule": "humanities", "area": "VA"},
+    {"rule": "language", "area": "VB"},
+    {"rule": "arts", "area": "VI"}
   ]
 }

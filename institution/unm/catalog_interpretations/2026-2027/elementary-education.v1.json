@@ -4694,5 +4694,14 @@
     {"item": "question:2", "settled_by": "catalog"},
     {"item": "question:3", "settled_by": "catalog"},
     {"item": "question:4", "settled_by": "catalog"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "communication", "area": "I"},
+    {"rule": "science", "area": "III"},
+    {"rule": "social", "area": "IV"},
+    {"rule": "humanities", "area": "VA"},
+    {"rule": "language", "area": "VB"},
+    {"rule": "arts", "area": "VI"},
+    {"rule": "additional-credits", "area": ""}
   ]
 }

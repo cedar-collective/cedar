@@ -1659,5 +1659,8 @@
     {"item": "question:1", "settled_by": "catalog"},
     {"item": "question:2", "settled_by": "catalog"},
     {"item": "question:3", "settled_by": "capture"}
+  ],
+  "gen_ed_pools": [
+    {"rule": "additional-gened", "area": ""}
   ]
 }

@@ -64,13 +64,11 @@ biology-bs-2026,breadth6,degree,degree-biology-bs-2026-breadth6,Part of a requir
 biology-bs-2026,related1,degree,degree-biology-bs-2026-related1,Part of a required course group; the specific course has not been chosen.
 biology-bs-2026,related2,degree,degree-biology-bs-2026-related2,Part of a required course group; the specific course has not been chosen.
 history-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
-history-ba-2026,math1350,general,degree-history-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 history-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 history-ba-2026,englY,general,degree-history-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 history-ba-2026,engl1,general,degree-history-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 history-ba-2026,engl2,general,degree-history-ba-2026-engl2,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 philosophy-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
-philosophy-ba-2026,math1350,general,degree-philosophy-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 philosophy-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 philosophy-ba-2026,englY,general,degree-philosophy-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 philosophy-ba-2026,engl1,general,degree-philosophy-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -82,7 +80,6 @@ business-bba-2026,englY,general,degree-business-bba-2026-englY,Illustrative Engl
 business-bba-2026,engl1,general,degree-business-bba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 business-bba-2026,engl2,degree,degree-business-bba-2026-engl2,Named degree requirement.
 anthropology-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
-anthropology-ba-2026,math1350,general,degree-anthropology-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 anthropology-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 anthropology-ba-2026,englY,general,degree-anthropology-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
 anthropology-ba-2026,engl1,general,degree-anthropology-ba-2026-engl1,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -198,7 +195,6 @@ population-health-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation add
 population-health-bs-2026,engl2,general,degree-population-health-bs-2026-engl2,Illustrative English route; complete Gen Ed allocation remains separate.
 population-health-bs-2026,math1215,prerequisite,route-*-math1215-math1220,Preparation added by the selected entry route; not a separately listed major requirement.
 population-health-bs-2026,englY,general,degree-population-health-bs-2026-englY,Illustrative English route; complete Gen Ed allocation remains separate.
-population-health-bs-2026,math1350,general,degree-population-health-bs-2026-math1350,Suggested Gen Ed mathematics; no named mathematics course is required by this major.
 population-health-bs-2026,engl1,general,degree-population-health-bs-2026-engl1,Illustrative English route; complete Gen Ed allocation remains separate.
 medical-laboratory-bs-2026,mlbio1,degree,degree-medical-laboratory-bs-2026-mlbio1,Listed requirement in the selected program/route.
 medical-laboratory-bs-2026,mlbio2,degree,degree-medical-laboratory-bs-2026-mlbio2,Listed requirement in the selected program/route.
@@ -343,7 +339,6 @@ psychology-ba-2026,psyupper2,degree,degree-psychology-ba-2026-psyupper2,Selected
 psychology-ba-2026,psyupper3,degree,degree-psychology-ba-2026-psyupper3,Selected course group; individual course prerequisites still need review.
 psychology-ba-2026,psyupper4,degree,degree-psychology-ba-2026-psyupper4,Selected course group; individual course prerequisites still need review.
 psychology-ba-2026,psyelective,degree,degree-psychology-ba-2026-psyelective,Selected course group; individual course prerequisites still need review.
-psychology-ba-2026,math1350,general,degree-psychology-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 psychology-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 psychology-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 psychology-ba-2026,englY,general,degree-psychology-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -361,7 +356,6 @@ psychology-bs-2026,psyupper2,degree,degree-psychology-bs-2026-psyupper2,Selected
 psychology-bs-2026,psyupper3,degree,degree-psychology-bs-2026-psyupper3,Selected course group; individual course prerequisites still need review.
 psychology-bs-2026,psyupper4,degree,degree-psychology-bs-2026-psyupper4,Selected course group; individual course prerequisites still need review.
 psychology-bs-2026,psylab,degree,degree-psychology-bs-2026-psylab,Selected course group; individual course prerequisites still need review.
-psychology-bs-2026,math1350,general,degree-psychology-bs-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 psychology-bs-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 psychology-bs-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 psychology-bs-2026,englY,general,degree-psychology-bs-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -468,7 +462,6 @@ political-science-ba-2026,polsupper5,degree,degree-political-science-ba-2026-pol
 political-science-ba-2026,polsupper6,degree,degree-political-science-ba-2026-polsupper6,Selected course group; individual course prerequisites still need review.
 political-science-ba-2026,polsupper7,degree,degree-political-science-ba-2026-polsupper7,Selected course group; individual course prerequisites still need review.
 political-science-ba-2026,polsany,degree,degree-political-science-ba-2026-polsany,Selected course group; individual course prerequisites still need review.
-political-science-ba-2026,math1350,general,degree-political-science-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 political-science-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 political-science-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 political-science-ba-2026,englY,general,degree-political-science-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -574,7 +567,6 @@ film-digital-arts-ba-2026,finearts3,degree,degree-film-digital-arts-ba-2026-fine
 film-digital-arts-ba-2026,finearts4,degree,degree-film-digital-arts-ba-2026-finearts4,Selected course group; individual course prerequisites still need review.
 film-digital-arts-ba-2026,finearts5,degree,degree-film-digital-arts-ba-2026-finearts5,Selected course group; individual course prerequisites still need review.
 film-digital-arts-ba-2026,finearts6,degree,degree-film-digital-arts-ba-2026-finearts6,Selected course group; individual course prerequisites still need review.
-film-digital-arts-ba-2026,math1350,general,degree-film-digital-arts-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 film-digital-arts-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 film-digital-arts-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 film-digital-arts-ba-2026,englY,general,degree-film-digital-arts-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -606,7 +598,6 @@ film-digital-arts-bfa-2026,finearts1,degree,degree-film-digital-arts-bfa-2026-fi
 film-digital-arts-bfa-2026,finearts2,degree,degree-film-digital-arts-bfa-2026-finearts2,Selected course group; individual course prerequisites still need review.
 film-digital-arts-bfa-2026,finearts3,degree,degree-film-digital-arts-bfa-2026-finearts3,Selected course group; individual course prerequisites still need review.
 film-digital-arts-bfa-2026,finearts4,degree,degree-film-digital-arts-bfa-2026-finearts4,Selected course group; individual course prerequisites still need review.
-film-digital-arts-bfa-2026,math1350,general,degree-film-digital-arts-bfa-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 film-digital-arts-bfa-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 film-digital-arts-bfa-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 film-digital-arts-bfa-2026,englY,general,degree-film-digital-arts-bfa-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.
@@ -635,7 +626,6 @@ architecture-ba-2026,arch402,degree,degree-architecture-ba-2026-arch402,Named de
 architecture-ba-2026,arch472,degree,degree-architecture-ba-2026-arch472,Named degree requirement.
 architecture-ba-2026,structures2,degree,degree-architecture-ba-2026-structures2,Selected course group; individual course prerequisites still need review.
 architecture-ba-2026,sustainability2,degree,degree-architecture-ba-2026-sustainability2,Selected course group; individual course prerequisites still need review.
-architecture-ba-2026,math1350,general,degree-architecture-ba-2026-math1350,Illustrative Gen Ed math choice; this major does not specifically require MATH 1350.
 architecture-ba-2026,math1215,prerequisite,route-*-math1215-math1350,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 architecture-ba-2026,englX,prerequisite,route-*-englX-englY,Preparation added by the selected math or English starting route; not a separately listed major requirement.
 architecture-ba-2026,englY,general,degree-architecture-ba-2026-englY,Illustrative English route toward general communication requirements; full Gen Ed allocation is not encoded.

@@ -90,11 +90,13 @@ build_degree_plan_rules <- function(catalog, roadmaps, view) {
     for (i in seq_len(nrow(view$shared$areas))) {
       area <- view$shared$areas[i, ]
       assigned <- view$shared$assigned[view$shared$assigned$area == area$area, ]
-      add("Shared Gen Ed allocation", paste0("Area ", area$area, ": ", area$label, " — ", area$minimum, " credits minimum."),
+      add("Shared Gen Ed allocation", paste0("Area ", area$area, ": ", area$label, " — ", area$minimum, " credits minimum",
+          if (area$minimum > area$university_minimum) paste0(" (this program's own; the University asks for ", area$university_minimum, ")"), "."),
         paste0(area$planned, " planned credits represented by ",
           if (nrow(assigned)) paste(assigned$courses, collapse = "; ") else "no selected course", "; ",
-          area$remaining, " credits still earmarked in open space. Credits are counted once; open choices/transfer can change coverage."), area$source_url,
-        ids = paste(assigned$node_id, collapse = "|"))
+          area$remaining, " credits still earmarked in open space. Credits are counted once; open choices/transfer can change coverage."),
+        if (area$minimum > area$university_minimum) view$catalog$source_url else area$source_url,
+        ids = paste(assigned$node_id[nzchar(assigned$node_id)], collapse = "|"))
     }
     add("Shared allocation limits", view$shared$note, "Planned coverage only. Grades, approvals and transfer are not evaluated.")
     if (!is.null(view$shared$upper)) add("Shared college requirement", view$shared$upper$statement,
@@ -146,7 +148,9 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   view$nodes$coverage_detail <- ""
   if (!is.null(view$shared)) for (i in seq_len(nrow(view$nodes))) {
     node <- view$nodes[i, ]
-    assigned <- view$shared$assigned[view$shared$assigned$node_id == node$node_id, ]
+    # A lecture and lab counted as one pair carry both ids ("chem_1215|chem_1215l").
+    assigned <- view$shared$assigned[vapply(strsplit(view$shared$assigned$node_id, "|", fixed = TRUE),
+                                            function(ids) node$node_id %in% ids, TRUE), ]
     possible <- unique(view$shared$memberships$area[view$shared$memberships$subject_course %in%
       view$options$subject_course[view$options$node_id == node$node_id]])
     if (nrow(assigned)) {
@@ -163,17 +167,32 @@ build_degree_roadmap_view <- function(catalog, roadmaps, catalog_id, math_start,
   }
 
   view$title <- paste(view$catalog$degree_label, "·", view$catalog$catalog_year)
-  view$math_note <- paste0(view$math_target$code, " starts in semester ", view$math_target$semester, ".")
+  # The math start's own course: none, or only preparation, when the program
+  # names no course on the shared math route. A program's own math courses
+  # (a teacher-education program's math for teachers) are its tiles, not the route's.
+  target <- view$math_target
+  view$math_note <- if (nrow(target) && !identical(target$kind, "preparation")) {
+    paste0(target$code, " starts in semester ", target$semester, ".")
+  } else if (nrow(target)) {
+    paste0("This math starting point adds ", target$code, " in semester ", target$semester, ", as preparation.")
+  } else {
+    "This math starting point adds no math course to the plan."
+  }
   view$change_note <- paste0(nrow(view$terms), " semesters · ", view$policy$normal_load,
     " credits usual · ", view$policy$max_load, " maximum")
   view$timing_note <- paste0("Planning preference: prioritize Gen Ed in semesters 1–", upper_start - 1L,
     "; required upper-level courses start in semester ", upper_start, " or later, and ",
     COURSE_SENIOR_LEADING_DIGIT, "00-level courses in semester ", senior_start, " or later. Other electives can be upper level when their entry requirements allow it.")
+  # Flexible choices met by the program's own extra area credits sit inside
+  # those areas' cards: counted once, in neither total.
+  inside <- if (is.null(view$shared)) 0 else sum(view$shared$assigned$credits[!nzchar(view$shared$assigned$node_id)])
   view$coverage_note <- if (is.null(view$shared)) {
     "Shared Gen Ed coverage is not configured for this program. Elective boxes are unallocated credits, not additional Gen Ed requirements."
-  } else paste0("Gen Ed: ", sum(view$shared$areas$planned), " of ", sum(view$shared$areas$minimum),
+  } else paste0("Gen Ed: ", sum(view$shared$areas$planned) - inside, " of ", sum(view$shared$areas$minimum) - inside,
     " minimum credits represented by courses already shown or explicitly completed; ",
-    sum(view$allowances$credits[view$allowances$purpose == "gen_ed"]), " credits earmarked in open space. Other boxes do not have to be Gen Ed. Flexible-area coverage is provisional because catalog wording needs clarification. This is illustrative coverage, not a degree audit.")
+    sum(view$allowances$credits[view$allowances$purpose == "gen_ed"]), " credits earmarked in open space.",
+    if (inside > 0) " The program's extra credits in its Gen Ed areas also count as the flexible Gen Ed choices.",
+    " Other boxes do not have to be Gen Ed. Flexible-area coverage is provisional because catalog wording needs clarification. This is illustrative coverage, not a degree audit.")
   if (!is.null(view$shared$upper)) view$coverage_note <- paste(view$coverage_note,
     paste0("Standard college upper-level minimum: ", view$shared$upper$minimum, " credits; ",
       view$shared$upper$planned, " shown in named/upper-level choice slots; ", view$shared$upper$remaining,

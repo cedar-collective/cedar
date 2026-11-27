@@ -61,6 +61,69 @@ test_that("an unlisted credit pool is elective space inside the major and a cred
   expect_equal(compiled$credit_rules$id, c("degree-total", "electives"))
 })
 
+test_that("a reading's Gen Ed and remainder pools draw no tiles, and its area pools are the plan's area minimums (I97)", {
+  f <- normalization_fixture(withr::local_tempdir())
+  courses <- degree_packet_course_facts(f$program$packet)
+  nodes <- utils::read.csv(file.path(f$capture, "analysis", "rule-nodes.csv"), colClasses = "character")
+  program <- degree_packet_program_facts(f$program$packet)
+  # Change: the major also lists 4 and then 3 more Gen Ed science credits, 9
+  # credits of remaining University requirements, 6 elective credits and a
+  # count of two science courses, each an unlisted pool.
+  total <- compiler_biology_proposal$nodes[[match("degree-total", vapply(compiler_biology_proposal$nodes, `[[`, "", "id"))]]
+  pool <- function(id, minimum, label, ...) modifyList(total, list(id = id, parent_id = "major", minimum = minimum, label = label, ...))
+  reading <- compiler_biology_proposal
+  reading$nodes <- c(reading$nodes, list(
+    pool("science", 4, "Physical and Natural Sciences: 4 credit hours from the General Education list"),
+    pool("science-more", 3, "3 more credits of science from the General Education list"),
+    pool("remaining", 9, "Additional coursework to meet remaining University requirements"),
+    pool("electives", 6, "At least 6 elective credits"),
+    pool("science-courses", 2, "Two science courses", kind = "course_pool", unit = "courses")))
+  reading$gen_ed_pools <- list(list(rule = "science", area = "C"), list(rule = "science-more", area = "C"),
+                               list(rule = "remaining", area = ""))
+  compiled <- compile_degree_interpretation(reading, courses)
+  pools <- degree_reading_gen_ed_pools(reading, compiled, c("A", "B", "C"))
+  expect_equal(pools$credits, c(4, 3, 9))
+  draft <- assemble_compiled_degree_board(compiled, courses, program, degree_course_requisites(nodes, courses),
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    degree_course_conditions(nodes, courses), reading, pools)
+  own <- draft$roadmaps$nodes$node_id[draft$roadmaps$nodes$catalog_id == "demo-biology-draft"]
+  expect_false(any(grepl("^(science|science_more|remaining)_[0-9]", own)))
+  expect_equal(sum(startsWith(own, "electives_")), 2L)
+  # Two pools in one area add up; the remainder is open space, not a minimum.
+  expect_equal(draft$roadmaps$plans$gen_ed_area_minimums, "C:7")
+  # A reading with none names no minimums.
+  none <- assemble_compiled_degree_board(compiled, courses, program, degree_course_requisites(nodes, courses),
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    degree_course_conditions(nodes, courses), reading, compiler_no_gen_ed_pools)
+  expect_equal(none$roadmaps$plans$gen_ed_area_minimums, "")
+  expect_true(any(startsWith(none$roadmaps$nodes$node_id, "remaining_")))
+
+  named <- function(...) { r <- reading; r$gen_ed_pools <- list(...); r }
+  # A board with no shared-rules profile would get no Gen Ed cards for them.
+  expect_error(degree_reading_gen_ed_pools(reading, compiled, NULL), "no profile")
+  expect_error(degree_reading_gen_ed_pools(named(list(rule = "bio1", area = "C")), compiled, c("A", "B", "C")), "no unlisted pool.*bio1")
+  expect_error(degree_reading_gen_ed_pools(named(list(rule = "science", area = "C"), list(rule = "science", area = "B")),
+                                           compiled, c("A", "B", "C")), "twice: science")
+  expect_error(degree_reading_gen_ed_pools(named(list(rule = "science", area = "Z")), compiled, c("A", "B", "C")), "not one of A, B, C: Z")
+  expect_error(degree_reading_gen_ed_pools(named(list(rule = "science-courses", area = "C")), compiled, c("A", "B", "C")),
+               "states no credits: science-courses")
+  expect_equal(nrow(degree_reading_gen_ed_pools(compiler_biology_proposal, compiled, NULL)), 0L)
+})
+
+test_that("a program with no math course of its own takes each start's preparation, as hand-built boards plan it (I97)", {
+  expect_equal(degree_general_math_routes(test_degree_roadmaps), compiler_general_math_routes, ignore_attr = TRUE)
+  # Change: History plans MATH 1350 from the algebra start, so no hand-built board plans preparation only.
+  r <- test_degree_roadmaps
+  r$math_routes$node_ids[r$math_routes$catalog_id == "demo-history-ba-2026" & r$math_routes$start_id == "algebra"] <- "math1350"
+  expect_error(degree_general_math_routes(r), "No hand-built board")
+  # Change: a second board plans nothing from the intermediate start either, so two patterns tie.
+  r <- test_degree_roadmaps
+  other <- r$math_routes[r$math_routes$catalog_id == "demo-history-ba-2026", ]
+  other$catalog_id <- "demo-other"; other$node_ids <- ""
+  r$math_routes <- rbind(r$math_routes, other)
+  expect_error(degree_general_math_routes(r), "split evenly")
+})
+
 test_that("an elective slot takes the band of the lowest number its reading allows, else its group's level (I64)", {
   f <- normalization_fixture(withr::local_tempdir())
   courses <- degree_packet_course_facts(f$program$packet)
@@ -76,8 +139,8 @@ test_that("an elective slot takes the band of the lowest number its reading allo
     reading$nodes <- c(reading$nodes, list(pool))
     compiled <- compile_degree_interpretation(reading, courses)
     draft <- assemble_compiled_degree_board(compiled, courses, program, degree_course_requisites(nodes, courses),
-      compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-      degree_course_conditions(nodes, courses), reading)
+      compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+      degree_course_conditions(nodes, courses), reading, compiler_no_gen_ed_pools)
     own <- draft$roadmaps$nodes[startsWith(draft$roadmaps$nodes$node_id, "electives_"), ]
     list(level = unique(own$course_level), semester = unique(own$semester),
          rule = compiled$rules$minimum_course_number[compiled$rules$rule_id == "electives"])
@@ -136,7 +199,7 @@ test_that("the board plans to the reading's degree total, which a bare number in
   expect_equal(degree_reading_degree_hours(reading, worded), 128)
   draft <- assemble_compiled_degree_board(compile_degree_interpretation(reading, courses), courses, worded,
     degree_course_requisites(nodes, courses), compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence,
-    "math1350", degree_course_conditions(nodes, courses), reading)
+    compiler_general_math_routes, degree_course_conditions(nodes, courses), reading, compiler_no_gen_ed_pools)
   expect_equal(draft$roadmaps$plans$degree_credit_target, "128")
   # A bare number the reading contradicts stops; so does a reading with no credit rule on the field.
   expect_error(degree_reading_degree_hours(reading, program), "disagree with the record's Degree Hours, 120")
@@ -214,8 +277,8 @@ test_that("a draft board validates, places its tiles and draws only timed arrows
   compiled <- compile_degree_interpretation(compiler_biology_proposal, courses)
   program <- degree_packet_program_facts(f$program$packet)
   draft <- assemble_compiled_degree_board(compiled, courses, program, degree_course_requisites(nodes, courses),
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    degree_course_conditions(nodes, courses), compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    degree_course_conditions(nodes, courses), compiler_biology_proposal, compiler_no_gen_ed_pools)
 
   # The choice of the lab pair or Combined Biology is two tiles: first and second course.
   own <- draft$roadmaps$nodes[draft$roadmaps$nodes$catalog_id == "demo-biology-draft", ]
@@ -225,7 +288,8 @@ test_that("a draft board validates, places its tiles and draws only timed arrows
   expect_equal(opts$subject_course[opts$node_id == "start_1"], c("BIOL 2110", "BIOL 200"))
   expect_equal(opts$subject_course[opts$node_id == "start_2"], "BIOL 2110L")
   expect_equal(draft$roadmaps$plans$degree_credit_target, "120")
-  expect_equal(draft$roadmaps$math_routes$node_ids[draft$roadmaps$math_routes$start_id == "intermediate"], "math1215|math1350")
+  # The designed reading names no math course: preparation only (I97).
+  expect_equal(draft$roadmaps$math_routes$node_ids[draft$roadmaps$math_routes$start_id == "intermediate"], "math1215")
   # No arrow can start from a choice, and the choices' courses need only each other.
   expect_equal(nrow(draft$roadmaps$links[draft$roadmaps$links$catalog_id == "demo-biology-draft", ]), 0L)
 
@@ -248,8 +312,8 @@ test_that("required courses get arrows timed by their templates; untimed wording
   compiled$options <- compiled$options[0, ]
   draft <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet),
     degree_course_requisites(nodes, courses), compiler_biology_catalog_row, test_degree_roadmaps,
-    test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
 
   links <- draft$roadmaps$links[draft$roadmaps$links$catalog_id == "demo-biology-draft", ]
   expect_equal(paste(links$from, links$to, links$timing), "biol_2110 biol_2110l before")
@@ -266,8 +330,8 @@ test_that("required courses get arrows timed by their templates; untimed wording
   # other; that pair is held (a cycle), and only the lab's arrow is drawn.
   timed <- degree_course_requisites(nodes, courses); timed$timing <- "prior"
   cycle <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet), timed,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
   expect_equal(nrow(cycle$roadmaps$links[cycle$roadmaps$links$catalog_id == "demo-biology-draft", ]), 1L)
   expect_true(all(cycle$held$why == "listed each way; the board cannot draw a cycle"))
   expect_equal(nrow(cycle$held), 2L)
@@ -275,8 +339,8 @@ test_that("required courses get arrows timed by their templates; untimed wording
   # Change: the lab's requisite allows the same term; the arrow says so.
   same <- degree_course_requisites(nodes, courses); same$timing[same$subject_course == "BIOL 2110L"] <- "prior_or_concurrent"
   same <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet), same,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
   expect_equal(same$roadmaps$links$timing[same$roadmaps$links$catalog_id == "demo-biology-draft"], "before_or_same")
 })
 
@@ -296,8 +360,8 @@ test_that("a course that needs a choice's option waits on the choice as a condit
   compiled$options <- tibble::tibble(rule_id = "start", option_id = c("bio1", "combined"), subject_course = c("BIOL 2110", "BIOL 200"))
   requisites <- degree_course_requisites(nodes, courses)
   draft <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet), requisites,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
 
   cond <- draft$roadmaps$conditions
   expect_equal(paste(cond$node_id, cond$kind, cond$eligible_node_ids, cond$minimum), "biol_2110l course_count start_1 1")
@@ -312,8 +376,8 @@ test_that("a course that needs a choice's option waits on the choice as a condit
   # Change: the lab's requisite is in wording no template matches; it is held, not a condition.
   untimed <- requisites; untimed$timing[untimed$subject_course == "BIOL 2110L"] <- NA
   held <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet), untimed,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
   expect_equal(nrow(held$roadmaps$conditions), 0L)
   expect_equal(paste(held$held$requisite, held$held$subject_course), "BIOL 2110 BIOL 2110L")
 
@@ -325,8 +389,8 @@ test_that("a course that needs a choice's option waits on the choice as a condit
   either <- requisites[requisites$subject_course == "BIOL 2110L", ]
   either <- rbind(either, transform(either, requisite = "BIOL 200")); either$group <- "lab-one-of"; either$alternative <- TRUE
   grouped <- assemble_compiled_degree_board(two, courses, degree_packet_program_facts(f$program$packet), either,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
   expect_equal(paste(grouped$roadmaps$conditions$node_id, grouped$roadmaps$conditions$eligible_node_ids), "biol_2110l alt_1|start_1")
 
   # Change: Biology I is required; only Combined Biology is a choice. The drawn
@@ -337,8 +401,8 @@ test_that("a course that needs a choice's option waits on the choice as a condit
     transform(compiled$rules[2, ], rule_id = "alt", label = "Combined Biology"))
   served$options <- served$options[served$options$rule_id == "alt", ]
   arrow <- assemble_compiled_degree_board(served, courses, degree_packet_program_facts(f$program$packet), either,
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    no_conditions, compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    no_conditions, compiler_biology_proposal, compiler_no_gen_ed_pools)
   expect_equal(nrow(arrow$roadmaps$conditions), 0L)
   expect_equal(paste(arrow$roadmaps$links$from, arrow$roadmaps$links$to)[arrow$roadmaps$links$catalog_id == "demo-biology-draft"], "biol_2110 biol_2110l")
 })
@@ -373,7 +437,7 @@ test_that("course pages' conditions show on their courses, and the reading's rul
   compiled$options <- compiled$options[0, ]
   build <- function(courses, more) assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(f$program$packet),
     degree_course_requisites(nodes, courses), compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence,
-    "math1350", more, compiler_biology_proposal)
+    compiler_general_math_routes, more, compiler_biology_proposal, compiler_no_gen_ed_pools)
   draft <- build(courses, more)
   cond <- draft$roadmaps$conditions
   expect_equal(paste(cond$node_id, cond$kind, cond$label), c("biol_2110 permission Class standing: Junior",
@@ -406,8 +470,8 @@ test_that("the board comparison reads as a semester-by-semester checklist", {
   nodes <- utils::read.csv(file.path(f$capture, "analysis", "rule-nodes.csv"), colClasses = "character")
   draft <- assemble_compiled_degree_board(compile_degree_interpretation(compiler_biology_proposal, courses), courses,
     degree_packet_program_facts(f$program$packet), degree_course_requisites(nodes, courses),
-    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, "math1350",
-    degree_course_conditions(nodes, courses), compiler_biology_proposal)
+    compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence, compiler_general_math_routes,
+    degree_course_conditions(nodes, courses), compiler_biology_proposal, compiler_no_gen_ed_pools)
   placed <- build_degree_roadmap(draft$catalog, draft$roadmaps, "demo-biology-draft", "calculus", "composition")
   hand <- build_degree_roadmap(test_degree_catalog, test_degree_roadmaps, BIOLOGY, "calculus", "composition")
   expect_snapshot(cat(format_degree_board_comparison("Biology B.S.", "calculus", placed, hand, draft$held)))

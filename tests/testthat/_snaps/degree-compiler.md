@@ -49,7 +49,6 @@
           BIOL 304C         draft — · board 5
           BIOL 3200         draft — · board 5
           BIOL 499          draft — · board 8
-          MATH 1350         draft 1 · board —
 
 ---
 
@@ -61,8 +60,7 @@
         Semesters: 8 draft; no hand-built board to compare
         Arrows: 1 draft; 0 held for a reviewer
         Conditions: 0 course-count (0 wait on a choice), 0 standing, admission or permission
-        Courses: 3; choices: 2
+        Courses: 2; choices: 2
           ENGL 1110    draft 1
-          MATH 1350    draft 1
           ENGL 1120    draft 2
 

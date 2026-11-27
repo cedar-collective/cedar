@@ -22,7 +22,7 @@ test_that("a compiled board takes its authored board's place on the page, labell
   row <- compiler_biology_catalog_row; row$catalog_id <- BIOLOGY
   board <- assemble_compiled_degree_board(compile_degree_interpretation(settled, courses), courses,
     degree_packet_program_facts(f$program$packet), degree_course_requisites(nodes, courses), row, test_degree_roadmaps,
-    test_degree_catalog$evidence, "math1350", degree_course_conditions(nodes, courses), settled)
+    test_degree_catalog$evidence, compiler_general_math_routes, degree_course_conditions(nodes, courses), settled, compiler_no_gen_ed_pools)
   manifest <- data.frame(catalog_id = BIOLOGY, program_id = reading$program_id, reading = "catalog_interpretations/biology.v1.json",
     packet_key = basename(f$program$directory), unit_key = reading$unit_key,
     proposal_key = degree_reading_proposal_key(f$root, f$program, reading),
@@ -115,7 +115,7 @@ test_that("a compiled board for a program with no authored board joins the degre
   stage_catalog_normalization_drafts(f$root, staged, dirname(f$capture))
   compile <- function(row) assemble_compiled_degree_board(compile_degree_interpretation(compiler_biology_proposal, courses), courses,
     degree_packet_program_facts(f$program$packet), degree_course_requisites(nodes, courses), row, test_degree_roadmaps,
-    test_degree_catalog$evidence, "math1350", degree_course_conditions(nodes, courses), compiler_biology_proposal)
+    test_degree_catalog$evidence, compiler_general_math_routes, degree_course_conditions(nodes, courses), compiler_biology_proposal, compiler_no_gen_ed_pools)
   manifest_row <- function(id) data.frame(catalog_id = id, program_id = reading$program_id, reading = "catalog_interpretations/biology.v1.json",
     packet_key = basename(f$program$directory), unit_key = reading$unit_key,
     proposal_key = degree_reading_proposal_key(f$root, f$program, reading),
