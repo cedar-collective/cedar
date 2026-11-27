@@ -247,9 +247,12 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows)).
   Compiled boards are published (`--write`, `features/degree-drafts.R`): each
   takes its program's hand board's place on Degree Explorer, labelled a draft
-  until its reading is signed off, then reviewed. Next: readings for programs
-  with no hand board (a draft needs a catalog row for them), and showing a
-  sign-off without a restart.
+  until its reading is signed off, then reviewed; a program with no hand board
+  gets one from its row in `degree_reading_catalogs.csv`. Next: readings for
+  the largest programs with no map (user 2026-11-26: Liberal Arts &
+  Integrative Studies, Elementary Ed, Art Studio, Dental Hygiene, Chemical,
+  Civil and Computer Engineering, English, Secondary Ed, Journalism), then
+  readings for the hand boards, and showing a sign-off without a restart.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
   the four-program pilot first.
 - [ ] **Routes and constraints.** Selectable elective/science routes, all
