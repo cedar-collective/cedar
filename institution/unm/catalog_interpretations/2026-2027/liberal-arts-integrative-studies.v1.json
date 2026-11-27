@@ -9881,5 +9881,11 @@
         "question": "The degree was the Liberal Arts (LIBA) major before its 2023 rename to LAIS. Should students still declared under the LIBA codes be planned on this catalog, or on the catalog they entered under?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "reading"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"},
+    {"item": "question:4", "settled_by": "reading"}
+  ]
 }

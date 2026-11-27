@@ -1002,6 +1002,39 @@ compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", pr
 degree_board_status_demo <- data.frame(catalog_id = c("demo-biology-bs-2026", "demo-history-ba-2026"),
   source = c("compiled", "authored"), review = c("draft", NA), note = c("Its catalog reading is not signed off in Catalog Review.", ""))
 
+# ── test-catalog-questions.R ──────────────────────────────────────────────────
+
+# degree_reading_questions.csv as the compile script writes it, for two
+# designed programs (read_degree_drafts()$questions):
+#   Biology B.S.  rule:combined-scope  settled by the catalog
+#                 question:1           not sorted (its passage runs past 300
+#                                      characters, so the document cuts it)
+#   History B.A.  passage:b-hist-pool  settled by CEDAR's reading; no board
+# Counts: any 3, the catalog 1, CEDAR's copy 0, CEDAR's reading 1, not sorted 1.
+# Programs alphabetical: Bachelor of Arts in History, then Bachelor of Science in Biology.
+catalog_questions_designed <- data.frame(
+  reading = c(rep("catalog_interpretations/2026-2027/biology.v1.json", 2), "catalog_interpretations/2026-2027/history.v1.json"),
+  reading_file_sha256 = c(rep(strrep("a", 64), 2), strrep("b", 64)),
+  program_id = c("biology", "biology", "history"),
+  program_title = c("Bachelor of Science in Biology", "Bachelor of Science in Biology", "Bachelor of Arts in History"),
+  catalog_url = c(rep("https://catalog.example.invalid/#/programs/biology", 2), "https://catalog.example.invalid/#/programs/history"),
+  catalog_id = c("demo-biology-draft", "demo-biology-draft", ""),
+  item = c("rule:combined-scope", "question:1", "passage:b-hist-pool"),
+  kind = c("rule", "question", "passage"),
+  label = c("Does Combined Biology replace both Biology I and its lab?", "Interpretation question", "Unresolved source treatment"),
+  question = c("The list offers BIOL200 beside the pair without saying it covers the lab.",
+               "Is department permission required for admission, or only advised?",
+               "The credit wording restates the elective requirement; read as the elective pool."),
+  block_id = c("b-12cf2b1d2a007e540e5f8c49", "b-c83ed948337af5e15eada1e2", "b-hist-pool"),
+  section = c("Program requirements", "Admission", "Major requirements"),
+  passage = c("BIOL200 - Combined Biology (4)",
+              paste("Admission to the major requires at least two upper-level courses and department permission.",
+                    "Students should meet with an advisor before applying, and the department reviews each application",
+                    "in the term after it is received. Students who are not admitted may apply again the following term",
+                    "after completing additional coursework; the department may ask for an interview."),
+              "Earned at least 12 credits from HIST 300 - 499."),
+  settled_by = c("catalog", "", "reading"))
+
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
 

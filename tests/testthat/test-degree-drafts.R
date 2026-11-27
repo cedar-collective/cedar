@@ -28,9 +28,35 @@ test_that("a compiled board takes its authored board's place on the page, labell
     proposal_key = degree_reading_proposal_key(f$root, f$program, reading),
     reading_sha256 = source_sha256(source_json_bytes(settled)), analysis = "analysis", compiled_on = "2026-11-16")
   out <- file.path(root, "degree_drafts")
-  write_degree_drafts(stats::setNames(list(board), BIOLOGY), manifest, out, test_degree_catalog$evidence)
+  # The designed reading's open question (Combined Biology against the pair),
+  # listed as --write lists every latest reading's, its triage naming the catalog.
+  designed <- reading
+  designed$proposal <- compiler_biology_proposal
+  designed$triage <- list(list(item = "rule:combined-scope", settled_by = "catalog"))
+  designed_path <- file.path(root, "catalog_interpretations", "designed.v1.json")
+  dir.create(dirname(designed_path)); write_source_json(designed, designed_path)
+  questions <- data.frame(reading = "catalog_interpretations/designed.v1.json", reading_file_sha256 = degree_reading_file_sha256(designed_path),
+    program_id = designed$program_id, program_title = f$program$packet$title,
+    catalog_url = degree_packet_program_facts(f$program$packet)$catalog_url, catalog_id = BIOLOGY,
+    degree_reading_question_rows(designed, f$program$packet))
+  write_degree_drafts(stats::setNames(list(board), BIOLOGY), manifest, out, test_degree_catalog$evidence, questions)
   drafts <- read_degree_drafts(out, test_degree_programs)
   expect_equal(drafts$manifest$catalog_id, BIOLOGY)
+  expect_equal(drafts$questions$item, "rule:combined-scope")
+  expect_equal(drafts$questions$settled_by, "catalog")
+  expect_equal(drafts$questions$passage, questions$passage)
+  expect_length(drafts$questions_stale, 0L)
+  # Change: the reading's triage now names CEDAR's reading, and nothing is recompiled.
+  resorted <- designed
+  resorted$triage[[1]]$settled_by <- "reading"
+  write_source_json(resorted, designed_path)
+  expect_equal(read_degree_drafts(out, test_degree_programs)$questions_stale, "catalog_interpretations/designed.v1.json")
+  write_source_json(designed, designed_path)
+  # Change: the written list names a settler CEDAR does not know.
+  unknown <- drafts$questions; unknown$settled_by <- "registrar"
+  utils::write.csv(unknown, file.path(out, "degree_reading_questions.csv"), row.names = FALSE)
+  expect_error(read_degree_drafts(out, test_degree_programs), "unknown settled_by")
+  utils::write.csv(drafts$questions, file.path(out, "degree_reading_questions.csv"), row.names = FALSE)
   expect_false(any(drafts$evidence$evidence_id %in% test_degree_catalog$evidence$evidence_id))
   expect_null(read_degree_drafts(file.path(root, "none"), test_degree_programs))
 
@@ -96,7 +122,8 @@ test_that("a compiled board for a program with no authored board joins the degre
     reading_sha256 = source_sha256(source_json_bytes(compiler_biology_proposal)), analysis = "analysis", compiled_on = "2026-11-26")
   publish <- function(row) {
     out <- file.path(root, row$catalog_id)
-    write_degree_drafts(stats::setNames(list(compile(row)), row$catalog_id), manifest_row(row$catalog_id), out, test_degree_catalog$evidence)
+    write_degree_drafts(stats::setNames(list(compile(row)), row$catalog_id), manifest_row(row$catalog_id), out, test_degree_catalog$evidence,
+                        catalog_questions_designed[0, ])  # no open questions: this test is about the boards
     drafts <- read_degree_drafts(out, test_degree_programs)
     publish_degree_drafts(test_degree_catalog, test_degree_roadmaps, drafts, degree_board_review_status(drafts, f$root))
   }

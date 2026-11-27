@@ -5057,5 +5057,10 @@
         "question": "Three concentrations require 6 credits of \"coursework approved by program\". Is there a list a student can plan from?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
 }

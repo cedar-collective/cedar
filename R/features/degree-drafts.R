@@ -37,7 +37,10 @@ degree_draft_one_line <- function(df) {
 #' @param manifest One `degree_drafts` row per board.
 #' @param authored_evidence The institution's evidence: a draft writes only the
 #'   citations it adds.
-write_degree_drafts <- function(boards, manifest, dir, authored_evidence) {
+#' @param questions Every latest reading's open items, board or not
+#'   (`degree_reading_question_rows()` with the `degree_reading_questions`
+#'   columns), written to `degree_reading_questions.csv`.
+write_degree_drafts <- function(boards, manifest, dir, authored_evidence, questions) {
   if (!setequal(names(boards), manifest$catalog_id) || anyDuplicated(manifest$catalog_id)) {
     stop("[degree-drafts.R] One manifest row per compiled board")
   }
@@ -58,8 +61,14 @@ write_degree_drafts <- function(boards, manifest, dir, authored_evidence) {
   }
   utils::write.csv(degree_draft_one_line(manifest[CEDAR_CONFIG_FILE_SPECS$degree_drafts]),
                    file.path(dir, "degree_drafts.csv"), row.names = FALSE, na = "")
+  utils::write.csv(degree_draft_one_line(as.data.frame(questions)[CEDAR_CONFIG_FILE_SPECS$degree_reading_questions]),
+                   file.path(dir, "degree_reading_questions.csv"), row.names = FALSE, na = "")
   invisible(dir)
 }
+
+# A reading file's own bytes, hashed: its triage is outside the proposal, so a
+# change to who settles a question changes this and not the proposal's hash.
+degree_reading_file_sha256 <- function(path) source_sha256(readBin(path, "raw", file.size(path)))
 
 #' The staged proposal a reading became in Catalog Review
 #'
@@ -78,8 +87,11 @@ degree_reading_proposal_key <- function(root, program, reading) {
 #' @param programs The institution's `programs` file, which each draft's Banner
 #'   program codes are checked against (degree_catalog_program_codes()).
 #' @return NULL when the institution has no drafts folder; otherwise a list of
-#'   the draft tables (named as in `DEGREE_DRAFT_TABLES`), `manifest` and
-#'   `program_codes`.
+#'   the draft tables (named as in `DEGREE_DRAFT_TABLES`), `manifest`,
+#'   `program_codes`, `questions` (`degree_reading_questions`) and
+#'   `questions_stale`: the readings, by path, edited or removed since the
+#'   questions were compiled (the folder sits in the institution's directory,
+#'   and each `reading` is a path from there).
 read_degree_drafts <- function(dir, programs) {
   if (!dir.exists(dir)) return(NULL)
   drafts <- lapply(DEGREE_DRAFT_TABLES, read_institution_file, dir = dir)
@@ -88,6 +100,14 @@ read_degree_drafts <- function(dir, programs) {
     stop("[degree-drafts.R] ", dir, ": each draft board needs one manifest row and one catalog row")
   }
   drafts$program_codes <- degree_catalog_program_codes(drafts$catalogs, programs)
+  drafts$questions <- read_institution_file("degree_reading_questions", dir)
+  if (!all(drafts$questions$settled_by %in% c("", names(CATALOG_QUESTION_SETTLERS)))) {
+    stop("[degree-drafts.R] ", dir, ": degree_reading_questions.csv has an unknown settled_by")
+  }
+  compiled <- unique(drafts$questions[c("reading", "reading_file_sha256")])
+  paths <- file.path(dirname(dir), compiled$reading)
+  now <- vapply(paths, function(p) if (file.exists(p)) degree_reading_file_sha256(p) else "", "", USE.NAMES = FALSE)
+  drafts$questions_stale <- compiled$reading[now != compiled$reading_file_sha256]
   drafts
 }
 

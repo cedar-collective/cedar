@@ -253,6 +253,9 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   Chemical and Computer Engineering, Journalism, Liberal Arts & Integrative
   Studies and Secondary Ed B.A.Ed. and B.S.Ed. have drafts. Civil
   Engineering and Elementary Ed wait on a decision about Gen Ed (I97).
+  Every reading's open questions are on Admin > Catalog Review > Catalog
+  questions, sorted by who can settle each (the catalog, CEDAR's copy of it,
+  or the reading), with a document of the catalog's questions to send.
   English and Dental Hygiene wait on which path their board follows. Then
   readings for the hand boards, and showing a sign-off without a restart.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on

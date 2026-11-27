@@ -4687,5 +4687,12 @@
         "question": "How do the 24 credits of the concentration-teaching field count against the rest of the degree? Language Arts repeats core courses (COMM 1130, ENGL 1110, ENGL 1120, LING 2110), and the 19 additional credits name the concentration among the requirements they meet."
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "rule:sci-areas", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"},
+    {"item": "question:4", "settled_by": "catalog"}
+  ]
 }

@@ -1459,5 +1459,9 @@
         "question": "Which courses make up the 2.75 grade point in the major: the 45 credits of the major's requirements, or every ARTS and ARTH course taken? The captured Art Studio text names no higher major grade point for the B.A."
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"}
+  ]
 }

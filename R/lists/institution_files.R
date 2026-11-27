@@ -167,6 +167,12 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   # the catalog analysis it was compiled with.
   degree_drafts = c("catalog_id", "program_id", "reading", "packet_key", "unit_key", "proposal_key",
                     "reading_sha256", "analysis", "compiled_on"),
+  # Every open item of every latest reading, board or not, with its catalog
+  # passage and who can settle it (degree_reading_question_rows()); written
+  # beside the drafts. `reading_file_sha256` is the whole file's, triage included.
+  degree_reading_questions = c("reading", "reading_file_sha256", "program_id", "program_title", "catalog_url",
+                               "catalog_id", "item", "kind", "label", "question", "block_id", "section",
+                               "passage", "settled_by"),
   # Authored semester templates, selected prerequisite routes and starting points.
   degree_roadmap_nodes = c("catalog_id", "node_id", "track", "code", "title", "credits",
                             "semester", "kind", "bundle", "detail", "source_url", "course_level", "row_group", "requirement_summary"),

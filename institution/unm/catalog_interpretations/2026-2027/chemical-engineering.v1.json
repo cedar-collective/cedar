@@ -4866,5 +4866,12 @@
         "question": "The concentrations list 500-level courses (for example BIOL 592, BME 575, CBE 512) beside 400-level ones. May an undergraduate count a 500-level course, and is a 400/500 pair (CBE 412 and CBE 512) one choice or two?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "rule:admit-footnote", "settled_by": "capture"},
+    {"item": "rule:semi-credits", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "capture"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
 }

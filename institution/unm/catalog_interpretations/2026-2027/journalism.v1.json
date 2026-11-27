@@ -2655,5 +2655,11 @@
         "question": "Which courses count as \"a higher-level core MATH class\" than MATH 1130 for admission?"
       }
     ]
-  }
+  },
+  "triage": [
+    {"item": "rule:major-hours", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
 }

@@ -1,10 +1,11 @@
 # Admin > Data & Usage > Catalog Review. Sources and decisions remain files.
 
-catalogReviewUI <- function(id, catalog, roadmaps) {
+catalogReviewUI <- function(id, catalog, roadmaps, drafts = NULL) {
   ns <- NS(id)
   navset_tab(id = ns("mode"), selected = "rules",
     nav_panel("Visualization rules", value = "rules", degreePlanRulesUI(ns("rules"), catalog, roadmaps)),
     nav_panel("Draft interpretations", value = "program", catalogNormalizationUI(ns("normalization"))),
+    nav_panel("Catalog questions", value = "questions", catalogQuestionsUI(ns("questions"), drafts)),
     nav_panel("Extraction diagnostics", value = "diagnostics", catalogExtractionDiagnosticsUI(id)))
 }
 
@@ -112,10 +113,12 @@ catalog_review_modal <- function(detail) {
 }
 
 catalogReviewServer <- function(id, root, active, catalog, roadmaps,
-    review_root = file.path(dirname(dirname(root)), "catalog-normalizations", basename(root)), shared = NULL) {
+    review_root = file.path(dirname(dirname(root)), "catalog-normalizations", basename(root)), shared = NULL,
+    drafts = NULL, boards = NULL) {
   moduleServer(id, function(input, output, session) {
     overall_active <- active
     degreePlanRulesServer("rules", catalog, roadmaps, shared)
+    catalogQuestionsServer("questions", drafts, boards)
     catalogNormalizationServer("normalization", root = review_root, capture_root = root,
       active = reactive(isTRUE(overall_active()) && identical(input$mode, "program")))
     active <- reactive(isTRUE(overall_active()) && identical(input$mode, "diagnostics"))

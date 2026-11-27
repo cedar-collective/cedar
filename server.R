@@ -5238,6 +5238,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   cacheServer("cache")
   catalogReviewServer("catalog_review", file.path(data_dir, "catalog-scans", cedar_institution_id()),
     catalog = CEDAR_DEGREE_CATALOG, roadmaps = CEDAR_DEGREE_ROADMAPS, shared = CEDAR_SHARED_REQUIREMENTS,
+    drafts = CEDAR_DEGREE_DRAFTS, boards = CEDAR_DEGREE_BOARDS,
     active = reactive(identical(input$main_navbar, "Data & Usage") &&
       identical(input$data_usage_tabs, "Catalog Review")))
 

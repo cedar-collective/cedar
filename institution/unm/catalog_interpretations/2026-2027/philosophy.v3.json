@@ -2144,5 +2144,12 @@
       }
     ],
     "questions": []
-  }
+  },
+  "triage": [
+    {"item": "rule:admit-course-overlap", "settled_by": "catalog"},
+    {"item": "rule:concentration-scope", "settled_by": "catalog"},
+    {"item": "passage:b-bcbe5f9745103647ea366094", "settled_by": "reading"},
+    {"item": "passage:b-f2cbb874d80c6d324c299512", "settled_by": "reading"},
+    {"item": "passage:b-027bf9fb60fc36d3f5549b1f", "settled_by": "reading"}
+  ]
 }
