@@ -306,14 +306,14 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                        "after census) at the student level chosen above, counted once for each term, by the student's home campus. Came back means enrolled the next regular term, ",
                        "at UNM on any campus: summer is not a step, and moving campus is not leaving.")),
         tags$li(retention_who_note(p$who)),
-        tags$li(paste0("Left out: ", fmt_count(m$n_graduated), " who finished rather than left, and ",
-                       fmt_count(m$n_unobservable), " whose next term had not settled. Finished means awarded a ",
+        tags$li(paste0("Left out: ", fmt_count(m$n_graduated), " who finished rather than left. Finished means awarded a ",
                        "degree that term",
                        if (m$term_type == "spring") paste0(
                          " or in the summer after it (", fmt_count(m$n_finished_between), " students; ",
                          fmt_count(m$n_applied_between), " more have applied to graduate in a summer whose ",
                          "degrees are not posted yet, and are counted as finishing)") else "",
                        ". A degree on hold is not a degree.")),
+        if (!is.null(retention_unsettled_words(m$unsettled))) tags$li(retention_unsettled_words(m$unsettled)),
         if (NROW(sel$series) > 0L) {
           st <- p$stages
           tagList(

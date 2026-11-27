@@ -27,11 +27,13 @@
 #
 # Who the rates count is stated with them: retention_scope_facts() counts the
 # latest term's students by how the record says they arrived (first-time, a
-# new transfer, or neither) and the students at another level, who are left
-# out; describe_retention_scope() words it for the page's data scope bar.
+# new transfer, or neither), which of them are new that term (their 1st
+# semester, as the semester lines read it), and the students at another
+# level, who are left out; describe_retention_scope() words it for the page's
+# data scope bar.
 #
 # Depends on: get_return_rates(), get_stopout(), compute_rate_trend(),
-#             get_entering_class_retention(), student_arrival_as_of()
+#             get_entering_class_retention(), student_term_semesters()
 
 RETENTION_SIGNS <- c(late_withdrawal = "A late withdrawal", dfw = "A DFW grade")
 
@@ -83,7 +85,9 @@ build_retention_dashboard <- function(student_terms, attempts, degrees, opt = li
                n_enrolled = sum(overall$rates$n_enrolled), n_graduated = sum(overall$rates$n_graduated),
                n_finished_between = sum(overall$rates$n_finished_between),
                n_applied_between = sum(overall$rates$n_applied_between),
-               n_unobservable = sum(overall$rates$n_unobservable), n_groups_past = 0L)
+               n_unobservable = sum(overall$rates$n_unobservable),
+               unsettled = overall$rates %>% filter(n_unobservable > 0L) %>% select(term, n_unobservable),
+               n_groups_past = 0L)
   # A scope with no student whose return can be read (a campus with none at
   # this level, say) is an answer, not an error: an empty payload says so.
   if (nrow(series) == 0L) {
@@ -334,19 +338,32 @@ retention_stage_sentence <- function(stages, entry, type) {
 RETENTION_ARRIVALS <- c(first_time = "First-time students", transfer = "Transfer students",
                         not_recorded = "Start not on record")
 
+# "1 transfer", "3,023 transfers".
+.retention_noun <- function(n, one, many = paste0(one, "s")) paste(fmt_count(n), if (n == 1L) one else many)
+
+# "3,820 first-time students, 1,142 transfers": one kind of start each way.
+.retention_starts <- function(first_time, transfer, sep = ", ") {
+  paste0(.retention_noun(first_time, "first-time student"), sep, .retention_noun(transfer, "transfer"))
+}
+
 #' Who the page's return rates count, in one term
 #'
 #' The enrolled students of the scope's level and home campus in `term`, as
 #' get_return_rates() picks them; how the record says each most recently
-#' arrived by then (student_arrival_as_of()); and the students of the same
-#' term and home campus at another level, who are not counted.
+#' arrived at that level by then, and whether `term` is their 1st semester
+#' (student_term_semesters(), as the semester lines read it); and the
+#' students of the same term and home campus at another level, who are not
+#' counted.
 #'
 #' @param student_terms `cedar_student_terms`.
 #' @param programs `cedar_programs`, for `student_population`.
 #' @param opt The dashboard's scope: `student_level`, `campus`.
 #' @param term The term to describe (the latest the page reads).
 #' @return list(`term`, `student_level`, `campus`, `n_counted`, `arrivals`
-#'   (a count for each of `RETENTION_ARRIVALS`, adding to `n_counted`),
+#'   (a count for each of `RETENTION_ARRIVALS`, adding to `n_counted`: how
+#'   each student started, in this term or an earlier one), `new_arrivals`
+#'   (the first-time and transfer students whose 1st semester is `term`: who
+#'   arrived in it, or for a fall in the summer before; part of `arrivals`),
 #'   `other_levels` (`student_level`, `n`; largest first, empty when the scope
 #'   names no level)).
 retention_scope_facts <- function(student_terms, programs, opt = list(), term) {
@@ -355,16 +372,19 @@ retention_scope_facts <- function(student_terms, programs, opt = list(), term) {
     stop("[retention-dashboard.R] student_terms lacks ", paste(missing, collapse = ", "), call. = FALSE)
   }
   as_of <- as.integer(term)
-  in_term <- student_terms %>% filter(enrolled, term == as_of) %>% select(student_id, student_level, student_campus)
+  in_term <- student_terms %>% filter(enrolled, term == as_of) %>% select(student_id, term, student_level, student_campus)
   if (!is.null(opt$campus)) in_term <- in_term %>% filter(student_campus %in% opt$campus)
   at_level <- if (is.null(opt$student_level)) rep(TRUE, nrow(in_term)) else in_term$student_level %in% opt$student_level
-  counted <- in_term[at_level, ] %>% distinct(student_id)
+  counted <- in_term[at_level, ] %>% distinct(student_id, term, student_level)
   arrived <- counted %>%
-    left_join(student_arrival_as_of(programs, as_of), by = "student_id", relationship = "one-to-one") %>%
+    left_join(student_term_semesters(counted, programs) %>% select(student_id, entry_type, semester_here),
+              by = "student_id", relationship = "one-to-one") %>%
     mutate(arrival = dplyr::coalesce(entry_type, "not_recorded"))
   arrivals <- vapply(names(RETENTION_ARRIVALS), function(a) sum(arrived$arrival == a), integer(1))
+  new_arrivals <- vapply(c("first_time", "transfer"),
+                         function(a) sum(arrived$arrival == a & arrived$semester_here %in% 1L), integer(1))
   list(term = as_of, student_level = opt$student_level, campus = opt$campus,
-       n_counted = nrow(counted), arrivals = arrivals,
+       n_counted = nrow(counted), arrivals = arrivals, new_arrivals = new_arrivals,
        other_levels = in_term[!at_level, ] %>%
          distinct(student_id, student_level) %>%
          count(student_level, name = "n") %>%
@@ -374,18 +394,28 @@ retention_scope_facts <- function(student_terms, programs, opt = list(), term) {
 #' Who the page counts, as short labelled facts for its data scope bar
 #'
 #' @param who retention_scope_facts() output.
-#' @return A named character vector, in display order: the students counted,
-#'   how many of them started each way, and the levels not counted (absent
-#'   when no other level has a student in the term).
+#' @return A named character vector, in display order: the students counted;
+#'   of them, the first-time and transfer students new that term, those who
+#'   started before it, and those with no start on record (the three add to
+#'   the students counted; the first two absent when no student counted has a
+#'   start on record at the level); and the levels not counted (absent when no
+#'   other level has a student in the term).
 describe_retention_scope <- function(who) {
   level_name <- function(code) ifelse(is.na(code), "no level recorded",
                                       dplyr::coalesce(unname(CEDAR_STUDENT_LEVEL_LABELS[code]), code))
   level <- if (is.null(who$student_level)) "students at every level"
            else paste(paste(level_name(who$student_level), collapse = " and "), "students")
   campus <- if (is.null(who$campus)) "every home campus" else paste("home campus", paste(who$campus, collapse = ", "))
+  a <- who$arrivals
+  new <- who$new_arrivals
+  term <- fmt_term(who$term)
   described <- c(paste0(fmt_count(who$n_counted), " ", level, ", ", campus),
-                 paste(fmt_count(who$arrivals), "of them"))
-  names(described) <- c(paste0("Counted, ", fmt_term(who$term)), unname(RETENTION_ARRIVALS[names(who$arrivals)]))
+                 .retention_starts(new[["first_time"]], new[["transfer"]]),
+                 .retention_starts(a[["first_time"]] - new[["first_time"]], a[["transfer"]] - new[["transfer"]]),
+                 .retention_noun(a[["not_recorded"]], "student"))
+  names(described) <- c(paste0("Counted, ", term), paste0("New in ", term), paste0("Started before ", term),
+                        unname(RETENTION_ARRIVALS[["not_recorded"]]))
+  if (sum(a[c("first_time", "transfer")]) == 0L) described <- described[c(1L, 4L)]
   if (nrow(who$other_levels) > 0L) {
     described[["Not counted"]] <- paste0(
       "students at another level: ",
@@ -404,11 +434,36 @@ retention_who_note <- function(who) {
                  "level is not counted: choose that level above to read them.")
   if (is.null(who)) return(rule)
   a <- who$arrivals
-  paste0(rule, " Of the ", fmt_count(who$n_counted), " counted in ", fmt_term(who$term), ", the record calls ",
-         fmt_count(a[["first_time"]]), " first-time students and ", fmt_count(a[["transfer"]]),
-         " new transfers in the term they arrived; the other ", fmt_count(a[["not_recorded"]]),
-         " it never calls new in the terms on record (readmitted after time away, moved from another campus or ",
+  new <- who$new_arrivals
+  term <- fmt_term(who$term)
+  before <- a[c("first_time", "transfer")] - new
+  if (sum(a[c("first_time", "transfer")]) == 0L) {
+    return(paste0(rule, " None of the ", fmt_count(who$n_counted), " counted in ", term, " has a start on record at ",
+                  "this level: the record never calls them first-time students or new transfers here, so which ",
+                  "of them are new that term cannot be told."))
+  }
+  paste0(rule, " Of the ", fmt_count(who$n_counted), " counted in ", term, ", ", fmt_count(sum(new)),
+         if (sum(new) == 1L) " is" else " are", " new that term (",
+         .retention_starts(new[["first_time"]], new[["transfer"]], " and "),
+         if (who$term %% 100L == 80L) ", counting any who started the summer before" else "", "); ",
+         fmt_count(sum(before)), " started before it (", .retention_starts(before[["first_time"]], before[["transfer"]], " and "),
+         "); and the other ", fmt_count(a[["not_recorded"]]),
+         " the record never calls new in the terms on record (readmitted after time away, moved from another campus or ",
          "level, or here before the records begin). A student who arrived more than once is read by the latest.")
+}
+
+#' The terms whose students are not read yet, in words
+#'
+#' @param unsettled The payload's `meta$unsettled`: `term`, `n_unobservable`.
+#' @return One sentence naming each term, its students and the next regular
+#'   term they wait on, or NULL when every term's next term has settled.
+retention_unsettled_words <- function(unsettled) {
+  if (is.null(unsettled) || nrow(unsettled) == 0L) return(NULL)
+  waiting <- add_next_term_col(unsettled, "term")
+  each <- paste0(vapply(waiting$n_unobservable, fmt_count, character(1)), " in ",
+                 vapply(waiting$term, fmt_term, character(1)), ", whose next term, ",
+                 vapply(waiting$next_term, fmt_term, character(1)), ", has not settled")
+  paste0("Not read yet: ", .retention_and(each), ".")
 }
 
 #' The courses where a DFW goes with not coming back, and the 25 listed
@@ -588,9 +643,8 @@ format_retention_dashboard <- function(payload) {
            if (!is.null(m$campus)) paste0(", home campus ", paste(m$campus, collapse = "/")) else "",
            "; settled through ", fmt_term(m$edge), ", grades through ", fmt_term(m$graded_edge), "."),
     paste0("Left out: ", n(m$n_graduated), " awarded a degree that term or before the next regular term (",
-           n(m$n_finished_between), " in between, ", n(m$n_applied_between), " applied for one not yet posted); ",
-           n(m$n_unobservable),
-           " whose next regular term is not yet settled."),
+           n(m$n_finished_between), " in between, ", n(m$n_applied_between), " applied for one not yet posted).",
+           if (!is.null(retention_unsettled_words(m$unsettled))) paste0(" ", retention_unsettled_words(m$unsettled)) else ""),
     if (nrow(payload$series) > 0L) paste0("Overall: ", retention_trend_sentence(t))
     else "Overall: no student in this scope has a settled next term."
   )

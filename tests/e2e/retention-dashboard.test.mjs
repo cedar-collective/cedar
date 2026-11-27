@@ -74,12 +74,17 @@ try {
   await waitForSelector(page, `#${NS}scope .scope-chip`, { timeout: 120000 });
   const scope = await readScope();
   const keys = scope.map((c) => c.key);
-  ok(/^Counted, Fall \d{4}$/.test(keys[0] || '') && keys.slice(1, 4).join('|') === 'First-time students|Transfer students|Start not on record',
-     `the scope bar says who is counted and how they started (${keys})`);
-  const started = scope.slice(1, 4).map((c) => num(c.val));
-  ok(started.every((n) => n >= 0) && started.reduce((a, b) => a + b, 0) === num(scope[0]?.val),
-     `first-time, transfer and start-not-on-record students add to those counted (${started} of ${num(scope[0]?.val)})`);
-  ok(started[1] > 0, `transfer students are among those counted (${started[1]})`);
+  ok(/^Counted, Fall \d{4}$/.test(keys[0] || '') && /^New in Fall \d{4}$/.test(keys[1] || '') &&
+     /^Started before Fall \d{4}$/.test(keys[2] || '') && keys[3] === 'Start not on record',
+     `the scope bar says who is counted, who is new that term and who started before it (${keys})`);
+  const nums = (text) => (String(text || '').match(/\d[\d,]*/g) || []).map(num);
+  const [newFirst, newTransfer] = nums(scope[1]?.val);
+  const [beforeFirst, beforeTransfer] = nums(scope[2]?.val);
+  const started = [newFirst, newTransfer, beforeFirst, beforeTransfer, ...nums(scope[3]?.val)];
+  ok(started.length === 5 && started.every((n) => n >= 0) && started.reduce((a, b) => a + b, 0) === num(scope[0]?.val),
+     `new, earlier and start-not-on-record students add to those counted (${started} of ${num(scope[0]?.val)})`);
+  ok(newFirst > 0 && newTransfer + beforeTransfer > 0,
+     `the term has new first-time students, and transfer students are among those counted (${newFirst}; ${newTransfer + beforeTransfer})`);
   const leftOut0 = scope.find((c) => c.key === 'Not counted');
   ok(leftOut0 && /^students at another level: \D+ [\d,]+/.test(leftOut0.val), `the levels left out are named with their counts (${leftOut0?.val.slice(0, 80)})`);
 
