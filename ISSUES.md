@@ -38,7 +38,8 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
+| [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
+| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -55,7 +56,7 @@ fix each needs, and which of them are one piece of work, are under
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M80 | Improvement | See [Improvements](#improvements) |
+| M1–M82 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -63,6 +64,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | Resolved 2026-11-27: A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
 | [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
 | [I89](#i89--low-enrollment-ignored-the-enrollment-bars-subject) | Defect | Low Enrollment ran under the Enrollment bar but built its own scope without Subject: a Subject choice narrowed the Courses table and not the Low Enrollment list beside it. Found 2026-11-26; the page now has its own bar |
@@ -209,9 +211,90 @@ an option (a `credits` node with no courses), and staging accepts it.
 naming the options in its detail. Failing that, list it for the reviewer. In
 neither case may one reading stop the others.
 
-## I97 — A compiled board counts a reading's Gen Ed credits twice: as elective tiles and as the starting routes' courses
+## I102 — Every refresh of Draft interpretations restages every reading, and the admin browser suite times out waiting
 
 **Status:** open.
+**Found:** 2026-11-27, running `./run-tests.sh --e2e admin` for I97 (branch
+`degree/gen-ed-choices`). The same suite on `origin/main`'s source (d20627c)
+fails in the same place, so it is not that branch's; it passed in #434's run.
+**Severity:** low for readers (a slow Refresh on an Admin tab); the admin
+suite cannot pass on this Mac.
+
+The tab's Refresh, like opening it, runs
+`stage_catalog_normalization_drafts()` over every reading before it lists the
+proposals: each reading's packet is loaded and its source bytes verified
+again, although nothing is imported when its bytes were already staged. On
+this Mac that is 14.5 s for the 17 readings on either branch (timed against a
+copy of the store). The suite imports a throwaway proposal, clicks Refresh and
+waits 30 s for it to be listed; in the container it does not arrive:
+
+```
+TimeoutError: Waiting failed: 30000ms exceeded
+    at tests/e2e/admin.test.mjs:246
+```
+
+The session log holds no error, and the store kept no leftover proposal (the
+suite's `finally` removed it).
+
+**Reproduction:** `./run-tests.sh --e2e admin` with `data` linked to the
+store, on a fresh container: 30 checks pass, then the timeout above.
+
+**Done when:** Refresh verifies only readings it has not staged (or whose
+bytes changed) and the suite passes; the staging pass is the same as I101's.
+
+## I101 — One reading without its source packet on a server empties Catalog Review's Draft interpretations tab
+
+**Status:** open.
+**Found:** 2026-11-27, by the user on production, after #434 deployed.
+**Severity:** moderate, Admin only. No program can be opened in Draft
+interpretations; Degree Explorer is unaffected (its compiled boards are
+committed files).
+
+Opening the tab stages every reading in
+`institution/<id>/catalog_interpretations/` (`stage_catalog_normalization_drafts()`,
+`R/features/catalog-normalization.R`). Each needs its prepared packet under the
+server's `data/catalog-normalizations/<id>/programs/`, which is Git-ignored and
+reaches a server only by hand. The first reading without one stops the whole
+pass, before the program list is filled:
+
+```
+[catalog-normalization.R] Prepare the matching source packet before loading draft:
+/srv/shiny-server/cedar/institution/unm/catalog_interpretations/2026-2027/art-studio-ba.v1.json
+```
+
+The readings added in #431–#434 (Art Studio B.A. and B.F.A., Chemical, Civil
+and Computer Engineering, Elementary Education, Journalism, Liberal Arts and
+Integrative Studies, Secondary Education B.A.Ed. and B.S.Ed.) were prepared on
+the development Mac only; all 17 readings on `main` match a packet there.
+
+**Reproduction:** on a checkout whose `data/catalog-normalizations/unm/programs/`
+lacks one reading's packet, open Admin > Catalog Review > Draft
+interpretations: an error notification, and an empty program list.
+`test-degree-explorer.R` pins the stop itself ("matching source packet").
+
+**Done when:** the packets are on production, and a reading whose packet is
+missing is named on the tab without stopping the others, or the deploy
+refuses a reading whose packet the server does not hold.
+
+## I97 — A compiled board counts a reading's Gen Ed credits twice: as elective tiles and as the starting routes' courses
+
+**Status:** resolved 2026-11-27 (branch `degree/gen-ed-choices`), for math and
+the Gen Ed pools; the English routes' tiles are I68's. The decision (the user,
+2026-11-26): a course tile means the program names that course or a set of
+options; every other Gen Ed credit is a Gen Ed card
+([degree-explorer-rules.md](docs/developers/degree-explorer-rules.md#what-students-should-see)).
+- A reading names its Gen Ed and remainder pools (`gen_ed_pools`); they draw no
+  tiles, and its area pools set the plan's `gen_ed_area_minimums`, which raise
+  that area's Gen Ed cards. Civil Engineering and Elementary Education compile.
+- A program with no course on the shared math route plans each start's
+  preparation only; the example MATH 1350 is gone from the 10 hand-built
+  boards, the demo's History board and the compiled boards, and the program's
+  own courses or a Gen Ed card meet the area.
+- The compiled boards have shared-rules profiles, except Liberal Arts and
+  Integrative Studies (M82), so they get Gen Ed cards at all. A lecture and its
+  own lab drawn as two tiles now meet a science area together, as a bundle does;
+  without that, the engineering boards showed a Science card beside CHEM 1215.
+
 **Found:** 2026-11-26, as I99.
 **Severity:** moderate, Degree Explorer only.
 - **Civil Engineering and Elementary Education:** the boards cannot be built.
@@ -5787,6 +5870,28 @@ attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
 of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
+
+**M82 — The compiled Liberal Arts and Integrative Studies board has no
+shared-rules profile, so it shows no Gen Ed cards.** Open; found 2026-11-27
+giving the compiled boards profiles (I97). A profile names exactly one college
+rule set matching the program's college (`read_shared_requirement_bundle()`),
+and the 2026–2027 rules have none for University College, which awards the
+B.A. in LAIS (`BA-LAIS-US`). So its 60 open credits read as electives, and its
+reading may name no Gen Ed pools. *Done when:* the edition's rules hold a
+University College set (its requirements, or a captured page saying it has
+none), and the board has a profile.
+
+**M81 — A choice whose every option is in one Gen Ed area still leaves that
+area's card.** Open; found 2026-11-27 checking the compiled Civil Engineering
+board (I97). Its choice of ECON 2110 or ECON 2120 meets Area IV whichever the
+student takes, but an open choice never counts toward an area
+(`degree_shared_coverage()`), so the board also plans a Social and Behavioral
+Sciences card. Its 6 open credits then cannot hold all four remaining areas
+(IV, Humanities, Second Language, Arts and Design), and the page says 6 Gen Ed
+credits could not fit. The same holds for the hand-built Business board's
+PSYC/SOCI choice. *Done when:* a choice whose options all belong to one area,
+each with the area's credits, counts toward it once, and a choice with any
+option outside the area still only says it may meet it.
 
 **M80 — Retention follows an entering class in two sections that each choose
 their own students.** Open; found 2026-11-26 folding the First Year page into

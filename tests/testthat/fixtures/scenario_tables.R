@@ -994,6 +994,20 @@ compiler_biology_catalog_row <- data.frame(catalog_id = "demo-biology-draft", pr
   source_url = "https://catalog.example.invalid/#/programs/biology", retrieved_on = "2026-10-17", coverage = "excerpt",
   notes = "Draft compiled from the designed reading")
 
+# The math routes of a program with no math course of its own, as
+# degree_general_math_routes() reads them from the demo boards (History B.A.):
+# each start's preparation only, so a student at intermediate algebra takes
+# MATH 1215 and every other start has nothing before the Gen Ed math card.
+compiler_general_math_routes <- data.frame(catalog_id = "demo-history-ba-2026",
+  start_id = c("calculus", "precalculus", "algebra", "intermediate"),
+  label = c("Calculus-ready", "Pre-calculus-ready",
+            "College-algebra-ready", "Start with Intermediate Algebra (MATH 1215)"),
+  node_ids = c("", "", "", "math1215"))
+
+# A reading that names no Gen Ed or remainder pools
+# (degree_reading_gen_ed_pools() of a reading without gen_ed_pools).
+compiler_no_gen_ed_pools <- data.frame(rule_id = character(), area = character(), credits = numeric())
+
 # ── test-degree-drafts.R, test-degree-explorer.R ──────────────────────────────
 
 # The page's board status (publish_degree_drafts()$status) for the demo

@@ -65,7 +65,9 @@ optional styling suggestions. The data/API contract is in
 - Resolve math entry routes per program. A placement choice must not impose
   calculus on a major that only needs general math/statistics. Preserve the
   placement identifier when changing degrees; update the route and labels.
-  Distinguish a named major math requirement from an illustrative Gen Ed choice.
+  A program that names no course on the shared math route plans each start's
+  preparation and nothing more; its own courses or a Gen Ed card (below) meet
+  the math area.
 - Keep courses and course groups visible. Do not replace the board with a set
   of accordions or a requirements table.
 - A named alternative set must show **Choose N of X courses** and its course
@@ -73,6 +75,15 @@ optional styling suggestions. The data/API contract is in
   lines with a visible ellipsis, retaining the total count. The popup always
   shows the complete list, full titles, credits and individual catalog links.
   Never show one example course as though the program requires that course.
+- **A course tile means the program names that course or a set of options.**
+  Credit a program lists without naming courses (Gen Ed by area, "remaining
+  University requirements") is open space: Gen Ed cards cover each area the
+  board's courses do not, and elective cards the rest. No board shows an
+  example course for a Gen Ed area, hand-built or compiled. Where a program's
+  page asks for more of an area than the University, the plan records it
+  (`gen_ed_area_minimums`): the extra credits are cards sourced to the
+  program's page, and they fill the flexible Gen Ed choices as extra courses
+  on the board would (ISSUES I97).
 - Keep each course code intact when wrapping a preview. Break between options,
   rather than separating a subject prefix from its number to squeeze in a list.
 - Store OR alternatives separately from the AND components of a lecture/lab
@@ -138,7 +149,9 @@ optional styling suggestions. The data/API contract is in
   **May also meet Gen Ed** on open choices. Open choices never reduce the
   reported gap; explain that choosing an eligible option can turn a matching
   Gen Ed slot into elective space. Unlisted language/studio approvals remain
-  open. Do not manufacture memberships or pair unrelated science/lab courses.
+  open. Do not manufacture memberships or pair unrelated science/lab courses;
+  a lecture and its own lab drawn as two tiles (CHEM 1215, CHEM 1215L) pair as
+  a bundle does.
 - Use the structured Gen Ed program's flexible-area labels for an illustrative
   allocation, consuming additional courses from different base areas. Mark
   flexible coverage provisional on cards, in the summary and in readable rules

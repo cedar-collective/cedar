@@ -51,12 +51,14 @@ packet_units <- vapply(packets, function(p) {
 if (!is.null(opts[["--analysis"]])) {
   rule_nodes <- utils::read.csv(file.path(normalizePath(opts[["--analysis"]], mustWork = TRUE), "rule-nodes.csv"),
                                 colClasses = "character", check.names = FALSE)
-  # A program with no math requirement plans toward the shared course most
-  # authored boards show as their illustrative general-education math.
-  r <- CEDAR_DEGREE_ROADMAPS
-  general <- r$basis$node_id[r$basis$basis == "general" & r$basis$node_id %in% r$nodes$node_id[r$nodes$catalog_id == "*" & r$nodes$track == "math"]]
-  general_math <- names(sort(table(general), decreasing = TRUE))[1]
+  # A program with no math course of its own plans each start's preparation
+  # only, as most such hand-built boards do; the area is a Gen Ed card.
+  general_routes <- degree_general_math_routes(CEDAR_DEGREE_ROADMAPS)
 }
+# The Gen Ed areas a reading's pools can name (degree_reading_gen_ed_pools()).
+shared_rules <- load_degree_shared_requirements(CEDAR_DEGREE_CATALOG, cedar_institution_dir())
+gen_ed_areas <- if (!is.null(shared_rules)) degree_shared_gen_ed_areas(shared_rules)
+profiled <- if (!is.null(shared_rules)) vapply(shared_rules$bundle$profiles, function(p) p$catalog_id, "")
 readings <- list.files(file.path(cedar_institution_dir(), "catalog_interpretations"), "\\.json$", recursive = TRUE, full.names = TRUE)
 # A program with a reading and no hand-built board takes its catalog row (names,
 # Banner program codes) from degree_reading_catalogs.csv; an institution with
@@ -116,9 +118,12 @@ for (path in readings) {
     board <- listed
     row <- reading_catalogs[reading_catalogs$catalog_id == board, ]
   }
+  # A board with no shared-rules profile gets no Gen Ed cards, so its reading
+  # may name no Gen Ed pools.
+  gen_ed_pools <- degree_reading_gen_ed_pools(reading, compiled, if (board %in% profiled) gen_ed_areas)
   draft <- assemble_compiled_degree_board(compiled, courses, degree_packet_program_facts(packet),
-    degree_course_requisites(rule_nodes, courses), row, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_CATALOG$evidence, general_math,
-    degree_course_conditions(rule_nodes, courses), reading$proposal)
+    degree_course_requisites(rule_nodes, courses), row, CEDAR_DEGREE_ROADMAPS, CEDAR_DEGREE_CATALOG$evidence, general_routes,
+    degree_course_conditions(rule_nodes, courses), reading$proposal, gen_ed_pools)
   for (math in c("calculus", "intermediate")) {
     placed <- build_degree_roadmap(draft$catalog, draft$roadmaps, row$catalog_id, math, "composition")
     hand <- if (!is.null(comparison)) build_degree_roadmap(CEDAR_DEGREE_CATALOG, CEDAR_DEGREE_ROADMAPS, board, math, "composition")
