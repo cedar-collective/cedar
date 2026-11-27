@@ -460,8 +460,8 @@ packets/proposals and hash-linked human review revisions. Maintainer drafts in
 controls and their observer are commented out for future shared use. Sign-off is
 one explicit action per complete unit, blocked by unresolved cases; routine rules
 and passages need no individual approval clicks. Edits reopen sign-off. This
-optional workflow is under **Draft interpretations**; old queues are **Extraction
-diagnostics**, loaded only on demand. `scripts/normalize-degree-catalog.R` and
+optional workflow is under **Draft interpretations**, and each reading's open
+items under **Catalog questions**. `scripts/normalize-degree-catalog.R` and
 `config/catalog-normalization*` define the exchange contract. No AI API calls,
 automatic approvals or runtime compilation occur; the draft compiler above runs
 offline and writes nothing. See
