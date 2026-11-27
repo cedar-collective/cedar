@@ -251,8 +251,8 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   gets one from its row in `degree_reading_catalogs.csv`. The largest
   programs with no map (user 2026-11-26): Art Studio B.A. and B.F.A.,
   Chemical and Computer Engineering, Journalism, Liberal Arts & Integrative
-  Studies and Secondary Ed B.A.Ed. have drafts. Civil Engineering (I97),
-  Elementary Ed (I98) and Secondary Ed B.S.Ed. (I99) wait on the compiler.
+  Studies and Secondary Ed B.A.Ed. and B.S.Ed. have drafts. Civil
+  Engineering and Elementary Ed wait on a decision about Gen Ed (I97).
   English and Dental Hygiene wait on which path their board follows. Then
   readings for the hand boards, and showing a sign-off without a restart.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
