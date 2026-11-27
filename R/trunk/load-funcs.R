@@ -222,6 +222,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
   source_file("features/catalog-review.R")
   source_file("features/catalog-normalization.R")
   source_file("features/degree-drafts.R")
+  source_file("features/catalog-questions.R")         # Catalog Review > Catalog questions: every reading's open items, by who can settle them
 
   # 6. Shiny modules (depend on branches + cones)
   if (modules) {
@@ -241,6 +242,7 @@ load_funcs <- function(cedar_base_dir, modules = TRUE) {
     source_file("modules/admin.R")
     source_file("modules/catalog-review.R")
     source_file("modules/catalog-normalization.R")
+    source_file("modules/catalog-questions.R")    # Catalog Review > Catalog questions
     source_file("modules/gen-ed.R")
     source_file("modules/dept-trends.R")
     source_file("modules/observed-course-paths.R")

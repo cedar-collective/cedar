@@ -107,17 +107,19 @@ const checkCommunicationOverlap = async () => {
 const checkAnthropologyCoverage = async () => {
   const prior = await page.$eval('[data-roadmap]', el => ({math: el.dataset.mathStart, english: el.dataset.englishStart, season: el.dataset.startSeason}));
   // Reset placement so this scenario matches the source-linked default
-  // example: four unfilled three-credit areas, other space stays elective.
+  // example: five unfilled three-credit areas (Communication, Mathematics and
+  // Statistics, Humanities, Second Language, Arts and Design; Anthropology names
+  // no math course, I97), other space stays elective.
   await choose('degree_explorer-dx_math_start', 'calculus');
   await choose('degree_explorer-dx_english_start', 'composition');
   await choose('degree_explorer-dx_start_season', 'fall');
-  check(await page.$$eval('[data-purpose="gen_ed"]', els => els.length === 4 &&
-    els.reduce((sum, el) => sum + Number(el.dataset.credits), 0) === 12) &&
+  check(await page.$$eval('[data-purpose="gen_ed"]', els => els.length === 5 &&
+    els.reduce((sum, el) => sum + Number(el.dataset.credits), 0) === 15) &&
     await page.$$eval('[data-purpose="elective"]', els => els.length > 0 &&
       els.every(el => Number(el.dataset.credits) < 3 || el.innerText.includes(
         el.dataset.allowancePhase === 'advanced' ? 'upper level may count' : 'Gen Ed not required'))),
-    'Anthropology identifies four Gen Ed areas; other cards are elective/minor space, upper level later');
-  check(await page.$eval('.cedar-roadmap-coverage', el => el.innerText.includes('19 of 31') &&
+    'Anthropology identifies five Gen Ed areas; other cards are elective/minor space, upper level later');
+  check(await page.$eval('.cedar-roadmap-coverage', el => el.innerText.includes('16 of 31') &&
     el.innerText.includes('48 credits') && el.innerText.includes('27 more needed')) &&
     await page.$eval('[data-node="antharch"]', el => el.innerText.includes('Also Gen Ed')),
     'the plan explains overlapping major/Gen Ed credits and the standard college upper-level balance');
@@ -543,9 +545,13 @@ const checkDegreeExplorer = async () => {
       await alignedHeaders() && await soundRows(), `${id} uses the same aligned board, 16-credit budget and later upper-level stage`);
     check(await page.$eval('#degree_explorer-dx_math_start', el => el.selectize.getValue()) === 'intermediate' &&
       await semester('math1215') === 1, `${id} preserves the selected placement when switching degrees`);
-    if (id !== 'physics-bs-2026') {
+    if (id === 'business-bba-2026') {
       check(await page.$$('[data-node="calc1"]').then(els => els.length === 0) &&
         await semester('math1350') === 2, `${id} shows Intermediate Algebra then statistics without a calculus chain`);
+    } else if (id !== 'physics-bs-2026') {
+      // A program that names no math course plans only the preparation (I97).
+      check(await page.$$('[data-node="math1350"], [data-node="calc1"], [data-node="math1220"]').then(els => els.length === 0),
+        `${id} shows Intermediate Algebra as preparation and no example math course`);
     } else {
       check(await semester('calc1') === 4 && await page.$$('.cedar-roadmap-semester').then(els => els.length >= 10),
         'Physics preparation extends the calculus and physics chain to ten or more semesters');
@@ -646,16 +652,20 @@ const checkDegreeExplorer = async () => {
   await page.screenshot({ path: '/tmp/cedar-degree-physics.png', fullPage: false });
   await choose('degree_explorer-dx_math_start', 'algebra');
   await choose('degree_explorer-dx_catalog_id', 'history-ba-2026');
-  check(await semester('math1350') === 1 &&
+  // History names no math course: no math tile, a Mathematics and Statistics
+  // Gen Ed card, and a sentence that says so (I97).
+  check(await page.$$('[data-node="math1350"], [data-node="math1215"], [data-node="calc1"]').then(els => els.length === 0) &&
+    await page.$$('[data-purpose="gen_ed"][data-gen-ed-area="II"]').then(els => els.length === 1) &&
+    await page.evaluate(() => document.body.innerText.includes('This math starting point adds no math course to the plan.')) &&
     await page.$eval('#degree_explorer-dx_math_start', el => el.selectize.getValue()) === 'algebra',
-    'college-algebra placement remains selected and selects the shorter statistics route');
-  check(await page.$eval('[data-node="math1350"]', el => el.dataset.basis === 'general' &&
+    'college-algebra placement remains selected; History shows no example math course, and its math is a Gen Ed card');
+  check(await page.$eval('[data-node="engl2"]', el => el.dataset.basis === 'general' &&
     el.innerText.includes('Suggested Gen Ed') && getComputedStyle(el).borderTopStyle === 'dashed' && getComputedStyle(el).opacity === '1'),
     'a Gen Ed suggestion is visibly labelled and lighter with readable text');
-  await popup('math1350');
+  await popup('engl2');
   check(await page.$eval('.cedar-roadmap-evidence', el => el.innerText.includes('Illustrative general education course') &&
     el.innerText.includes('does not require it')),
-    'History statistics is visibly an illustrative Gen Ed choice, not a named major requirement');
+    'History composition is visibly an illustrative Gen Ed choice, not a named major requirement');
   await closePopup();
   await page.evaluate(() => window.scrollTo({ top: 0 }));
   await page.screenshot({ path: '/tmp/cedar-degree-history.png', fullPage: false });

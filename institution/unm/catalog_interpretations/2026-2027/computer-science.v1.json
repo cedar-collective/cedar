@@ -3337,5 +3337,11 @@
       }
     ],
     "questions": []
-  }
+  },
+  "triage": [
+    {"item": "rule:admit-engineering", "settled_by": "capture"},
+    {"item": "rule:course-renumbering", "settled_by": "catalog"},
+    {"item": "rule:science-bundles", "settled_by": "reading"},
+    {"item": "rule:minor-total-scope", "settled_by": "catalog"}
+  ]
 }

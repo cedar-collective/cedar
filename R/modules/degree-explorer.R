@@ -84,6 +84,8 @@ degreeExplorerServer <- function(id, catalog, roadmaps, sections, course_terms, 
       req(view())
       showModal(cedar_info_modal("Rules behind this plan",
         p("Generated from the same saved rules, courses, choices and prerequisite graph as the visualization. CEDAR planning preferences are labeled separately."),
+        # The board's own note: what it leaves out, or a disagreement in its catalog record (I100).
+        if (nzchar(view()$catalog$notes)) p(class = "text-hint", view()$catalog$notes),
         reactable::reactableOutput(session$ns("plan_rules")), size = "xl", scrollable = TRUE))
     })
     output$plan_rules <- reactable::renderReactable({
@@ -146,7 +148,7 @@ degreePlanRulesUI <- function(id, catalog, roadmaps) {
   if (!nrow(catalog$catalogs)) return(empty_state("No degree visualization prototypes are configured."))
   english <- roadmaps$starts[roadmaps$starts$track == "english", ]
   choices <- degree_catalog_choices(catalog)
-  tagList(subtab_header("Visualization rules", "The readable rules behind Degree Explorer, generated from its saved course lists, choices and graph. Compare catalog requirements with their source; CEDAR planning preferences are labeled separately."),
+  tagList(subtab_header("Visualization rules", "The readable rules behind each hand-built Degree Explorer board, generated from its saved course lists, choices and graph. Compare catalog requirements with their source; CEDAR planning preferences are labeled separately. Boards compiled from a catalog reading are listed under Catalog questions."),
     fluidRow(column(5, selectInput(ns("catalog"), "Program", choices, width = "100%")),
       column(3, selectInput(ns("math"), "Math starting point", degree_math_start_choices(roadmaps, choices[[1]]),
                             selected = degree_start_default(roadmaps, "math"), width = "100%")),

@@ -215,6 +215,7 @@ catalogNormalizationServer <- function(id, root, capture_root, active,
       reactable::reactable(rows, theme = cedar_tbl_theme, compact = TRUE, highlight = TRUE, defaultPageSize = 5L,
         onClick = htmlwidgets::JS(paste0("function(row) { Shiny.setInputValue(", jsonlite::toJSON(session$ns("issue"), auto_unbox = TRUE), ", row.index + 1, {priority:'event'}); }")),
         columns = list(type = reactable::colDef(show = FALSE), id = reactable::colDef(show = FALSE),
+          item = reactable::colDef(show = FALSE), block_id = reactable::colDef(show = FALSE),
           label = reactable::colDef(name = "Case"), reason = reactable::colDef(name = "What to check")))
     })
     output$evidence <- renderUI({

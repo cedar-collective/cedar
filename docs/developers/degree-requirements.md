@@ -15,6 +15,7 @@ by `R/lists/degree_catalog.R` at startup:
 | Table | Grain and purpose |
 |---|---|
 | `degree_catalogs.csv` | Snapshot: program name, degree label, Banner degree code and the degree's own Banner program codes, year, source, retrieval date, coverage and caveats |
+| `degree_reading_catalogs.csv` | Optional. The catalog row, in `degree_catalogs.csv`'s columns, of a program with a catalog reading and no hand-built board: its compiled board is written with it and joins the degree list ([publishing](catalog-normalization.md#publishing-a-compiled-board)). Read only by the compile script |
 | `degree_rules.csv` | Rule node, parent, catalog, phase, common area, target course, operator, minimum, grade, review status and detail |
 | `degree_rule_courses.csv` | One course per leaf rule, with catalog title and credits |
 | `degree_roadmap_nodes.csv` | Authored planning slots, course/group labels, explicit lower/upper course level, credits, type, paired flag, source and `row_group` course-family alignment; `*` holds shared entry routes |
@@ -23,7 +24,7 @@ by `R/lists/degree_catalog.R` at startup:
 | `degree_roadmap_options.csv` | Finite OR sets: `option_id` groups required AND components within an alternative; minimum option count, course code/title, component credit range, individual course URL, program evidence and optional course-prerequisite evidence. Separate from selected bundle components |
 | `degree_catalog_evidence.csv` | Exact excerpt, catalog year, program/course page, section path, retrieval date, transcription/review/conflict status and explanatory note |
 | `degree_roadmap_basis.csv` | One program/node membership: degree, prerequisite preparation or illustrative general route, with a citation and explanation |
-| `degree_roadmap_plans.csv` | Degree credit target, usual/maximum loads, baseline semesters, first upper-level semester, usual allowance-slot credits, Gen Ed source URL, target citation and workload assumption |
+| `degree_roadmap_plans.csv` | Degree credit target, usual/maximum loads, baseline semesters, first upper-level semester, usual allowance-slot credits, Gen Ed source URL, the program's own Gen Ed area minimums where its page asks for more than the University (`gen_ed_area_minimums`, `III:8|VA:6`, empty for none), target citation and workload assumption |
 | `degree_roadmap_starts.csv` | Common math/English placement identifiers, English course routes, explicitly completed degree credits, and the one start of each track the page's pickers open on (`opens`) |
 | `degree_roadmap_math_routes.csv` | One route per program/math placement identifier, with program-specific labels and ordered shared course IDs; no calculus fallback |
 | `degree_roadmap_conditions.csv` | Course-count pools and permission conditions, target, minimum, eligible single-course slots, visible label and course-page evidence; separate from named-course edges |

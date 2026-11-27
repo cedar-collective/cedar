@@ -1,0 +1,2665 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "SkPokdsjc",
+  "unit_key": "b9803cbdfb623e85f28a39738c6d5ba71bc2096d8f63fe89633ee0e28cb30a67",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "admit-attempted",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "credits",
+        "label": "At least 26 credit hours before admission",
+        "minimum": 26,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a6fd418730bb2315a098c68c",
+            "quote": "A minimum of 26 credit hours"
+          }
+        ]
+      },
+      {
+        "id": "admit-applicable",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "credits",
+        "label": "At least 23 hours in courses acceptable toward graduation",
+        "minimum": 23,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Courses acceptable toward graduation",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a6fd418730bb2315a098c68c",
+            "quote": "23 credit hours must be in courses acceptable toward graduation"
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-cumulative",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Cumulative grade point average of at least 2.00 on all work",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "All work",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b5b792de96157ab81597525e",
+            "quote": "A cumulative grade point average of at least 2.00 on all work."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-transfer",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Transfer GPA of at least 2.00, for transfer students",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Transfer GPA, for transfer students",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ef3580822c2df5bed0a4ff1a",
+            "quote": "Transfer students must have a 2.00 transfer GPA."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-continuing",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Institutional GPA of at least 2.00, for continuing UNM students",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Institutional GPA, for continuing UNM students",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5eeb2f84031f69e9a15dfc82",
+            "quote": "Continuing UNM students must have a 2.00 institutional GPA."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-communication",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "General Education: Communication completed",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of the General Education Curriculum area Communication",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7bb03bbbfd4a398a5547e24f",
+            "quote": "Completion of General Education Curriculum: Communication."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-math",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "General Education: Mathematics and Statistics completed",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of the General Education Curriculum area Mathematics and Statistics",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a0e35e00098340dbf0a25e24",
+            "quote": "Completion of General Education Curriculum: Mathematics and Statistics."
+          }
+        ]
+      },
+      {
+        "id": "admit-gened-language",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "General Education: Second Language completed",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Completion of the General Education Curriculum area Second Language",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-18f83f35fda184789e58e3b2",
+            "quote": "Completion of General Education Curriculum: Second Language."
+          }
+        ]
+      },
+      {
+        "id": "admit-courses",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "all",
+        "label": "COMM1140 and COMM2135, each with C or better",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Department of Communication and Journalism admission course work for Journalism and Mass Communication, grades of C or better",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-584c7f3780cac9d5f3353d62",
+            "quote": "Completion of Department of Communication and Journalism major admission coursework with grades of \"C\" or better:"
+          },
+          {
+            "block_id": "b-6c9b1430e966b1bc5904e1ee",
+            "quote": "Journalism and Mass Communication: COMM 1140 and COMM 2135."
+          }
+        ]
+      },
+      {
+        "id": "admit-comm1140",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "course",
+        "label": "COMM 1140",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:r1ZyhcVqsc"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-6c9b1430e966b1bc5904e1ee",
+            "quote": "COMM 1140"
+          }
+        ]
+      },
+      {
+        "id": "admit-comm2135",
+        "parent_id": "admit-courses",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "course",
+        "label": "COMM 2135",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "C",
+        "course_refs": [
+          "courses:r1fBgcV9i5"
+        ],
+        "program_ref": "",
+        "timing": "prior",
+        "citations": [
+          {
+            "block_id": "b-6c9b1430e966b1bc5904e1ee",
+            "quote": "COMM 2135"
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa-department",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Cumulative grade point average of at least 2.50",
+        "minimum": 2.5,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Cumulative GPA, for admission to the B.A.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e7e045a038f8bb731018af49",
+            "quote": "a cumulative GPA of 2.50 is required"
+          }
+        ]
+      },
+      {
+        "id": "admit-math",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Passed MATH 1130 or a higher-level core MATH class",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Taken and passed MATH 1130 or a higher-level core MATH class; MATH 1130 is not in this capture's course registry",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e7e045a038f8bb731018af49",
+            "quote": "students must have taken and passed MATH 1130 or a higher-level core MATH class"
+          }
+        ]
+      },
+      {
+        "id": "major-grade",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "C or better, not C-, in each course used for the major",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "A grade of C (not C-) or better in each course used to fulfill major requirements",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a2ecd2681138bdd1b69bcfd5",
+            "quote": "Earn a grade of \"C\" (not \"C-\") or better in each course used to fulfill major requirements;"
+          }
+        ]
+      },
+      {
+        "id": "major-gpa",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "Grade point average of at least 2.50 in all major course work",
+        "minimum": 2.5,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "All coursework in the major",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-09cb9f801469a969521a1975",
+            "quote": "Earn a 2.50 GPA for all coursework in the major;"
+          }
+        ]
+      },
+      {
+        "id": "graduation-gpa",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "gpa",
+        "label": "Cumulative grade point average of at least 2.0 at graduation",
+        "minimum": 2.0,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Cumulative GPA at graduation",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-796f07d7b725c369fb3dcbd9",
+            "quote": "Have a cumulative GPA of 2.0 at graduation."
+          }
+        ]
+      },
+      {
+        "id": "core",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete the six program core courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8fb5fc2361a2d8cb5bef65c3",
+            "quote": "Complete the following:"
+          },
+          {
+            "block_id": "b-fccc1dd90d2bc1dba0a2d32d",
+            "quote": "Complete major courses as specified by the department;"
+          },
+          {
+            "block_id": "b-aab169d28a548c5b0ac4b2c1",
+            "quote": "To earn a Bachelor of Arts (B.A.) in Journalism and Mass Communication, students must complete the required program core courses as well as the requirements of"
+          }
+        ]
+      },
+      {
+        "id": "core-cj350",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ350 - Data Tools for Media Professionals (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Syr8cVci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0ddd9162f0eb9477566157e2",
+            "quote": "CJ350 - Data Tools for Media Professionals (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-cj365",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ365 - Media History and Culture (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJhM5N9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3febf5da5d6f3e2997dc2aaa",
+            "quote": "CJ365 - Media History and Culture (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-cj478",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ478 - Media Theory and Research (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryCU5N9s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d7213d87958eac37356c370f",
+            "quote": "CJ478 - Media Theory and Research (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-comm1140",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM1140 - Introduction to Media Writing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1ZyhcVqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2f2dfa65d7e2f4e8a32be6b6",
+            "quote": "COMM1140 - Introduction to Media Writing (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-comm2135",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2135 - Media Ethics and Law (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1fBgcV9i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-196b12182373310b916bf3f5",
+            "quote": "COMM2135 - Media Ethics and Law (3)"
+          }
+        ]
+      },
+      {
+        "id": "core-comm2185",
+        "parent_id": "core",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2185 - Multimedia and Visual Storytelling (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJbhgsNcj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cb365a01c163349532b82abe",
+            "quote": "COMM2185 - Multimedia and Visual Storytelling (3)"
+          }
+        ]
+      },
+      {
+        "id": "concentration",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 30 credits in one concentration",
+        "minimum": 30,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "One concentration, Multimedia Journalism or Strategic Communication, with its requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-addd4c04b658f84e865093f3",
+            "quote": "Earn at least 30 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-e51c50188dce58114c1677ae",
+            "quote": "Students must complete one concentration."
+          },
+          {
+            "block_id": "b-aab169d28a548c5b0ac4b2c1",
+            "quote": "students must complete the required program core courses as well as the requirements of their selected concentration"
+          },
+          {
+            "block_id": "b-8bb4b36e1b24b837e8d4d8a6",
+            "quote": "\"concentrationRequiredYes\""
+          }
+        ]
+      },
+      {
+        "id": "other-degree",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 72 credits toward General Education and other degree requirements",
+        "minimum": 72,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "UNM's General Education Program and other general undergraduate degree requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-55c51d0761ef972d03423a2f",
+            "quote": "Earn at least 72 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-5956f2e193669c494c5f8d56",
+            "quote": "In addition to the program-specific requirements outlined here, all undergraduate students are required to fulfill UNM's General Education Program requirements"
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM's General Education and other general undergraduate degree requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "All undergraduate students fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits; some courses in a program's requirements may also fulfill General Education.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5956f2e193669c494c5f8d56",
+            "quote": "all undergraduate students are required to fulfill UNM"
+          }
+        ]
+      },
+      {
+        "id": "college-combination",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Arts and Sciences: a major and a minor, two majors, or a special curriculum requiring no minor",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Students within the College of Arts and Sciences also complete a major and a minor, two majors, or one of the special curricula of the College that requires no minor; each concentration says no minor is required with it",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5956f2e193669c494c5f8d56",
+            "quote": "Students within the College of Arts and Sciences must also complete 1) a major and a minor; or 2) two majors; or 3) one of the special curricula of the College that requires no minor."
+          },
+          {
+            "block_id": "b-30d00c981d758670b9677f0b",
+            "quote": "Departmental majors should choose a minor in other departments in the College of Arts and Sciences or in another college or unit of the University, such as the"
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 120 degree credits",
+        "minimum": 120,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-66b029005de4b728cd0ae1c2",
+            "quote": "Grand Total Credits: 120"
+          },
+          {
+            "block_id": "b-cc4f6fcf46437287ee3c104a",
+            "quote": "\"120\""
+          }
+        ]
+      },
+      {
+        "id": "major-hours",
+        "parent_id": "",
+        "entity_id": "programs:SkPokdsjc",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Major credit hours: 36, or the 48 of the core and a concentration?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The description gives 36 departmental credit hours, 21 at the 300 level or above, for the B.A. in Communication, and the record gives 36 minimum major hours; the six core courses (18 credits) and a 30-credit concentration make 48",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4eed8fd37a9e4da9236b4e47",
+            "quote": "To earn a Bachelor of Arts (B.A.) in Communication, students must complete 36 credit hours in departmental courses"
+          },
+          {
+            "block_id": "b-cb6137687fbbb8ab95a4346b",
+            "quote": "\"36\""
+          }
+        ]
+      },
+      {
+        "id": "mmj",
+        "parent_id": "",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Multimedia Journalism concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ef1bc2f26aa2ec7217dc14c9",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "mmj-required",
+        "parent_id": "mmj",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Multimedia Journalism: six required courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0b6c78fb775a4a6fa9391e58",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj360",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ360 - Video Storytelling (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkDBe9V9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d56c06bd2cdb6f1bca7392b8",
+            "quote": "CJ360 - Video Storytelling (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj367",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ367 - Social Media for Journalists (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1vl9Vci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6c6eb9533fb45da7345dc920",
+            "quote": "CJ367 - Social Media for Journalists (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj375",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ375 - Intermediate Reporting (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SybAkcN9ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8b7ffd401e605d718a2108c0",
+            "quote": "CJ375 - Intermediate Reporting (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj475",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ475 - Advanced Multimedia Journalism (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJOV9V9sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-70ba35298dcdd2de8f697f77",
+            "quote": "CJ475 - Advanced Multimedia Journalism (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-comm1145",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM1145 - Sex, Lies, and Fake News: How to Use Media Wisely (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByB19Vqs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7d9d0667663c1aff73e9b765",
+            "quote": "COMM1145 - Sex, Lies, and Fake News: How to Use Media Wisely (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-comm2190",
+        "parent_id": "mmj-required",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2190 - Writing and Editing for Multimedia Journalism (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1e7AtN5j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fe74704e4d8d908eecbd42b0",
+            "quote": "COMM2190 - Writing and Editing for Multimedia Journalism (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-communication",
+        "parent_id": "mmj",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Multimedia Journalism: at least 6 credits from the listed communication courses",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d19cdfdf6a79390f503becd6",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj313",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ313 - EcoCultural Communication: Humans and \"The Environment\" (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1yQ5Eco9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c5ec4ab601f93f4d59dac8c3",
+            "quote": "CJ313 - EcoCultural Communication: Humans and \"The Environment\" (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj314",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ314 - Intercultural Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H18V65Vqs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ec76b6c23e341c80e99c0bf2",
+            "quote": "CJ314 - Intercultural Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj332",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ332 - Business and Professional Speaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByE4ac49j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dd329831d12e9421967074fa",
+            "quote": "CJ332 - Business and Professional Speaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj333",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ333 - Professional Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyZC99N5iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-eb592bae0d260c02f96a8146",
+            "quote": "CJ333 - Professional Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj334",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ334 - Political Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJf34q4ci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-771e82d12997c72eefe6dd9a",
+            "quote": "CJ334 - Political Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj344",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ344 - Interviewing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyzeKFV5s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c324d5c89b7382f081cf66d2",
+            "quote": "CJ344 - Interviewing (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj450",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ450 - Health Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryIacE9o9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0e91d3bd8ffe7298e939a9dd",
+            "quote": "CJ450 - Health Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj469",
+        "parent_id": "mmj-communication",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ469 - Multiculturalism, Gender and Media (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1eCJ945ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-996886c25fe9e76b055786a8",
+            "quote": "CJ469 - Multiculturalism, Gender and Media (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-media",
+        "parent_id": "mmj",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Multimedia Journalism: at least 6 credits from the listed media courses",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5073abe55a7078a1bb35aa2c",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj361",
+        "parent_id": "mmj-media",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ361 - Photojournalism (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJxNGqN9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-154d7dd16a370de0b2928214",
+            "quote": "CJ361 - Photojournalism (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj370",
+        "parent_id": "mmj-media",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ370 - Audio Storytelling (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByfhU9V9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-90f38b5e73b63d30f0c35a1e",
+            "quote": "CJ370 - Audio Storytelling (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj374",
+        "parent_id": "mmj-media",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ374 - Design and Visual Presentation I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkkvcEqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4537a81275de19522f4f2c4a",
+            "quote": "CJ374 - Design and Visual Presentation I (3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-cj492",
+        "parent_id": "mmj-media",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ492 - Internship in Communication (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJ4RT5Ecj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-77fc0b8e46d98277d5f9c7fa",
+            "quote": "CJ492 - Internship in Communication (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "mmj-total",
+        "parent_id": "",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Multimedia Journalism concentration: 30 credits",
+        "minimum": 30,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e3758e468681ea1ab9f454f8",
+            "quote": "Grand Total Credits: 30"
+          }
+        ]
+      },
+      {
+        "id": "mmj-no-minor",
+        "parent_id": "",
+        "entity_id": "specializations:B1_V7uoo9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "No minor is required with the Multimedia Journalism concentration",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "No minor is required for students completing this concentration.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-688c162968f8fd45b5468086",
+            "quote": "No minor is required for students completing this concentration."
+          }
+        ]
+      },
+      {
+        "id": "sc",
+        "parent_id": "",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Strategic Communication concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-240a0ef4347408b14f6a24ae",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "sc-required",
+        "parent_id": "sc",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Strategic Communication: seven required courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dda95c0040a21350d7751f23",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj327",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ327 - Persuasive Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkZ0J9V9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9eff19cb8d7e0d7d7d570923",
+            "quote": "CJ327 - Persuasive Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj374",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ374 - Design and Visual Presentation I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkkvcEqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f60fd00b73725af2a4b319a4",
+            "quote": "CJ374 - Design and Visual Presentation I (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj387",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ387 - Strategic Communication Basics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkTX5N9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ac343f1879465da5a8022a06",
+            "quote": "CJ387 - Strategic Communication Basics (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj389",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ389 - Creativity and Strategy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1EMMc4qsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1788a3792dee328765e16bb5",
+            "quote": "CJ389 - Creativity and Strategy (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj390",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ390 - Strategic Writing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rk-6HcEqic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7085ab20eda9fe1482361afd",
+            "quote": "CJ390 - Strategic Writing (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj391",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ391 - Strategic Social Media (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJg8RKV5oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6c03179cc50fb21f72dd588c",
+            "quote": "CJ391 - Strategic Social Media (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj488",
+        "parent_id": "sc-required",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ488 - Developing Strategic Campaigns (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyMqgs49s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c75a716238dad2506b45a748",
+            "quote": "CJ488 - Developing Strategic Campaigns (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-electives",
+        "parent_id": "sc",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Strategic Communication: at least 9 credits from the listed courses",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8c1e0ad2c855c0ca064569d9",
+            "quote": "Earn at least 9 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj332",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ332 - Business and Professional Speaking (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByE4ac49j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-39dbb9025adcdce0042cf6df",
+            "quote": "CJ332 - Business and Professional Speaking (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj333",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ333 - Professional Communication (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyZC99N5iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-551e38d8c3d9a7ca372deb3c",
+            "quote": "CJ333 - Professional Communication (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj340",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ340 - Communication in Organizations (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkeaJoEcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-538e3ecd435c9e51d4af1ce2",
+            "quote": "CJ340 - Communication in Organizations (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj361",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ361 - Photojournalism (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJxNGqN9iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e1ccfb7120be2fab148d65ea",
+            "quote": "CJ361 - Photojournalism (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj367",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ367 - Social Media for Journalists (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1vl9Vci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-336c9806d8d439c2af98f206",
+            "quote": "CJ367 - Social Media for Journalists (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj490",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ490 - Undergraduate Problems (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJp1iEqoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e2970b78b8de4300e3785e1f",
+            "quote": "CJ490 - Undergraduate Problems (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-cj492",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CJ492 - Internship in Communication (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJ4RT5Ecj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-5f8f01d0851b7d5c928f0a81",
+            "quote": "CJ492 - Internship in Communication (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-comm2190",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2190 - Writing and Editing for Multimedia Journalism (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1e7AtN5j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-683a4e9ca2f51042ac9cf342",
+            "quote": "COMM2190 - Writing and Editing for Multimedia Journalism (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-comm2245",
+        "parent_id": "sc-electives",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "COMM2245 - Web Design (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJTe5Nqjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d6d1e19162dad1059953121c",
+            "quote": "COMM2245 - Web Design (3)"
+          }
+        ]
+      },
+      {
+        "id": "sc-total",
+        "parent_id": "",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Strategic Communication concentration: 30 credits",
+        "minimum": 30,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c5279501d8932d113f33bbec",
+            "quote": "Grand Total Credits: 30"
+          }
+        ]
+      },
+      {
+        "id": "sc-no-minor",
+        "parent_id": "",
+        "entity_id": "specializations:r1b_VXOis5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "No minor is required with the Strategic Communication concentration",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "No minor is required for students completing this concentration.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7707a218697b11e61da1990c",
+            "quote": "No minor is required for students completing this concentration."
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-4eed8fd37a9e4da9236b4e47",
+        "disposition": "unresolved",
+        "node_ids": [
+          "major-hours"
+        ],
+        "explanation": "The B.A. in Communication's credit hours, which differ from this degree's core and concentration."
+      },
+      {
+        "block_id": "b-30d00c981d758670b9677f0b",
+        "disposition": "requirements",
+        "node_ids": [
+          "college-combination"
+        ],
+        "explanation": "Majors should choose a minor; the concentrations say none is required with them."
+      },
+      {
+        "block_id": "b-aab169d28a548c5b0ac4b2c1",
+        "disposition": "requirements",
+        "node_ids": [
+          "core",
+          "concentration"
+        ],
+        "explanation": "The degree is the core and one concentration."
+      },
+      {
+        "block_id": "b-82dc7d74fcf044083e728dff",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the College and department admission requirements; each is represented individually."
+      },
+      {
+        "block_id": "b-a6fd418730bb2315a098c68c",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-attempted",
+          "admit-applicable"
+        ],
+        "explanation": "Credit hours before admission."
+      },
+      {
+        "block_id": "b-b5b792de96157ab81597525e",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-cumulative"
+        ],
+        "explanation": "Cumulative grade point for admission."
+      },
+      {
+        "block_id": "b-ef3580822c2df5bed0a4ff1a",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-transfer"
+        ],
+        "explanation": "Transfer grade point for admission."
+      },
+      {
+        "block_id": "b-5eeb2f84031f69e9a15dfc82",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-continuing"
+        ],
+        "explanation": "Institutional grade point for admission."
+      },
+      {
+        "block_id": "b-45de7955dfa3b1852f138d07",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the conditions below, each represented individually."
+      },
+      {
+        "block_id": "b-7bb03bbbfd4a398a5547e24f",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-communication"
+        ],
+        "explanation": "A General Education area before admission."
+      },
+      {
+        "block_id": "b-a0e35e00098340dbf0a25e24",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-math"
+        ],
+        "explanation": "A General Education area before admission."
+      },
+      {
+        "block_id": "b-18f83f35fda184789e58e3b2",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gened-language"
+        ],
+        "explanation": "A General Education area before admission."
+      },
+      {
+        "block_id": "b-584c7f3780cac9d5f3353d62",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-courses"
+        ],
+        "explanation": "Admission course work with its grade threshold."
+      },
+      {
+        "block_id": "b-17371665e1740fee205e7917",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The B.A. in Communication's admission course work, not this degree's."
+      },
+      {
+        "block_id": "b-6c9b1430e966b1bc5904e1ee",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-courses",
+          "admit-comm1140",
+          "admit-comm2135"
+        ],
+        "explanation": "This degree's admission course work."
+      },
+      {
+        "block_id": "b-29f5d0a677ac988ded49c6c2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of the department admission requirements; each is represented individually."
+      },
+      {
+        "block_id": "b-e7e045a038f8bb731018af49",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa-department",
+          "admit-math"
+        ],
+        "explanation": "The department grade point and mathematics course for admission."
+      },
+      {
+        "block_id": "b-2401fdb5c66614ed7397576d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the graduation requirements, each represented individually."
+      },
+      {
+        "block_id": "b-fccc1dd90d2bc1dba0a2d32d",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "The major courses the department specifies."
+      },
+      {
+        "block_id": "b-a2ecd2681138bdd1b69bcfd5",
+        "disposition": "requirements",
+        "node_ids": [
+          "major-grade"
+        ],
+        "explanation": "The major grade threshold."
+      },
+      {
+        "block_id": "b-09cb9f801469a969521a1975",
+        "disposition": "requirements",
+        "node_ids": [
+          "major-gpa"
+        ],
+        "explanation": "The major grade point."
+      },
+      {
+        "block_id": "b-796f07d7b725c369fb3dcbd9",
+        "disposition": "requirements",
+        "node_ids": [
+          "graduation-gpa"
+        ],
+        "explanation": "The cumulative grade point at graduation."
+      },
+      {
+        "block_id": "b-8895c8ffde1f3d81db4ee6e3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of departmental honors, an optional distinction."
+      },
+      {
+        "block_id": "b-3d084805a8cff5906c331f7c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Departmental honors are optional; their grade point and thesis apply only to students who seek them."
+      },
+      {
+        "block_id": "b-4e7d9d4c4494d1c804da5a4e",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts, each represented individually."
+      },
+      {
+        "block_id": "b-8fb5fc2361a2d8cb5bef65c3",
+        "disposition": "requirements",
+        "node_ids": [
+          "core"
+        ],
+        "explanation": "Every core course is required."
+      },
+      {
+        "block_id": "b-0ddd9162f0eb9477566157e2",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-cj350"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-3febf5da5d6f3e2997dc2aaa",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-cj365"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-d7213d87958eac37356c370f",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-cj478"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-2f2dfa65d7e2f4e8a32be6b6",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-comm1140"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-196b12182373310b916bf3f5",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-comm2135"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-cb365a01c163349532b82abe",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-comm2185"
+        ],
+        "explanation": "A core course."
+      },
+      {
+        "block_id": "b-addd4c04b658f84e865093f3",
+        "disposition": "requirements",
+        "node_ids": [
+          "concentration"
+        ],
+        "explanation": "The concentration credits."
+      },
+      {
+        "block_id": "b-e51c50188dce58114c1677ae",
+        "disposition": "requirements",
+        "node_ids": [
+          "concentration"
+        ],
+        "explanation": "One concentration is required."
+      },
+      {
+        "block_id": "b-55c51d0761ef972d03423a2f",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree"
+        ],
+        "explanation": "The remaining degree credits."
+      },
+      {
+        "block_id": "b-5956f2e193669c494c5f8d56",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree",
+          "general-education",
+          "college-combination"
+        ],
+        "explanation": "The remaining credits' qualification, General Education, and the College's major and minor rule."
+      },
+      {
+        "block_id": "b-66b029005de4b728cd0ae1c2",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-c2ccd090a233aaa076f29377",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-64087f7bb2e5a681d0b8a83b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-7b3cf7f3e43aeefd63b1add5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-52f5bda64b7e49a1f4531c75",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-7e71905d4acbbbebaae397bd",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The program is also offered online; the record states no separate online requirements."
+      },
+      {
+        "block_id": "b-d3274dc4552c90d169058280",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-e4e943eb75318e390c7ddeac",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-a9713a124c6e5d0f89977f6b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-cb6137687fbbb8ab95a4346b",
+        "disposition": "unresolved",
+        "node_ids": [
+          "major-hours"
+        ],
+        "explanation": "The record's minimum major hours, 36, against the 48 of the core and a concentration."
+      },
+      {
+        "block_id": "b-cc4f6fcf46437287ee3c104a",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 120, agree with the stated total."
+      },
+      {
+        "block_id": "b-54b6cab5d994716359fb2acf",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-0e362a5408577f86a9976c0d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-b15d92b493a9b9556adb7c82",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-8bb4b36e1b24b837e8d4d8a6",
+        "disposition": "requirements",
+        "node_ids": [
+          "concentration"
+        ],
+        "explanation": "The record requires a concentration."
+      },
+      {
+        "block_id": "b-2021b7fc164f0d4efc5481ec",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-688c162968f8fd45b5468086",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-no-minor"
+        ],
+        "explanation": "No minor with this concentration; the department gives more information."
+      },
+      {
+        "block_id": "b-ef1bc2f26aa2ec7217dc14c9",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj"
+        ],
+        "explanation": "Every part of the concentration is required."
+      },
+      {
+        "block_id": "b-0b6c78fb775a4a6fa9391e58",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-required"
+        ],
+        "explanation": "Six named required courses."
+      },
+      {
+        "block_id": "b-d56c06bd2cdb6f1bca7392b8",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj360"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-6c6eb9533fb45da7345dc920",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj367"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-8b7ffd401e605d718a2108c0",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj375"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-70ba35298dcdd2de8f697f77",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj475"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-7d9d0667663c1aff73e9b765",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-comm1145"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-fe74704e4d8d908eecbd42b0",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-comm2190"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-d19cdfdf6a79390f503becd6",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-communication"
+        ],
+        "explanation": "Six credits from the eight listed courses."
+      },
+      {
+        "block_id": "b-c5ec4ab601f93f4d59dac8c3",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj313"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-ec76b6c23e341c80e99c0bf2",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj314"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-dd329831d12e9421967074fa",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj332"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-eb592bae0d260c02f96a8146",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj333"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-771e82d12997c72eefe6dd9a",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj334"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-c324d5c89b7382f081cf66d2",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj344"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-0e91d3bd8ffe7298e939a9dd",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj450"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-996886c25fe9e76b055786a8",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj469"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-5073abe55a7078a1bb35aa2c",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-media"
+        ],
+        "explanation": "Six credits from the four listed courses."
+      },
+      {
+        "block_id": "b-154d7dd16a370de0b2928214",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj361"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-90f38b5e73b63d30f0c35a1e",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj370"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-4537a81275de19522f4f2c4a",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj374"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-77fc0b8e46d98277d5f9c7fa",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-cj492"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-e3758e468681ea1ab9f454f8",
+        "disposition": "requirements",
+        "node_ids": [
+          "mmj-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-9b5f275e234269d1f6114ea7",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-506dfdbc5921c0a93c170228",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-f4b0126f7f16b13786db804a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-5c9285255f9175e1f1bcb5a3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-f8e64dc1d7f22a44fdc19a36",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-7707a218697b11e61da1990c",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-no-minor"
+        ],
+        "explanation": "No minor with this concentration; the department gives more information."
+      },
+      {
+        "block_id": "b-240a0ef4347408b14f6a24ae",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc"
+        ],
+        "explanation": "Every part of the concentration is required."
+      },
+      {
+        "block_id": "b-dda95c0040a21350d7751f23",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-required"
+        ],
+        "explanation": "Seven named required courses."
+      },
+      {
+        "block_id": "b-9eff19cb8d7e0d7d7d570923",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj327"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-f60fd00b73725af2a4b319a4",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj374"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-ac343f1879465da5a8022a06",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj387"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-1788a3792dee328765e16bb5",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj389"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-7085ab20eda9fe1482361afd",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj390"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-6c03179cc50fb21f72dd588c",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj391"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-c75a716238dad2506b45a748",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj488"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-8c1e0ad2c855c0ca064569d9",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-electives"
+        ],
+        "explanation": "Nine credits from the nine listed courses."
+      },
+      {
+        "block_id": "b-39dbb9025adcdce0042cf6df",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj332"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-551e38d8c3d9a7ca372deb3c",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj333"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-538e3ecd435c9e51d4af1ce2",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj340"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-e1ccfb7120be2fab148d65ea",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj361"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-336c9806d8d439c2af98f206",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj367"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-e2970b78b8de4300e3785e1f",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj490"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-5f8f01d0851b7d5c928f0a81",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-cj492"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-683a4e9ca2f51042ac9cf342",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-comm2190"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-d6d1e19162dad1059953121c",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-comm2245"
+        ],
+        "explanation": "One of the listed courses."
+      },
+      {
+        "block_id": "b-c5279501d8932d113f33bbec",
+        "disposition": "requirements",
+        "node_ids": [
+          "sc-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-ebeaea2a582fcf02bd6d85c5",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-2cd3fc510445b19124a0d332",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-b06c3eea1ded1cc7feeb13fb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-9fddc755c5dcb1c0d67eb19f",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-31d260254b665b41a043c076",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-4eed8fd37a9e4da9236b4e47",
+        "question": "The description gives 36 departmental credit hours, 21 of them at the 300 level or above, for the B.A. in Communication, and the record gives 36 minimum major hours. This degree's six core courses and a 30-credit concentration make 48. Which applies to Journalism and Mass Communication, and does the 21-hour upper-division rule?"
+      },
+      {
+        "block_id": "b-30d00c981d758670b9677f0b",
+        "question": "Every Journalism and Mass Communication student completes a concentration, and each concentration says no minor is required with it. Does that make the degree one of the College's special curricula requiring no minor, so the \"should choose a minor\" advice does not apply?"
+      },
+      {
+        "block_id": "b-e7e045a038f8bb731018af49",
+        "question": "Which courses count as \"a higher-level core MATH class\" than MATH 1130 for admission?"
+      }
+    ]
+  },
+  "triage": [
+    {"item": "rule:major-hours", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "catalog"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
+}
