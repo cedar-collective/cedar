@@ -148,6 +148,8 @@ dfw_spread_finding <- function(payload) {
     return(list(n_courses = 0L, n_course_terms = 0L, first_term = NA_integer_, last_term = NA_integer_,
                 spread_pts = NA_real_, lo_pct = NA_real_, hi_pct = NA_real_, direction_phrase = NA_character_))
   }
+  # MAX-TERM-OK: the first and last terms of the series the payload already
+  # holds, stated as its range; the build bounded it at its edge.
   list(n_courses = avg$n_courses, n_course_terms = avg$n_course_terms,
        first_term = min(s$overall$terms$term), last_term = max(s$overall$terms$term),
        spread_pts = avg$spread_pts, lo_pct = avg$lo_pct, hi_pct = avg$hi_pct,
