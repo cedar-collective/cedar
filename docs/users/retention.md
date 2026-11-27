@@ -39,7 +39,9 @@ The entering-class sections were their own page, First Year, for a few days in N
 The strip under the controls says who the page is counting, with the numbers for the latest term it reads:
 
 - **Counted**: every student enrolled that term at the chosen level and home campus.
-- **First-time students**, **Transfer students**, **Start not on record**: how many of them the record calls a first-time student or a new transfer in the term they arrived, and how many it never calls new in the terms on record (readmitted after time away, moved from another campus or level, or here before the records begin). The three add to the number counted. **Transfer students are counted** in every return rate on the page.
+- **New in** the term: the first-time students and transfers for whom it is the 1st semester here (a fall's include those who started the summer before). This is the term's entering class, not everyone who once started as a first-time student.
+- **Started before** the term: the students counted who arrived, first-time or as a transfer, in an earlier term.
+- **Start not on record**: students the record never calls new in the terms on record (readmitted after time away, moved from another campus or level, or here before the records begin). The three add to the number counted. **Transfer students are counted** in every return rate on the page.
 - **Not counted**: students at another level that term, each level with its number. At UNM non-degree students are their own levels (Non-degree undergraduate, which holds high-school students taking college courses, and Non-degree graduate), so **they are not among the undergraduates**; choose that level to read them.
 
 Five sections count a narrower group, and say so in **How this is counted**:

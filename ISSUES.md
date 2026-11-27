@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I94](#i94--retention-reads-no-graduate-start-so-it-says-graduate-students-have-none-on-record) | Defect | Retention reads no graduate start: `student_term_entry_type()` knows freshman and new-transfer codes only, so the page says graduate students have no start on record while about a quarter of a fall's graduate declarations say first-time graduate |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -62,6 +63,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I93](#i93--retentions-scope-bar-read-as-if-every-student-who-ever-started-first-time-was-new-that-term) | Defect | Retention's scope bar and method note gave each student's start, in any term, as a count for the latest term: a reader took its first-time count for Fall 2025's new class, which is about a third of it |
 | [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
 | [I90](#i90--low-enrollment-read-as-not-yet-run-when-nothing-was-low-and-dropped-history-from-a-long-list-without-saying) | Defect | Low Enrollment showed "Click Gather Enrollments" after a run that found nothing low, and a list of more than 500 sections showed a dash in every Prior History cell with nothing to say why. Found 2026-11-26 reading the code; fixed by the page's move to Courses |
 | [I89](#i89--low-enrollment-ignored-the-enrollment-bars-subject) | Defect | Low Enrollment ran under the Enrollment bar but built its own scope without Subject: a Subject choice narrowed the Courses table and not the Low Enrollment list beside it. Found 2026-11-26; the page now has its own bar |
@@ -123,6 +125,90 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I94 — Retention reads no graduate start, so it says graduate students have none on record
+
+**Status:** open.
+**Found:** 2026-11-26, rewording Retention's scope bar (I93): at the
+graduate level every student came out "start not on record".
+**Severity:** medium. No number is wrong, but the graduate view loses its
+semester lines and says something untrue about the record.
+**Affects:** `student_term_entry_type()` (`R/branches/population.R`) and so
+`student_term_semesters()`, Retention's semester lines and scope bar at a
+graduate or professional level; its other callers
+(`get_entering_class_retention()`, `get_major_tenure()`,
+`retention-context.R`'s summer arrivals) read no graduate arrival either.
+
+### What is wrong
+
+`student_term_entry_type()` calls a declaration first-time when its
+`student_population` matches `First Time.*Fresh|Beg[a-z]* Fresh`, and a
+transfer on `New Transfer`. Graduate and professional declarations carry
+their own codes, `Frst Time Grad/Prf Deg not UNM` and `First Time Grad/Prof
+w/UNM Deg`: about a quarter of the graduate declarations in Fall 2025, and of
+Law's. Neither matches, so no graduate student has an arrival. Retention then
+draws one line for every graduate student and says "No first-time students at
+this level have a start on record", which the record contradicts.
+
+### Reproduce
+
+On the fixtures, RS01's W-H (`Frst Time Grad/Prf Deg not UNM`, Fall 2022):
+`retention_scope_facts(rs01$student_terms, rs01$programs, list(student_level
+= "GR", campus = "ABQ"), 202280L)$arrivals` gives no first-time student.
+
+### Done when
+
+The graduate codes are read as an arrival (whether "with a UNM degree" is
+first-time or its own kind is a decision for the page's words), each caller's
+answer at a graduate level is checked, and the graduate view draws semester
+lines.
+
+---
+
+## I93 — Retention's scope bar read as if every student who ever started first-time was new that term
+
+**Status:** resolved 2026-11-26 (branch `retention/scope-words`).
+**Found:** 2026-11-26, by a reader who took the bar's first-time count for
+Fall 2025's new students and knew that class to be about a third of it.
+**Severity:** medium. No count was wrong; the words made a count of every
+student's start, in any term, read as the latest term's entering class,
+about three times its size.
+**Affects:** Retention's data scope bar and its first section's "How this is
+counted" (`describe_retention_scope()`, `retention_who_note()`).
+
+### What was wrong
+
+`retention_scope_facts()` counted the latest term's students by how each had
+most recently arrived, in that term or any earlier one. The bar labelled the
+counts "First-time students" and "Transfer students", and the method note
+said the record "calls N first-time students and N new transfers in the term
+they arrived". Of the Fall 2025 ABQ undergraduates the bar called first-time,
+about a third were new that fall; the rest had started in an earlier term.
+The arrivals were also read at any level (`student_arrival_as_of()`), where
+the semester lines read them at the student's own level.
+
+Beside it, "N whose next term had not settled" did not say these are the
+whole latest fall's students, waiting on the spring.
+
+### Reproduce (before the fix)
+
+`retention_scope_facts(rs01$student_terms, rs01$programs, rs01$opt,
+202280L)` has no count of the students new in Fall 2022; the bar gave W-B
+(first-time in Fall 2021) as one of three "First-time students".
+
+### Fix
+
+The facts count the students whose 1st semester is the term
+(`student_term_semesters()`, as the semester lines read it, so a fall's
+summer starters are new). The bar shows **New in** the term, **Started
+before** it and **Start not on record**, adding to those counted, and leaves
+out the first two at a level with no start on record. The method note words
+the same split, and the not-settled count names its term and the term it
+waits on. `student_arrival_as_of()` had no other caller and is removed.
+`test-return-rates.R` RS01 holds the counts, a summer starter and the
+graduate case; RR01 the not-settled line.
+
+---
 
 ## I92 — Classification changed meaning from Summer 2025: a student now sits a step lower, and every reading by classification crosses the change unmarked
 
