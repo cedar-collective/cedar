@@ -151,6 +151,26 @@ test_that("a run that rebuilds some tables keeps the others in the status file",
   expect_equal(names(jsonlite::fromJSON(status_file)$tables), "holds")
 })
 
+test_that("every transform checks the stored student IDs and stops on a table holding two (I1)", {
+  env <- load_transform_helpers()
+  # A table that joins in one class-list term and not at all in another stops
+  # the run, naming the table and the term to pull again; the log above it has
+  # every table-term.
+  expect_error(
+    expect_message(env$check_stored_student_ids(test_ids_spine, list(cedar_programs = test_ids_split)), "By term"),
+    "cedar_programs holds two student ID spaces: no student in cedar_programs 202410 joins", fixed = TRUE)
+  # An entering term nobody has registered for yet does not.
+  expect_message(res <- env$check_stored_student_ids(test_ids_spine,
+    list(cedar_programs = test_ids_clean, cedar_applicants = test_ids_ahead)), "not judged")
+  expect_equal(res$n_tables_split, 0L)
+  # A table not built is named, and the rest are checked.
+  expect_message(env$check_stored_student_ids(test_ids_spine, list(cedar_programs = test_ids_clean, cedar_applicants = NULL)),
+    "not built, so not checked: cedar_applicants", fixed = TRUE)
+  # Change: the applicants table was built with no rows.
+  expect_message(env$check_stored_student_ids(test_ids_spine, list(cedar_programs = test_ids_clean, cedar_applicants = test_ids_clean[0, ])),
+    "built with no rows, so not checked: cedar_applicants", fixed = TRUE)
+})
+
 test_that("applicant transform keeps only runtime comparison covariates", {
   env <- load_transform_helpers()
   captured <- NULL

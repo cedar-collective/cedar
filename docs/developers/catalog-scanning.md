@@ -227,74 +227,31 @@ source bytes; `scripts/sync-catalog-store.sh` copies the archive to production.
 Catalog Review opens **Visualization rules**, generated directly from the saved
 metadata and selected graph used by Degree Explorer. It explains what drives the
 chart, with catalog wording and links; it is not an approval queue. Optional AI
-proposals remain under **Draft interpretations** ([workflow](catalog-normalization.md)).
-The interfaces below are **Extraction diagnostics**. Unsupported-language flags
-are parser limitations, not failures in the running chart or requests to approve
-every clause manually.
+proposals remain under **Draft interpretations** ([workflow](catalog-normalization.md)),
+and every item a reading left open, with who can settle it, under **Catalog
+questions**.
 
-**Admin > Data & Usage > Catalog Review** reads completed analyses under the
-data directory's `catalog-scans/<institution>/`. Select a saved analysis, then filter by degree,
-record type or requirement type. A degree scope includes its concentrations and
-the transitive closure of captured course references; it does not claim every
-linked course is required. Cycles are visited once. Program-only scans have no
-course records to inspect.
+Catalog Review had a fourth tab, **Extraction diagnostics**, that listed this
+parser's flags (narrative it could not represent, source checks, milestones,
+every section) for a person to inspect. It was retired on 2026-11-27: the
+readings under Draft interpretations replaced the parser's draft trees as what
+the boards are compiled from, and its flags were parser limits, not questions
+anyone needed to answer. The one flag worth acting on, a program whose page
+states the degree total two ways (`total_credit_conflict`, above), is now an item
+on **Catalog questions**, for the catalog to settle, whether or not CEDAR has
+read the program: `scripts/compile-degree-interpretations.R --write` adds one
+row per flag from the analysis it compiles against
+(`catalog_total_conflict_questions()`, `R/features/catalog-questions.R`).
 
-- **Requirements to interpret** lists narrative nodes the extractor could not
-  fully represent as draft rules. A flag indicates an extraction gap, not
-  necessarily an error or ambiguous language in the catalog. A literal
-  **Course Not Found** gets its own reason and an action to verify the source.
-- **Source checks** lists inclusion flags, missing degree sections, ambiguous
-  credential classifications, and conflicting total-credit mentions on a
-  program's own page (1.3.0; see above). Current checks run on the saved
-  records, including older analyses created before `source-issues.csv` was
-  added or before 1.3.0; nothing is fetched.
-- **Milestones** lists cited uses of shared standing/admission gates, following
-  the degree/type filters. Inspect preserves the complete rule and shared ID;
-  admission uses also show the linked program's frozen policy, independently
-  hash-verified on Inspect. Older saved analyses explicitly explain that they
-  predate milestone extraction instead of claiming no milestones exist.
-- **All requirement sections** includes parsed lists that still need validation.
-- **Program coverage** counts program-level sections/flags, excluding embedded
-  concentrations and course records. It follows the degree filter; record/type
-  filters apply to the review queues.
-
-**Inspect** shows the selected excerpt, what to decide, its full captured section
-with list nesting preserved, and the draft structure. Evidence includes capture
-time, JSON field pointer, SHA-256, a public API record link and a published catalog
-page link. The saved section is frozen; the live links can change. Catalog markup
-is rendered with a restricted tag vocabulary and no attributes, scripts or active
-embeds. Structured source fields are displayed as JSON.
-
-Review-artifact hashes and the capture-manifest hash are checked before loading
-or looking up prepared data. Original source bytes are checked on every Inspect,
-so opening a ten-row queue does not read thousands of individual source files.
-Offline capture and analysis retain full-source verification; comparisons retain
-artifact verification. The page
-states this distinction. Corrupt/missing inspected evidence is an explicit error;
-a missing optional archive has a separate setup message.
-
-Prepared review data is shared in Shiny's bounded, app-level memory cache. Its key
-covers the archive location, verified analysis metadata/content hashes and a
-manual review-payload version. Actual artifact bytes are checked before cache
-lookup, so corruption cannot be hidden by a warm entry or unchanged timestamps.
-The cache stores data and frozen provenance, not widgets or live presentation
-settings. Bump the version in `catalog_review_cache_key()` when preparation logic
-or its result shape changes.
-
-Returning to the tab preserves the loaded snapshot, degree filter and table
-state. **Refresh scans** rediscovers analyses and rechecks artifacts; unchanged
-verified inputs reuse their prepared data. The browser renders previews and
-Inspect buttons for visible rows, avoiding thousands of R HTML-cell renders.
-No catalog archive or Banner table is loaded merely by opening another Admin subtab.
-
-Download the filtered queue as CSV to coordinate review. Like Mappings, this page
-is an inspection surface: decisions belong in reviewed, versioned files. It does
-not save approval states, edit archives or compile runtime degree plans.
-
-Production Compose mounts the data directory's `catalog-scans/` read-only over
-the app's copy of it, so the app never modifies its evidence. Keep each analysis with its capture's `source-manifest.json` and `sources/`
-so archives remain portable across host/container paths. Refresh scans to discover
-new completed analyses without restarting Shiny.
+The analyses themselves are unchanged and can still be read from the console:
+`list_catalog_review_scans(root)`, `load_catalog_review(root, scan_id)` (which
+verifies the review artifacts and the capture manifest),
+`filter_catalog_review(payload, program, kind, phase)` and
+`catalog_review_detail(payload, item_id)` (which verifies the source bytes it
+shows). Keep each analysis with its capture's `source-manifest.json` and
+`sources/` so an archive stays readable wherever it is copied. Production
+Compose mounts the data directory's `catalog-scans/` read-only over the app's
+copy of it, so the app never modifies its evidence.
 
 ## Offline rebuilding and annual review
 
@@ -347,14 +304,10 @@ review rows and program reference scopes; `R/features/catalog-review.R` discover
 local analyses, verifies their artifacts and sources, and retrieves complete source
 sections. `catalogReviewUI(id, catalog, roadmaps)` / `catalogReviewServer(id, root, active,
 catalog, roadmaps, review_root, shared)` in
-`R/modules/catalog-review.R` mounts at Admin > Data & Usage > Catalog Review.
-It reuses prepared data in a content-keyed app memory cache, verifies derived
-artifacts before cache lookup and original source bytes on Inspect, preserves
-state on return, and renders table controls only for visible rows. Full offline
-scanning/extraction still verifies all sources. It shows source checks separately from narrative flags,
-and exposes every unreviewed section. Viewing/exporting never approves rules or
-edits source/runtime files. Extracted rules remain unreviewed. Contract:
-[catalog-scanning.md](catalog-scanning.md).
+`R/modules/catalog-review.R` mounts at Admin > Data & Usage > Catalog Review,
+with Visualization rules, Draft interpretations and Catalog questions; the
+scanner's analyses are read from the console (above). Nothing there approves
+rules or edits source or runtime files. Extracted rules remain unreviewed.
 
 Admin Catalog Review defaults to **Visualization rules**, generated by
 `build_degree_plan_rules(catalog, roadmaps, view)` from the same inputs as Degree

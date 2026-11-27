@@ -141,6 +141,14 @@ for (path in readings) {
 if (write) {
   dir <- file.path(cedar_institution_dir(), "degree_drafts")
   open <- do.call(rbind, questions)
+  # And every program whose catalog page states its degree total two ways,
+  # read or not, from the analysis the boards were compiled against.
+  analysis_dir <- normalizePath(opts[["--analysis"]], mustWork = TRUE)
+  issues <- utils::read.csv(file.path(analysis_dir, "source-issues.csv"), colClasses = "character", check.names = FALSE)
+  landing <- catalog_capture_manifest(dirname(analysis_dir), verify_sources = FALSE)$settings$source$landing_url
+  totals <- catalog_total_conflict_questions(issues, landing)
+  open <- rbind(open, totals)
   write_degree_drafts(boards, do.call(rbind, manifest), dir, CEDAR_DEGREE_CATALOG$evidence, open)
-  cat("Wrote", length(boards), "compiled boards and", nrow(open), "open questions from", length(questions), "readings to", dir, "\n")
+  cat("Wrote", length(boards), "compiled boards and", nrow(open) - nrow(totals), "open questions from", length(questions),
+      "readings, and", nrow(totals), "degree totals the catalog states two ways, to", dir, "\n")
 }

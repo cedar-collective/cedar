@@ -71,6 +71,23 @@ test_that("check_student_id_integrity counts term statuses per table", {
   expect_equal(split_row$pct_ids_matched, 50)
 })
 
+test_that("a term the class lists do not hold, with no student registered, is not judged", {
+  res <- ids_result()
+  ahead <- res$by_term %>% filter(table == "ids_ahead")
+
+  # ids_ahead's 202510 is an entering term nobody has registered for yet; its
+  # zero is no evidence of a second ID space, and must not stop a refresh.
+  expect_equal(ahead$term_status[ahead$term == 202510L], "unjudged")
+  expect_equal(res$by_table$n_terms_unjudged[res$by_table$table == "ids_ahead"], 1L)
+  expect_equal(verdict_for(res, "ids_ahead"), "consistent")
+  expect_equal(res$n_tables_split, 1L)
+})
+
+test_that("the refresh log shows each table's verdict and every term, failures first", {
+  testthat::local_edition(3)
+  expect_snapshot(cat(format_student_id_integrity(ids_result()), sep = "\n"))
+})
+
 test_that("check_student_id_integrity stops on a table missing a required column", {
   bad <- ids_tables
   bad$ids_clean <- bad$ids_clean %>% select(-term)
@@ -93,5 +110,9 @@ test_that("check_student_id_integrity stops when the spine lacks the id column",
   expect_error(
     check_student_id_integrity(test_ids_spine %>% select(-student_id), ids_tables),
     "student_id"
+  )
+  expect_error(
+    check_student_id_integrity(test_ids_spine %>% select(-term), ids_tables),
+    "term column"
   )
 })

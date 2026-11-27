@@ -4233,6 +4233,13 @@ cedar_population_pcc <- tibble::tibble(
 #   ids_split      X1,X2      (0/2 none)       S1,S2   (2/2)       split
 #   ids_partial    S1,P1      (1/2 partial)    S2,P2   (1/2)       partial->consistent
 #   ids_orphan     X3,X4      (0/2 none)       X5,X6   (0/2)       no overlap
+#   ids_ahead      S3,P3      (1/2 partial)    202510: P4,P5 (0/2,  consistent
+#                                              a term the spine does not hold:
+#                                              unjudged)
+#
+# ids_ahead is an applicants table with an entering term nobody has registered
+# for yet. Judged like any other term, its zero would read as a second ID space
+# and stop a good refresh; it is "unjudged" and counts toward no verdict.
 #
 # Pinned: n_tables_split = 1 (ids_split only). ids_orphan is "no overlap", which
 # is deliberately NOT called split — every term failing is as consistent with a
@@ -4265,6 +4272,11 @@ cedar_ids_partial <- dplyr::bind_rows(
 cedar_ids_orphan <- dplyr::bind_rows(
   .ids_row(c("X3", "X4"), 202410),
   .ids_row(c("X5", "X6"), 202480)
+)
+
+cedar_ids_ahead <- dplyr::bind_rows(
+  .ids_row(c("S3", "P3"), 202410),
+  .ids_row(c("P4", "P5"), 202510)
 )
 
 

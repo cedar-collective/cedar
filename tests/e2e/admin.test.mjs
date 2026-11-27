@@ -80,7 +80,9 @@ try {
     sameTab: document.getElementById('usage_overview_ui').closest('.tab-pane') === document.getElementById('feature_usage_table').closest('.tab-pane'),
   }));
   check(`the dashboard and the event log share one tab (${usage.tabs.join(', ')})`,
-        usage.sameTab && usage.tabs.includes('Usage') && !usage.tabs.includes('Feature Details') && !usage.tabs.includes('Usage Overview'));
+        usage.sameTab && usage.tabs.includes('Usage') && !usage.tabs.includes('Feature Details') && !usage.tabs.includes('Usage Overview') &&
+        // Join Integrity was retired: the transform checks the IDs at every run.
+        !usage.tabs.includes('Join Integrity'));
   check(`one date range filters both (${usage.dates} date inputs)`, usage.dates === 2);
   // This session's own visit is in today's log: the dashboard counts it and
   // the event log lists it, so the two read the same range.
@@ -152,7 +154,6 @@ try {
     campusRef.includes('ABQ') && /in default scope/i.test(campusRef));
   await page.screenshot({ path: '/tmp/cedar-admin-mappings.png', fullPage: true });
 
-  const queueStarted = performance.now();
   await openSubTab(page, 'Catalog Review');
   await readyAll(['catalog_review-rules-table']);
   check('Catalog Review opens on the actual visualization rules rather than parser flags',
@@ -178,13 +179,29 @@ try {
     const who = colIndex(questionList.headers, 'Who can settle it');
     check('Catalog questions lists open questions with who can settle each and the file to change',
       questionList.rows.length > 0 && who >= 0 && colIndex(questionList.headers, 'Change it in') >= 0 &&
-      questionList.rows.every(row => /\.json · (rule|question|passage) /.test(row.join(' '))));
+      questionList.rows.every(row => /\.json · (rule|question|passage) |the catalog page, then a new catalog scan/.test(row.join(' '))));
     await page.$eval('#catalog_review-questions-settled_by', el => el.selectize.setValue('catalog'));
     await waitForIdle(page);
     await page.waitForFunction(() => !document.getElementById('catalog_review-questions-questions')?.classList.contains('recalculating'));
     const catalogOnly = await readReactable(page, 'catalog_review-questions-questions');
     check('"The catalog" keeps only the questions the catalog can settle',
       catalogOnly.rows.length > 0 && catalogOnly.rows.every(row => row[who] === 'The catalog'));
+    // A degree total the catalog states two ways is one of them, found by the
+    // catalog scan and named by no reading (it replaced Extraction diagnostics).
+    const questionSearch = '#catalog_review-questions-questions input.rt-search';
+    const totalsQuery = 'gives this degree two totals';
+    await page.type(questionSearch, totalsQuery);
+    await page.waitForFunction(() => document.querySelector('#catalog_review-questions-questions .rt-tbody')?.innerText.includes('two totals'));
+    const totals = await readReactable(page, 'catalog_review-questions-questions');
+    check('a degree total the catalog states two ways is a question for the catalog, changed on its page',
+      totals.rows.length > 0 && totals.rows.every(row => row[who] === 'The catalog' &&
+        row.join(' ').includes('the catalog page, then a new catalog scan')));
+    await page.focus(questionSearch);
+    await page.keyboard.press('End');
+    for (let i = 0; i < totalsQuery.length; i++) await page.keyboard.press('Backspace');
+    await page.waitForFunction((sel) => document.querySelector(sel)?.value === '', {}, questionSearch);
+    check('clearing the search shows every question the catalog can settle again',
+      (await readReactable(page, 'catalog_review-questions-questions')).rows.length === catalogOnly.rows.length);
     const boardList = await readReactable(page, 'catalog_review-questions-boards');
     check('each board compiled from a reading is listed with what it leaves out',
       boardList.rows.length > 0 && colIndex(boardList.headers, 'What the board leaves out') >= 0);
@@ -283,157 +300,6 @@ try {
     await page.waitForFunction(() => document.getElementById('catalog_review-normalization-review_status')?.innerText.includes('review revision 4'));
     check('whole-unit sign-off survives a new Shiny session', true);
   }
-  await openSubTab(page, 'Extraction diagnostics');
-  await page.waitForFunction(() => {
-    const text = document.getElementById('catalog_review-status')?.innerText || '';
-    return /No catalog scans|All extracted requirements|Catalog review unavailable/.test(text);
-  }, { timeout: 180000 });
-  const catalogStatus = await page.$eval('#catalog_review-status', el => el.innerText);
-  check('catalog review reports source errors instead of an empty successful queue',
-    !catalogStatus.includes('Catalog review unavailable'));
-  if (catalogStatus.includes('No catalog scans')) {
-    check('an absent optional archive explains how to supply it', catalogStatus.includes('scan-degree-catalog.R'));
-  } else {
-    check('catalog review labels all extraction unreviewed and verifies saved evidence',
-      catalogStatus.includes('All extracted requirements are unreviewed') && catalogStatus.includes('hashes verified'));
-    await readyAll(['catalog_review-interpretation']);
-    console.log(`TIMING  catalog review first queue: ${Math.round(performance.now() - queueStarted)} ms`);
-    await page.waitForFunction(() => Object.keys(document.getElementById('catalog_review-program')?.selectize?.options || {}).some(Boolean));
-    const firstProgram = await page.$eval('#catalog_review-program', el => Object.values(el.selectize.options).find(x => x.value)?.value);
-    assert.ok(firstProgram, 'captured degrees populate the program selector');
-    await page.$eval('#catalog_review-program', (el, value) => el.selectize.setValue(value), firstProgram);
-    await page.$eval('#catalog_review-kind', el => el.selectize.setValue('Degree'));
-    await page.$eval('#catalog_review-phase', el => el.selectize.setValue('Degree'));
-    await openSubTab(page, 'All requirement sections');
-    await readyAll(['catalog_review-sections']);
-    const sectionRows = await page.$eval('#catalog_review-sections', el => el.innerText);
-    check('degree filters retain complete requirement sections for validation',
-      sectionRows.includes('Section has not been validated') && sectionRows.includes('Inspect'));
-    await page.click('#catalog_review-sections button.btn-outline-secondary');
-    await readyCatalogModal();
-    const evidence = await page.$eval('.modal.show', el => ({ text: el.innerText,
-      links: [...el.querySelectorAll('a')].map(a => ({ text: a.innerText, href: a.href })) }));
-    check('Inspect shows full context, draft structure, pointer and source hash',
-      ['captured catalog section', 'draft structure', 'source sha-256', '/degreerequirements']
-        .every(text => evidence.text.toLowerCase().includes(text)));
-    check('evidence links to both the published program and the captured public record',
-      evidence.links.some(a => a.text === 'Open catalog page' && a.href.includes('#/programs/')) &&
-      evidence.links.some(a => a.text === 'Public source record' && a.href.startsWith('https://')));
-    await page.screenshot({ path: '/tmp/cedar-admin-catalog-evidence.png', fullPage: true });
-    await page.keyboard.press('Escape');
-    await page.waitForFunction(() => !document.querySelector('#shiny-modal'));
-    await page.$eval('#catalog_review-program', el => el.selectize.setValue(''));
-    await page.$eval('#catalog_review-kind', el => el.selectize.setValue(''));
-    await page.$eval('#catalog_review-phase', el => el.selectize.setValue(''));
-    // Older immutable analyses intentionally keep their original draft grammar.
-    // New analyses expose the grade as a constraint in the evidence tree too.
-    if (/Extractor: 1\.[1-9][0-9]*\./.test(catalogStatus)) {
-      await openSubTab(page, 'All requirement sections');
-      await readyAll(['catalog_review-sections']);
-      await page.type('#catalog_review-sections input.rt-search', 'Earned a minimum grade of C in each of the following:');
-      await waitForIdle(page);
-      const gradeRows = await readReactable(page, 'catalog_review-sections');
-      if (gradeRows.rows[0]?.at(-1) === 'Inspect') {
-        await page.click('#catalog_review-sections button.btn-outline-secondary');
-        await readyCatalogModal();
-        const gradeTree = await page.$eval('.modal.show details pre', el => el.textContent);
-        check('recognized grade requirements remain visible as constraints in the draft tree',
-          gradeTree.includes('[minimum grade C]') && gradeTree.includes('Course:'));
-        await page.keyboard.press('Escape');
-        await page.waitForFunction(() => !document.querySelector('#shiny-modal'));
-      }
-      await page.click('#catalog_review-sections input.rt-search', { clickCount: 3 });
-      await page.keyboard.press('Backspace');
-      await waitForIdle(page);
-    }
-    if (catalogStatus.includes('shared status milestones are recognized')) {
-      await openSubTab(page, 'Milestones');
-      await readyAll(['catalog_review-milestones']);
-      const search = '#catalog_review-milestones input.rt-search';
-      // Both cases use published grammar, not institution-specific codes.
-      for (const [query, expected, screenshot] of [
-        ['Must have a class standing of Junior', 'class_standing:is:Junior', '/tmp/cedar-admin-catalog-standing.png'],
-        ['Program admission milestone', 'program_admission:', '/tmp/cedar-admin-catalog-admission.png']
-      ]) {
-        const hasSearch = await page.$(search);
-        if (!hasSearch) break; // This catalog may contain no supported status gates.
-        await page.click(search, { clickCount: 3 });
-        await page.keyboard.press('Backspace');
-        await page.type(search, query);
-        await waitForIdle(page);
-        const milestoneRows = await readReactable(page, 'catalog_review-milestones');
-        if (milestoneRows.rows[0]?.at(-1) !== 'Inspect') continue;
-        await page.click('#catalog_review-milestones button.btn-outline-secondary');
-        await readyCatalogModal();
-        const milestone = await page.$eval('.modal.show', el => ({
-          text: el.textContent, tree: el.querySelector('details pre')?.textContent
-        }));
-        check(`${query}: Inspect retains a shared milestone and full rule context`,
-          milestone.text.includes('Shared milestone:') && milestone.text.includes(expected) &&
-          milestone.tree.includes('Status milestone:') && milestone.text.includes('Captured catalog section'));
-        if (expected.startsWith('program_admission:')) {
-          check('program admission Inspect supplies policy evidence or explicit missing-policy context',
-            milestone.text.includes('Linked program admission policy') || milestone.text.includes('No admission policy section was supplied'));
-        }
-        await page.screenshot({ path: screenshot, fullPage: true });
-        await page.keyboard.press('Escape');
-        await page.waitForFunction(() => !document.querySelector('#shiny-modal'));
-      }
-      if (await page.$(search)) {
-        await page.click(search, { clickCount: 3 });
-        await page.keyboard.press('Backspace');
-        await waitForIdle(page);
-      }
-    }
-    await openSubTab(page, 'Source checks');
-    await readyAll(['catalog_review-source']);
-    const sourceChecks = await page.$eval('#catalog_review-source', el => el.innerText);
-    check('source checks expose flags separately from narrative interpretation',
-      sourceChecks.includes('Catalog inclusion flag') || sourceChecks.includes('No items match'));
-    await openSubTab(page, 'Requirements to interpret');
-    await readyAll(['catalog_review-interpretation']);
-    const pageOne = await readReactable(page, 'catalog_review-interpretation');
-    const nextAvailable = await page.$eval('#catalog_review-interpretation', el => {
-      const next = [...el.querySelectorAll('button')].find(b => b.textContent.trim() === 'Next');
-      if (!next || next.disabled) return false;
-      next.click(); return true;
-    });
-    if (nextAvailable) {
-      await page.waitForFunction(previous => {
-        const cell = document.querySelector('#catalog_review-interpretation .rt-tbody .rt-tr .rt-td');
-        return cell && cell.innerText.trim() !== previous;
-      }, {}, pageOne.rows[0][0]);
-      const pageTwo = await readReactable(page, 'catalog_review-interpretation');
-      await page.click('#catalog_review-interpretation button.btn-outline-secondary');
-      await readyCatalogModal();
-      const selectedTitle = await page.$eval('.modal.show .modal-title', el => el.innerText.trim());
-      check('Inspect on a later table page opens the correct source item', selectedTitle === pageTwo.rows[0][0]);
-      await page.keyboard.press('Escape');
-      await page.waitForFunction(() => !document.querySelector('#shiny-modal'));
-    }
-    // Returning to the page must preserve the selected degree and loaded view.
-    await page.$eval('#catalog_review-program', (el, value) => el.selectize.setValue(value), firstProgram);
-    await waitForIdle(page);
-    await openSubTab(page, 'Mappings');
-    const returnStarted = performance.now();
-    await openSubTab(page, 'Catalog Review');
-    await readyAll(['catalog_review-interpretation']);
-    await page.waitForFunction(() => document.getElementById('catalog_review-status')?.innerText.includes('All extracted requirements are unreviewed'));
-    check('returning to catalog review preserves the degree filter',
-      await page.$eval('#catalog_review-program', el => el.selectize.getValue()) === firstProgram);
-    console.log(`TIMING  catalog review return: ${Math.round(performance.now() - returnStarted)} ms`);
-    const returnedRows = await readReactable(page, 'catalog_review-interpretation');
-    if (returnedRows.rows[0]?.at(-1) === 'Inspect') {
-      await page.click('#catalog_review-interpretation button.btn-outline-secondary');
-      await readyCatalogModal();
-      check('Inspect remains functional after returning to the review queue',
-        await page.$eval('.modal.show .modal-title', el => el.innerText.trim()) === returnedRows.rows[0][0]);
-      await page.keyboard.press('Escape');
-      await page.waitForFunction(() => !document.querySelector('#shiny-modal'));
-    }
-    await page.screenshot({ path: '/tmp/cedar-admin-catalog-review.png', fullPage: true });
-  }
-
   await clickNavTab(page, 'Projections');
   await waitForIdle(page);
   const projection = await page.evaluate(() => {

@@ -38,17 +38,6 @@ catalog_review_capture_directory <- function(directory, meta) {
   candidates[which(matches)[1]]
 }
 
-# Recheck actual artifact bytes before a cache lookup, not only their recorded
-# hashes or modification dates. Corruption must fail even on a warm cache.
-catalog_review_cache_key <- function(root, scan_id) {
-  directory <- catalog_review_directory(root, scan_id)
-  analysis <- read_catalog_analysis(directory, read_sections = FALSE)
-  capture <- catalog_review_capture_directory(directory, analysis$meta)
-  # Bump when review payload shape, item interpretation or source checks change.
-  list(version = 3L, directory = normalizePath(directory), source_directory = normalizePath(capture),
-    analysis = analysis$meta)
-}
-
 #' Verify the derived review artifacts; verify original source bytes on Inspect
 load_catalog_review <- function(root, scan_id) {
   directory <- catalog_review_directory(root, scan_id)

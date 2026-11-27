@@ -52,6 +52,10 @@ test_that("a compiled board takes its authored board's place on the page, labell
   write_source_json(resorted, designed_path)
   expect_equal(read_degree_drafts(out, test_degree_programs)$questions_stale, "catalog_interpretations/designed.v1.json")
   write_source_json(designed, designed_path)
+  # Change: the list also holds a degree total from the catalog scan, which
+  # names no reading; no reading file can make it stale.
+  utils::write.csv(rbind(drafts$questions, catalog_total_question_designed), file.path(out, "degree_reading_questions.csv"), row.names = FALSE)
+  expect_length(read_degree_drafts(out, test_degree_programs)$questions_stale, 0L)
   # Change: the written list names a settler CEDAR does not know.
   unknown <- drafts$questions; unknown$settled_by <- "registrar"
   utils::write.csv(unknown, file.path(out, "degree_reading_questions.csv"), row.names = FALSE)

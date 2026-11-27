@@ -46,7 +46,7 @@ Dates are source extract dates, not the time you opened the page. The separate
 app-snapshot timestamp identifies when the running app loaded them. Missing
 datasets remain visible as **Not loaded** and missing dates as **Not available**.
 The morning refresh reloads this snapshot; the table does not poll files while
-you browse. Join Integrity and usage analyses only start when opened.
+you browse. Usage analyses only start when opened.
 
 ---
 

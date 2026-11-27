@@ -481,6 +481,20 @@ test_that("conflicting total-credit mentions are flagged without claiming which 
   expect_match(flagged$detail, "Degree Hours \\(structured field\\): 120", perl = TRUE)
   expect_match(flagged$detail, "Grand Total Credits: 130", perl = TRUE)
   expect_match(flagged$detail, "does not say which number is correct", fixed = TRUE)
+  # The flag becomes an item for the catalog to settle on Catalog questions,
+  # with no reading, its two totals and the program's catalog page (it was
+  # the retired Extraction diagnostics tab's one flag worth acting on).
+  saved <- read.csv(file.path(out, "analysis", "source-issues.csv"), colClasses = "character", check.names = FALSE)
+  landing <- catalog_capture_manifest(out, verify_sources = FALSE)$settings$source$landing_url
+  item <- catalog_total_conflict_questions(saved, landing)
+  expect_identical(names(item), CEDAR_CONFIG_FILE_SPECS$degree_reading_questions)
+  expect_identical(item[c("reading", "program_id", "settled_by")],
+    data.frame(reading = "", program_id = "biology", settled_by = "catalog"))
+  testthat::local_edition(3)
+  expect_snapshot(cat(format_catalog_questions(catalog_question_rows(item), "All open questions")))
+  reworded <- saved
+  reworded$detail[reworded$issue == "total_credit_conflict"] <- "Two totals."
+  expect_error(catalog_total_conflict_questions(reworded, landing), "not in the analyser's form")
 
   consistent <- scan_fixture
   consistent$programs$biology$description <- "<p>Grand Total Credits: 120</p>"
@@ -523,16 +537,13 @@ test_that("catalog review connects flagged language to full immutable source con
   index <- list_catalog_review_scans(root)
   expect_equal(index$scan_id, "capture/analysis")
   payload <- load_catalog_review(root, index$scan_id)
-  key <- catalog_review_cache_key(root, index$scan_id)
-  expect_identical(catalog_review_cache_key(root, index$scan_id), key)
   report_path <- file.path(out, "analysis", "REPORT.md")
   report_bytes <- readBin(report_path, "raw", n = file.info(report_path)$size)
-  # A changed artifact cannot enter a warm cache, even at the same byte length.
+  # A changed artifact is refused, even at the same byte length.
   changed_report <- report_bytes; changed_report[1] <- charToRaw("!")
   writeBin(changed_report, report_path)
-  expect_error(catalog_review_cache_key(root, index$scan_id), "modified analysis artifact")
+  expect_error(load_catalog_review(root, index$scan_id), "modified analysis artifact")
   writeBin(report_bytes, report_path)
-  expect_identical(catalog_review_cache_key(root, index$scan_id), key)
   views <- filter_catalog_review(payload, program = "biology")
   # One program, its concentration, and three cyclically linked courses: once each.
   expect_setequal(catalog_review_program_entities(payload$records, "biology"),
@@ -572,7 +583,6 @@ test_that("catalog review connects flagged language to full immutable source con
   write_source_json(meta, meta_path)
   unlink(file.path(out, "analysis", "source-issues.csv"))
   expect_equal(load_catalog_review(root, index$scan_id)$source_check_count, 1)
-  expect_false(identical(catalog_review_cache_key(root, index$scan_id), key))
   # Evidence is checked again on Inspect, even after a page payload was loaded.
   receipt <- payload$records[[1]]$source
   writeBin(charToRaw("changed"), file.path(out, receipt$file))
@@ -593,9 +603,9 @@ test_that("catalog evidence renderer preserves nesting and cannot execute source
   expect_false(grepl("script|onclick|onerror|javascript:|src=|bad\\(", html))
   ui <- as.character(catalogReviewUI("catalog_review", test_degree_catalog, test_degree_roadmaps))
   expect_match(ui, "Visualization rules", fixed = TRUE)
-  expect_match(ui, "not a checklist for approving the visualization", fixed = TRUE)
-  expect_match(ui, "catalog_review-interpretation", fixed = TRUE)
-  expect_match(ui, "Program coverage", fixed = TRUE)
+  # Extraction diagnostics was retired (2026-11-27); its total-credit flags are
+  # catalog questions now.
+  expect_false(grepl('data-value="diagnostics"', ui, fixed = TRUE))
 })
 
 test_that("catalog comparisons separate choice changes, formatting and missing scope", {

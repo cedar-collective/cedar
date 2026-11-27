@@ -554,12 +554,11 @@ test_that("open blue boxes do not grow, and the backlog shrinks on record (M43)"
   allowance <- c(
     "R/modules/cancellations.R" = 1L,
     "R/modules/catalog-normalization.R" = 2L,
-    "R/modules/catalog-review.R" = 4L,
     "R/modules/enrollment-projections.R" = 1L,
     "R/modules/gen-ed.R" = 3L,
     "R/modules/pathways.R" = 4L,
     "R/modules/regstats.R" = 7L,
-    "server.R" = 8L,
+    "server.R" = 7L,
     "ui.R" = 1L
   )
   architecture_expect_ratchet(measured, allowance, "open blue box(es)")

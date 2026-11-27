@@ -540,14 +540,14 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 | `course-topics.R` | `courseTopicsUI/Server` | Course Dynamics > Topics: one course number's topics by term and side by side, with the titles behind each; shown only for a course that offers topics in the campuses picked (the server returns `has_topics`, and `server.R` shows or hides the tab); rates of one-instructor topics behind the instructor gate (`dfw_authenticated`); every number from `build_course_topics()` |
 | `concurrent-by-major.R` | `concurrentByMajorUI/Server` | Course Dynamics > Other Courses > Courses Taken Alongside: per campus, every student's courses as a treemap grouped by college (`plot_concurrent_courses_treemap()`) beside an All students card of the ten largest, then one card per major (the five largest, then All other majors), each course a bar of the group's share, the course's own lab once above the cards; a Term type control under the heading; counts only while Other Courses is open, for the course the report was run for; every number from `get_concurrent_courses_by_major()` |
 | `admin.R` | `dataStatusUI` (static HTML, no server), `changelogUI/Server`, `cacheUI/Server` | Admin freshness, changelog, and cache management |
-| `catalog-review.R` | `catalogReviewUI(id, catalog, roadmaps)`, `catalogReviewServer(id, root, active, catalog, roadmaps, review_root, shared)` | Admin > Data & Usage > Catalog Review; Visualization rules by default, then Draft interpretations and lazy Extraction diagnostics |
+| `catalog-review.R` | `catalogReviewUI(id, catalog, roadmaps)`, `catalogReviewServer(id, root, active, catalog, roadmaps, review_root, shared)` | Admin > Data & Usage > Catalog Review; Visualization rules by default, then Draft interpretations and Catalog questions |
 | `catalog-normalization.R` | `catalogNormalizationUI(id)`, `catalogNormalizationServer(id, root, capture_root, active, draft_dir)` | Versioned local drafts, source/rule comparison, exception cases, edits and whole-unit sign-off; exchange UI deferred, no model calls or runtime planning edits |
 | `ui-helpers.R` | shared UI primitives, not a module: `filter_bar`, `filter_scope_stripe`, `scope_chip`, `headcount_scope_bar`, `info_panel`, `empty_state`, `section_block`, `dept_selector_bar`, …; plus shared table pieces `cedar_tbl_theme` (the reactable theme every table uses) and `cedar_pot_coldef()` (standardized Part-of-Term column) | used across modules and ui.R |
 
 `degreePlanRulesUI/Server(id, catalog, roadmaps)` in `degree-explorer.R` is the default **Visualization
 rules** view in Admin Catalog Review. The graph's rules dialog shares its table
-renderer and `build_degree_plan_rules()` payload. Optional AI drafts and legacy
-parser diagnostics are separate tabs.
+renderer and `build_degree_plan_rules()` payload. The readings' drafts and their
+open questions are separate tabs.
 
 **Layout pattern:**
 ```r

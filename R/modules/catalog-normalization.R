@@ -187,7 +187,7 @@ catalogNormalizationServer <- function(id, root, capture_root, active,
     })
     output$status <- renderUI({
       if (!is.null(error())) return(div(class = "alert alert-danger", error()))
-      if (is.null(index()) || !nrow(index())) return(div(class = "alert alert-info", "No program review packets are available. Prepare them with scripts/normalize-degree-catalog.R. Catalog extraction diagnostics remain available in the other tab."))
+      if (is.null(index()) || !nrow(index())) return(div(class = "alert alert-info", "No program review packets are available. Prepare them with scripts/normalize-degree-catalog.R."))
       req(program(), unit())
       p(class = "text-hint", paste(program()$packet$catalog_title, "·", length(program()$packet$units) - 1L,
         "linked course review units. Captured source bytes are checked when opening requirements or a passage. No proposal changes a semester plan or projection."))

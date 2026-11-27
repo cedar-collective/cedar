@@ -35,6 +35,17 @@ build_demo_sources <- function(cohorts = 5L,
            is_pre_major = FALSE)
   programs <- bind_rows(programs, concurrent)
   degrees <- collect(c(base = "cedar_degrees", graduates = "cedar_degrees_gg"))
+  # A degree whose holder takes no class here stays a unit-test input too. The
+  # pathway fixtures describe their graduates by declarations alone, and the
+  # graduates fixture has one with no record on purpose: in an institution
+  # that is a person who graduated without a course, and a term of such
+  # degrees reads as a second student ID space (check_stored_student_ids()).
+  # No class is invented for them: an authored demo population, with a course
+  # history for every declared person, is on ROADMAP.
+  course_less <- !degrees$student_id %in% students$student_id
+  message("[demo-data.R] Left out ", sum(course_less), " of ", nrow(degrees),
+          " fixture degrees whose holders take no class in the demo")
+  degrees <- degrees[!course_less, ]
 
   term_start <- function(term) as.Date(paste0(term %/% 100L,
     case_when(term %% 100L == 10L ~ "-01-15", term %% 100L == 60L ~ "-06-01",

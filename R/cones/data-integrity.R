@@ -32,10 +32,19 @@
 #' term and never at zero. A hash mismatch is all-or-nothing per term, because
 #' every row in that term came from the same ingest.
 #'
-#' So a table is reported as \code{"split"} only when it has both zero-match
-#' terms and full-match terms. That mixture cannot be explained by population
+#' So a table is reported as \code{"split"} when it has both zero-match terms
+#' and full-match terms. That mixture cannot be explained by population
 #' differences: the same table joins perfectly in some terms and not at all in
-#' others, which means it holds two ID spaces.
+#' others, which means it holds two ID spaces. A table that never joins fully
+#' (applicants, degrees) is \code{"split"} too when one of its terms has no
+#' match while others have some: it should land partway in every term.
+#' Only a table with no match in any term is \code{"no overlap"}.
+#'
+#' A term the spine does not hold is \code{"unjudged"} when none of its IDs
+#' match: its students may not have registered yet (an entering term's
+#' applicants), or have left before the spine begins, so zero is not evidence
+#' of a second ID space there. Such terms count toward no verdict. A term the
+#' spine does not hold that has matches is judged as any other.
 #'
 #' @param spine  Data frame whose ID space is canonical. Pass `cedar_registrations`:
 #'   the class lists are the only source ingested as one continuous series, and
@@ -50,10 +59,11 @@
 #' @return Named list:
 #'   \itemize{
 #'     \item \code{by_term} — tibble: table, term, n_ids, n_matched, pct_matched,
-#'       term_status ("full", "partial", "none")
+#'       term_status ("full", "partial", "none", "unjudged")
 #'     \item \code{by_table} — tibble: table, n_terms, n_terms_full,
-#'       n_terms_partial, n_terms_none, n_ids, n_ids_matched, pct_ids_matched,
-#'       verdict
+#'       n_terms_partial, n_terms_none, n_terms_unjudged, n_ids, n_ids_matched,
+#'       pct_ids_matched, verdict ("split", "no overlap", "consistent", or
+#'       "not judged" when every term is unjudged)
 #'     \item \code{spine} — list(name, n_ids, n_terms)
 #'     \item \code{n_tables_split} — count of tables with verdict "split"
 #'   }
@@ -66,6 +76,8 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
     stop("check_student_id_integrity: `spine` must be a data frame")
   if (!id_col %in% names(spine))
     stop("check_student_id_integrity: spine is missing the id column `", id_col, "`")
+  if (!term_col %in% names(spine))
+    stop("check_student_id_integrity: spine is missing the term column `", term_col, "`")
   if (!is.list(tables) || is.data.frame(tables))
     stop("check_student_id_integrity: `tables` must be a named list of data frames")
   if (length(tables) == 0L)
@@ -85,7 +97,8 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
            paste(absent, collapse = ", "))
   }
 
-  spine_ids <- unique(spine[[id_col]])
+  spine_ids   <- unique(spine[[id_col]])
+  spine_terms <- unique(spine[[term_col]])
 
   by_term <- lapply(names(tables), function(nm) {
     tables[[nm]] %>%
@@ -102,6 +115,8 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
         # "none" is the signature worth naming: records exist for this term and
         # not one of them joins. Population differences never produce it.
         term_status = case_when(
+          # Nobody in a term the spine does not hold may have registered yet.
+          n_matched == 0L & !.term %in% spine_terms ~ "unjudged",
           n_matched == 0L     ~ "none",
           n_matched == n_ids  ~ "full",
           TRUE                ~ "partial"
@@ -118,6 +133,7 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
     terms   <- by_term %>% filter(table == nm)
     n_none  <- sum(terms$term_status == "none")
     n_full  <- sum(terms$term_status == "full")
+    n_unjudged <- sum(terms$term_status == "unjudged")
 
     tibble(
       table           = nm,
@@ -125,17 +141,19 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
       n_terms_full    = n_full,
       n_terms_partial = sum(terms$term_status == "partial"),
       n_terms_none    = n_none,
+      n_terms_unjudged = n_unjudged,
       n_ids           = length(ids),
       n_ids_matched   = sum(ids %in% spine_ids),
       pct_ids_matched = round(100 * sum(ids %in% spine_ids) / length(ids), 1),
       verdict = case_when(
+        n_unjudged == nrow(terms) ~ "not judged",
         # Both extremes present: the table joins perfectly in some terms and not
         # at all in others. Only a hash change explains that.
         n_none > 0 & n_full > 0 ~ "split",
         # Nothing joins anywhere. Either an entirely separate ID space, or a
         # population with no overlap by design. Named distinctly because the
         # evidence does not distinguish them.
-        n_none == nrow(terms)   ~ "no overlap",
+        n_none == nrow(terms) - n_unjudged ~ "no overlap",
         n_none > 0              ~ "split",
         TRUE                    ~ "consistent"
       )
@@ -152,4 +170,29 @@ check_student_id_integrity <- function(spine, tables, opt = list()) {
                           n_terms = n_distinct(spine[[term_col]])),
     n_tables_split = sum(by_table$verdict == "split")
   )
+}
+
+
+#' The check's result as lines for a log
+#'
+#' One line for the spine, one per table with its verdict and term counts, then
+#' every table-term, failures first. The transform prints it at every run
+#' (`check_stored_student_ids()`), so a refresh log shows what the retired
+#' Admin > Join Integrity page showed.
+#'
+#' @param res `check_student_id_integrity()` output.
+#' @return Character vector, one line each.
+format_student_id_integrity <- function(res) {
+  tables <- res$by_table
+  terms <- res$by_term[order(match(res$by_term$term_status, c("none", "partial", "unjudged", "full")),
+                             res$by_term$table, res$by_term$term), ]
+  c(sprintf("Student IDs against %s: %s IDs in %d terms.", res$spine$name,
+            format(res$spine$n_ids, big.mark = ","), res$spine$n_terms),
+    sprintf("%-22s %-11s %d terms: %d full, %d partial, %d with no match, %d not judged; %.1f%% of its IDs match",
+            tables$table, tables$verdict, tables$n_terms, tables$n_terms_full, tables$n_terms_partial,
+            tables$n_terms_none, tables$n_terms_unjudged, tables$pct_ids_matched),
+    "By term (a term the class lists do not hold, with no match, is not judged):",
+    utils::capture.output(print(data.frame(table = terms$table, term = as.character(terms$term),
+      ids = terms$n_ids, matched = terms$n_matched, pct = sprintf("%.1f", terms$pct_matched),
+      status = terms$term_status), row.names = FALSE)))
 }

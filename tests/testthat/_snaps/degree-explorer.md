@@ -28,6 +28,23 @@
         block b-d393fa921001d2c885dde016: Coverage must account for every requested block exactly once (it has no coverage)
         Biology B.S.: the triage names no open item, or names one twice: rule:no-such-rule
 
+# conflicting total-credit mentions are flagged without claiming which number is right
+
+    Code
+      cat(format_catalog_questions(catalog_question_rows(item), "All open questions"))
+    Output
+      # Open questions in the catalog readings
+      
+      All open questions. 1 question in 1 program, each with the start of the catalog passage it is about.
+      
+      ## Biology B.S.
+      
+      https://catalog.example.invalid/#/programs/biology
+      
+      1. Degree total: The catalog gives this degree two totals. Which is right?
+         Total credits: "Degree Hours field: 120; Grand Total Credits: 130"
+         (The catalog; the catalog page, then a new catalog scan)
+
 # the board's math sentence names the route's math course, or says what the start adds (I97)
 
     Code

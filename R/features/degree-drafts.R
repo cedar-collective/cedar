@@ -104,7 +104,8 @@ read_degree_drafts <- function(dir, programs) {
   if (!all(drafts$questions$settled_by %in% c("", names(CATALOG_QUESTION_SETTLERS)))) {
     stop("[degree-drafts.R] ", dir, ": degree_reading_questions.csv has an unknown settled_by")
   }
-  compiled <- unique(drafts$questions[c("reading", "reading_file_sha256")])
+  # The catalog scan's own items name no reading (catalog_total_conflict_questions()).
+  compiled <- unique(drafts$questions[nzchar(drafts$questions$reading), c("reading", "reading_file_sha256")])
   paths <- file.path(dirname(dir), compiled$reading)
   now <- vapply(paths, function(p) if (file.exists(p)) degree_reading_file_sha256(p) else "", "", USE.NAMES = FALSE)
   drafts$questions_stale <- compiled$reading[now != compiled$reading_file_sha256]
