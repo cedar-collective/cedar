@@ -236,6 +236,13 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
 - [ ] **Minors.** Pilot list (English, Spanish, History, …), placed in the top
   band, with authored overlap rules. Asked again 2026-11-23, as a minor
   picker on the map.
+- [ ] **What a major's students take for a Gen Ed card** (user 2026-11-26):
+  the card's pop-up lists the area's courses its majors most often take
+  (MATH 1350 rather than MATH 1220 for a humanities major), from the class
+  list, with a small-cell minimum, and says that transfer and AP credit are
+  not seen and that common is not the same as right for the student. The
+  English routes' tiles follow the same rule next: ENGL 1120 a University
+  requirement, ENGL 1110 preparation (I68).
 - [ ] **Elective guidance.** Reviewed, major-specific suggestions kept apart
   from catalog rules, perhaps as institution Markdown files.
 - [ ] **Advising-reviewed audit.** Conditional alternatives, transfer, grades,
@@ -247,9 +254,17 @@ contracts: [degree-requirements.md](docs/developers/degree-requirements.md),
   [results](docs/developers/catalog-normalization.md#compiling-a-reading-into-board-rows)).
   Compiled boards are published (`--write`, `features/degree-drafts.R`): each
   takes its program's hand board's place on Degree Explorer, labelled a draft
-  until its reading is signed off, then reviewed. Next: readings for programs
-  with no hand board (a draft needs a catalog row for them), and showing a
-  sign-off without a restart.
+  until its reading is signed off, then reviewed; a program with no hand board
+  gets one from its row in `degree_reading_catalogs.csv`. The largest
+  programs with no map (user 2026-11-26): Art Studio B.A. and B.F.A.,
+  Chemical and Computer Engineering, Journalism, Liberal Arts & Integrative
+  Studies, Secondary Ed B.A.Ed. and B.S.Ed., Civil Engineering and
+  Elementary Ed have drafts.
+  Every reading's open questions are on Admin > Catalog Review > Catalog
+  questions, sorted by who can settle each (the catalog, CEDAR's copy of it,
+  or the reading), with a document of the catalog's questions to send.
+  English and Dental Hygiene wait on which path their board follows. Then
+  readings for the hand boards, and showing a sign-off without a restart.
 - [ ] **AI automation** behind the same proposal/review boundary, evaluated on
   the four-program pilot first.
 - [ ] **Routes and constraints.** Selectable elective/science routes, all

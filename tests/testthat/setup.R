@@ -177,6 +177,8 @@ rm(.rn_course_tables)
 # test-degree-explorer.R. Independent of any real institution's annual catalog.
 test_degree_catalog  <<- read_degree_catalog(cedar_institution_dir(cedar_base_dir, "demo"))
 test_degree_roadmaps <<- read_degree_roadmaps(test_degree_catalog, cedar_institution_dir(cedar_base_dir, "demo"))
+# Its programs file, which a draft board's Banner program codes are checked against.
+test_degree_programs <<- read_institution_file("programs", cedar_institution_dir(cedar_base_dir, "demo"))
 
 data_objects <<- list(
   cedar_programs = test_programs,

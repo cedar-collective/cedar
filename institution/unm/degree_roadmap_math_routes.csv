@@ -7,30 +7,30 @@ biology-bs-2026,calculus,Ready for Calculus I,calc1
 biology-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 biology-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 biology-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
-history-ba-2026,calculus,Calculus-ready · statistics route,math1350
-history-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-history-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-history-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
-philosophy-ba-2026,calculus,Calculus-ready · statistics route,math1350
-philosophy-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-philosophy-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-philosophy-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+history-ba-2026,calculus,Calculus-ready,
+history-ba-2026,precalculus,Pre-calculus-ready,
+history-ba-2026,algebra,College-algebra-ready,
+history-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
+philosophy-ba-2026,calculus,Calculus-ready,
+philosophy-ba-2026,precalculus,Pre-calculus-ready,
+philosophy-ba-2026,algebra,College-algebra-ready,
+philosophy-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
 business-bba-2026,calculus,Calculus-ready · statistics route,math1350
 business-bba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
 business-bba-2026,algebra,College-algebra-ready · statistics route,math1350
 business-bba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
-anthropology-ba-2026,calculus,Calculus-ready · statistics route,math1350
-anthropology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-anthropology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-anthropology-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+anthropology-ba-2026,calculus,Calculus-ready,
+anthropology-ba-2026,precalculus,Pre-calculus-ready,
+anthropology-ba-2026,algebra,College-algebra-ready,
+anthropology-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
 physics-bs-2026,calculus,Ready for Calculus I,calc1
 physics-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 physics-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 physics-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
-population-health-bs-2026,calculus,Ready for MATH 1350,math1350
-population-health-bs-2026,precalculus,Ready for MATH 1350,math1350
-population-health-bs-2026,algebra,Ready for MATH 1350,math1350
-population-health-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1350
+population-health-bs-2026,calculus,Calculus-ready,
+population-health-bs-2026,precalculus,Pre-calculus-ready,
+population-health-bs-2026,algebra,College-algebra-ready,
+population-health-bs-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
 medical-laboratory-bs-2026,calculus,Ready for MATH 1220,math1220
 medical-laboratory-bs-2026,precalculus,Ready for MATH 1220,math1220
 medical-laboratory-bs-2026,algebra,Ready for MATH 1220,math1220
@@ -47,14 +47,14 @@ mechanical-engineering-bs-2026,calculus,Ready for Calculus I,calc1
 mechanical-engineering-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 mechanical-engineering-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 mechanical-engineering-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
-psychology-ba-2026,calculus,Calculus-ready · statistics route,math1350
-psychology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-psychology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-psychology-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
-psychology-bs-2026,calculus,Calculus-ready · statistics route,math1350
-psychology-bs-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-psychology-bs-2026,algebra,College-algebra-ready · statistics route,math1350
-psychology-bs-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+psychology-ba-2026,calculus,Calculus-ready,
+psychology-ba-2026,precalculus,Pre-calculus-ready,
+psychology-ba-2026,algebra,College-algebra-ready,
+psychology-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
+psychology-bs-2026,calculus,Calculus-ready,
+psychology-bs-2026,precalculus,Pre-calculus-ready,
+psychology-bs-2026,algebra,College-algebra-ready,
+psychology-bs-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
 criminology-ba-2026,calculus,Calculus-ready · statistics route,math1350
 criminology-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
 criminology-ba-2026,algebra,College-algebra-ready · statistics route,math1350
@@ -71,10 +71,10 @@ biochemistry-bs-2026,calculus,Ready for Calculus I,calc1
 biochemistry-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 biochemistry-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
 biochemistry-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1250|calc1
-political-science-ba-2026,calculus,Calculus-ready · statistics route,math1350
-political-science-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-political-science-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-political-science-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+political-science-ba-2026,calculus,Calculus-ready,
+political-science-ba-2026,precalculus,Pre-calculus-ready,
+political-science-ba-2026,algebra,College-algebra-ready,
+political-science-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
 electrical-engineering-bs-2026,calculus,Ready for Calculus I,calc1
 electrical-engineering-bs-2026,precalculus,Start with Trig / Pre-Calculus (MATH 1250),math1250|calc1
 electrical-engineering-bs-2026,algebra,Start with College Algebra (MATH 1220),math1220|math1250|calc1
@@ -83,15 +83,15 @@ exercise-science-bs-2026,calculus,"Ready for MATH 1220, then statistics",math122
 exercise-science-bs-2026,precalculus,"Ready for MATH 1220, then statistics",math1220|math1350
 exercise-science-bs-2026,algebra,"Start with College Algebra (MATH 1220), then statistics",math1220|math1350
 exercise-science-bs-2026,intermediate,Start with Intermediate Algebra (MATH 1215),math1215|math1220|math1350
-film-digital-arts-ba-2026,calculus,Calculus-ready · statistics route,math1350
-film-digital-arts-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-film-digital-arts-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-film-digital-arts-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
-film-digital-arts-bfa-2026,calculus,Calculus-ready · statistics route,math1350
-film-digital-arts-bfa-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-film-digital-arts-bfa-2026,algebra,College-algebra-ready · statistics route,math1350
-film-digital-arts-bfa-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
-architecture-ba-2026,calculus,Calculus-ready · statistics route,math1350
-architecture-ba-2026,precalculus,Pre-calculus-ready · statistics route,math1350
-architecture-ba-2026,algebra,College-algebra-ready · statistics route,math1350
-architecture-ba-2026,intermediate,"Start with MATH 1215, then statistics",math1215|math1350
+film-digital-arts-ba-2026,calculus,Calculus-ready,
+film-digital-arts-ba-2026,precalculus,Pre-calculus-ready,
+film-digital-arts-ba-2026,algebra,College-algebra-ready,
+film-digital-arts-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
+film-digital-arts-bfa-2026,calculus,Calculus-ready,
+film-digital-arts-bfa-2026,precalculus,Pre-calculus-ready,
+film-digital-arts-bfa-2026,algebra,College-algebra-ready,
+film-digital-arts-bfa-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215
+architecture-ba-2026,calculus,Calculus-ready,
+architecture-ba-2026,precalculus,Pre-calculus-ready,
+architecture-ba-2026,algebra,College-algebra-ready,
+architecture-ba-2026,intermediate,"Start with Intermediate Algebra (MATH 1215)",math1215

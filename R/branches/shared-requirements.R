@@ -134,6 +134,20 @@ read_shared_requirement_bundle <- function(directory, source_directory = NULL) {
        source_bytes_verified = !is.null(source_directory))
 }
 
+#' The Gen Ed areas a program can name its own minimum for
+#'
+#' Every area of the edition's Gen Ed rules except the flexible one, whose
+#' courses come from two other areas (`degree_gen_ed_area_minimums()`).
+#' @param reference `read_shared_requirement_bundle()` output.
+#' @return Character: area codes.
+degree_shared_gen_ed_areas <- function(reference) {
+  gen <- Filter(function(x) !is.null(x$planning), reference$sets)
+  if (length(gen) != 1L) stop("[shared-requirements.R] Need one Gen Ed rule set")
+  areas <- Filter(function(x) identical(x$role, "gen_ed_area") && !identical(x$planning_method, "distinct_areas"),
+                  shared_requirement_nodes(gen[[1]]$rules))
+  vapply(areas, function(x) x$area, "")
+}
+
 #' Source-linked, illustrative coverage from the courses already on a roadmap
 #' Membership is curricular, not enrollment data (CAMPUS_ROLLUP). A course is
 #' consumed once across base/flexible areas; its major credits are never added
@@ -160,6 +174,16 @@ degree_shared_coverage <- function(view, roadmaps, reference) {
   flex <- Filter(function(x) identical(x$planning_method, "distinct_areas"), area_rules)
   if (length(flex) != 1L) stop("[shared-requirements.R] Need one flexible-area rule")
   flex <- flex[[1]]
+  # A program page can ask for more than the University in an area
+  # (degree_gen_ed_area_minimums()); the board's cards cover the larger.
+  own <- degree_gen_ed_area_minimums(view$policy$gen_ed_area_minimums)
+  if (length(setdiff(names(own), areas$area))) {
+    stop("[shared-requirements.R] The plan names a Gen Ed area the shared rules do not: ", paste(setdiff(names(own), areas$area), collapse = ", "))
+  }
+  if (flex$area %in% names(own)) stop("[shared-requirements.R] A program minimum for the flexible area is not planned: ", flex$area)
+  areas$university_minimum <- areas$minimum
+  raised <- areas$area %in% names(own)
+  areas$minimum[raised] <- pmax(areas$minimum[raised], own[areas$area[raised]])
   flex_unit <- flex[["minimum"]] / flex$planning_course_count
   units <- list()
   add_unit <- function(id, courses, area, credits) {
@@ -182,6 +206,20 @@ degree_shared_coverage <- function(view, roadmaps, reference) {
           add_unit(id, courses, area, sum(as.numeric(rows$credits)))
       } else for (j in seq_len(nrow(rows))) add_unit(id, rows$subject_course[j], area, as.numeric(rows$credits[j]))
     }
+    # A lecture and its own lab drawn as two tiles (CHEM 1215, CHEM 1215L) are
+    # the same pairing an authored bundle states: the lab's code is the
+    # lecture's with an L. Unrelated labs are never paired.
+    lab <- view$nodes$node_id[view$nodes$kind != "choice" & view$nodes$node_id != id]
+    lab <- lab[vapply(lab, function(n) identical(components$subject_course[components$node_id == n], paste0(courses, "L")), TRUE)]
+    if (length(courses) == 1L && length(lab) == 1L) {
+      pair <- memberships[memberships$subject_course %in% c(courses, paste0(courses, "L")), ]
+      for (area in unique(pair$area)) {
+        rule <- area_rules[[match(area, vapply(area_rules, function(x) x$area, character(1)))]]
+        rows <- pair[pair$area == area, ]
+        if (identical(rule$planning_method, "related_science") && nrow(rows) == 2L && sum(as.numeric(rows$credits)) >= rule[["minimum"]])
+          add_unit(paste(id, lab, sep = "|"), c(courses, paste0(courses, "L")), area, sum(as.numeric(rows$credits)))
+      }
+    }
     prep <- intersect(courses, preparation)
     # This exception applies to preparation actually on the selected route;
     # a completed-English starting point does not prove prior preparation need.
@@ -201,19 +239,37 @@ degree_shared_coverage <- function(view, roadmaps, reference) {
     if (identical(rule$planning_method, "distinct_areas")) next
     parts <- rule$planning_parts
     if (!length(parts)) parts <- list(list(label = areas$label[areas$area == rule$area], minimum = rule[["minimum"]]))
+    # The program's credits beyond the University's: more of the area, in
+    # cards the size of its last part (a 4-credit science, a 3-credit course),
+    # sourced to the program's page, which asks for them.
+    extra <- areas$minimum[areas$area == rule$area] - rule[["minimum"]]
+    if (extra > 0) {
+      size <- parts[[length(parts)]]$minimum
+      n <- ceiling(extra / size)
+      sizes <- c(rep(size, n - 1L), extra - size * (n - 1L))
+      parts <- c(parts, lapply(sizes, function(s) list(label = areas$label[areas$area == rule$area], minimum = s,
+        source_url = view$catalog$source_url)))
+    }
     for (part in parts) {
       eligible <- Filter(function(u) u$area == rule$area && !any(u$courses %in% used) &&
         !any(u$courses %in% preparation) && u$credits >= part$minimum &&
         (is.null(part$subject_courses) || all(u$courses %in% unlist(part$subject_courses))), units)
       if (length(eligible)) assign_unit(eligible[[1]], rule$area, part$minimum)
-      else needs[nrow(needs) + 1L, ] <- list(rule$area, part$label, part$minimum, source_url(rule))
+      else needs[nrow(needs) + 1L, ] <- list(rule$area, part$label, part$minimum, part$source_url %||% source_url(rule))
     }
   }
   flex_areas <- character()
+  # A program's credits beyond the University's in an area are additional Gen
+  # Ed courses: each such area can fill one flexible choice, as a course on the
+  # board can, and is not planned again.
+  raised <- areas$area[areas$minimum - areas$university_minimum >= flex_unit]
   for (i in seq_len(flex$planning_course_count)) {
     eligible <- Filter(function(u) !any(u$courses %in% used) && !u$area %in% flex_areas && u$credits >= flex_unit, units)
     if (length(eligible)) {
       unit <- eligible[[1]]; assign_unit(unit, flex$area, flex_unit); flex_areas <- c(flex_areas, unit$area)
+    } else if (length(setdiff(raised, flex_areas))) {
+      area <- setdiff(raised, flex_areas)[1]; flex_areas <- c(flex_areas, area)
+      assigned[nrow(assigned) + 1L, ] <- list("", flex$area, flex_unit, paste0("the program's added Area ", area, " credits"))
     } else needs[nrow(needs) + 1L, ] <- list(flex$area, "Flexible Gen Ed choice", flex_unit, source_url(flex))
   }
   areas$planned <- vapply(areas$area, function(area) sum(assigned$credits[assigned$area == area]), numeric(1))

@@ -192,6 +192,7 @@ record) and writes nothing.
 |---|---|
 | a required `course` | one tile |
 | `choose_n` / `any`, or credits from a listed set | one choice, with its options; a two-course option fills two tiles |
+| `choose_n` / `any` with an option that names no course ("one strand", three of them 9 credits of endorsement courses) | elective space for k of its smallest option's credits; k tiles of unknown credits when an option states none (ISSUES I98) |
 | a credit group whose listed courses add to its minimum | each course required |
 | an unlisted credit pool inside a group | elective space, credits ÷ 3 tiles (rounded, at least one) |
 | an unlisted credit rule at the top of the tree | listed for a reviewer, never a tile: the schema cannot tell an elective pool from a total or a residency rule |
@@ -222,6 +223,11 @@ through the same validators (`validate_degree_catalog()`,
 unchanged. With `--analysis DIR` the script builds each draft and prints it
 beside its hand-built board, semester by semester.
 
+- **The degree total** is the reading's: its one top-level credit rule that
+  cites the record's Degree Hours field. The record's field is text ("120", or
+  "A minimum of 128 hours"), so it is never parsed for the number; when it is
+  a bare number, the two must agree, and the build stops naming the program
+  otherwise (ISSUES I99).
 - **Placement.** A lower-division tile starts in semester 1 and an upper-division
   one at the semester most authored plans use (5). The scheduler moves each one
   later for prerequisites and load, as it does for an authored board. An elective
@@ -310,13 +316,23 @@ every compiled board. A board's own rows are written in the same files and
 columns as the authored boards, and `degree_drafts.csv` records where it came
 from: the reading, its packet, unit and staged proposal, the reading's hash,
 and the analysis. Each reading must be staged first
-(`scripts/normalize-degree-catalog.R stage`). A reading whose program has no
-authored board is not written: the draft takes that board's catalog row.
+(`scripts/normalize-degree-catalog.R stage`). A draft takes its authored
+board's catalog row. A program with no authored board takes its row from
+`institution/<id>/degree_reading_catalogs.csv` (the same columns as
+`degree_catalogs.csv`): its names, and the Banner program codes of the
+students it describes, which no reading can supply and are decided in that
+file. A reading with neither is listed and not written. With no hand-built
+board to compare, the script lists the draft's semesters, arrows, conditions
+and courses on their own.
 
 At startup (`R/features/degree-drafts.R`) the app reads the folder and puts
 each draft in place of the authored board with the same catalog id, keeping
-the degree list's order and every link to the board. The result passes the
-same validators. Catalog Review keeps the authored boards, the baseline the
+the degree list's order and every link to the board; a draft for a program
+with no authored board follows the authored ones. The result passes the same
+validators: each draft's Banner program codes are checked against
+`programs.csv` like an authored board's, a code on two boards stops startup,
+and so does a draft whose codes differ from its authored board's (codes
+decided after it was compiled: recompile). Catalog Review keeps the authored boards, the baseline the
 compiler is compared with; their files are not edited.
 
 A compiled board is labelled in the degree list ("· draft") and on the board's
@@ -326,6 +342,98 @@ reason on the label's hover, when the store is missing, the reading isn't
 staged, it isn't signed off, or it was signed off after edits (recompile from
 the edited reading). The status is read once at startup, so a sign-off shows
 after the next restart.
+
+### Open questions and who can settle them
+
+A reading lists what it could not settle from the catalog: its `questions`,
+each citing a passage, and its `unresolved` rules. Each such open item has a
+key within its reading: `rule:<node id>`, `passage:<block id>` (a passage
+left unresolved with no rule) or `question:<n>` (its n-th question). These
+are the open cases Catalog Review lists for the reading before anyone reviews
+it (`catalog_normalization_issues()`).
+
+Each reading says who can settle each item, in a `triage` beside its
+`proposal`:
+
+```json
+"triage": [
+  {"item": "rule:core-total", "settled_by": "catalog"},
+  {"item": "question:1", "settled_by": "capture"}
+]
+```
+
+| `settled_by` | On the page | When |
+|---|---|---|
+| `catalog` | The catalog | the catalog contradicts itself, is unclear or names nothing; the department or the catalog office answers, and the catalog changes |
+| `capture` | CEDAR's copy of the catalog | the catalog says it on a linked page or footnote CEDAR's copy did not keep; the scan is fixed |
+| `reading` | CEDAR's reading | the catalog leaves a choice and the reading planned it one way; a reviewer confirms or changes the reading |
+
+The triage is outside the proposal. Staging reads only the proposal, so
+changing the triage changes no packet, staged key or sign-off. An item the
+triage does not name is listed as "Not sorted yet", and the compile script
+prints it. A triage entry that names no open item, names one twice or gives
+another value stops the compile.
+
+`--write` lists every open item of every program's latest reading, with or
+without a board, in `degree_drafts/degree_reading_questions.csv`. Each row
+holds the item, the passage's section and full text from the packet, who can
+settle it, the program's catalog page, and the reading file with its hash.
+The app reads the list at startup (`read_degree_drafts()`); it never needs
+the review store. A reading edited since the list was compiled is named
+above the list until the boards are recompiled.
+
+**Admin > Data & Usage > Catalog Review > Catalog questions** shows the list
+(`R/features/catalog-questions.R`, `R/modules/catalog-questions.R`):
+
+- **The list:** filtered by who can settle each item and by program. Each row
+  names the file and item to change.
+- **"Download these questions":** the list as shown, as a Markdown document
+  for the department or the catalog office (`format_catalog_questions()`),
+  with each question, the start of its passage and the program's catalog
+  page.
+- **Boards compiled from a reading:** each draft board, whether its reading
+  is signed off, and its catalog row's note (what the board leaves out).
+  Degree Explorer's "Rules behind this plan" shows the same note.
+
+**To settle an item:**
+
+- When the catalog or the scan changes, prepare the new edition's packets and
+  read them again. For the current edition, write a new version of the reading
+  (`<name>.v<n+1>.json`) that drops the question or resolves the rule.
+- To change only who can settle an item, edit the reading's `triage` in place.
+- Then stage the readings and recompile with `--write`.
+- A mapping decision a question raises, such as which Banner codes a board
+  claims, is made in `degree_reading_catalogs.csv` or `programs.csv`.
+
+### Gen Ed and remainder pools
+
+A program page lists some credit without naming courses: Gen Ed by area
+("Humanities: 3 credit hours chosen from the General Education curriculum
+list") or what remains of the University's requirements ("Additional
+coursework to meet remaining University requirements"). Its wording cannot
+tell these from a pool with a real restriction ("12 credits outside the
+major"), so a reading names them in `gen_ed_pools`, beside its `proposal`:
+
+```json
+"gen_ed_pools": [
+  {"rule": "add-math", "area": "II"},
+  {"rule": "additional-gened", "area": ""}
+]
+```
+
+`rule` is an unlisted pool of the reading; `area` is a Gen Ed area of the
+edition's shared rules, or empty for the remainder. A named pool draws no
+tiles (`degree_reading_gen_ed_pools()`): the board's Gen Ed cards cover the
+areas and its elective cards the rest, and an area pool's credits become the
+plan's `gen_ed_area_minimums` (`III:8|VA:6`), which raise that area's Gen Ed
+cards where they ask for more than the University. Every other unlisted pool
+stays an elective tile. A pool that is not an unlisted pool of the reading,
+is named twice, names an unknown area or, for an area, states no credits
+stops the compile. So does naming pools for a board with no profile in the
+edition's `bundle.json`, which would get no Gen Ed cards to cover them. Like
+the triage, the pools are outside the proposal, so naming one changes no
+packet, staged key or sign-off. The rule they implement:
+[degree-explorer-rules.md](degree-explorer-rules.md#what-students-should-see).
 
 ## Where draft interpretations live
 

@@ -1,0 +1,4877 @@
+{
+  "schema_version": "1.0.0",
+  "version": 1,
+  "catalog_id": "68a34618094c97cf857f1ec1",
+  "program_id": "Sy7aQgQci9",
+  "unit_key": "0d3a45b514236b8686a5feeb94502af2046dd00efa4d5759f486b7d71fe57149",
+  "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-26; no API call.",
+  "scope": "Program and embedded concentrations only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+  "proposal": {
+    "schema_version": "1.1.0",
+    "nodes": [
+      {
+        "id": "admit-premajor",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Admitted to the department as a pre-major, then reviewed for admission to the B.S.Ch.E.",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Freshmen and transfer students are admitted to the department as pre-majors and reviewed for admission to the B.S.Ch.E. after meeting its admission requirements",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-008a4b950c69296454b29171",
+            "quote": "Freshmen and transfer students are admitted directly to the Department of Chemical and Biological Engineering as pre-major students."
+          }
+        ]
+      },
+      {
+        "id": "admit-gpa",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Cumulative overall grade point average of at least 2.30",
+        "minimum": 2.3,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "Cumulative overall GPA",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cf7d74476e323921ffcb4f1b",
+            "quote": "Earn a cumulative overall GPA of at least 2.30;"
+          }
+        ]
+      },
+      {
+        "id": "admit-technical",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "all",
+        "label": "Grade point average of at least 2.50, and C or better in each, in the Footnote 1 technical courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae2ece7cbb5bc09657709fe2",
+            "quote": "Earn a cumulative GPA of at least 2.50 and grades of"
+          },
+          {
+            "block_id": "b-bef5fafb8e6e0d9cfe3d1731",
+            "quote": "Major admission to the B.S.Ch.E. program requires completion of these technical courses"
+          }
+        ]
+      },
+      {
+        "id": "admit-technical-grades",
+        "parent_id": "admit-technical",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "C or better in each of the technical courses",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The technical courses identified in Footnote 1 of the requirement table, which the capture does not include",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae2ece7cbb5bc09657709fe2",
+            "quote": "grades of"
+          }
+        ]
+      },
+      {
+        "id": "admit-technical-gpa",
+        "parent_id": "admit-technical",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "gpa",
+        "label": "Grade point average of at least 2.50 in the technical courses",
+        "minimum": 2.5,
+        "maximum": null,
+        "unit": "gpa",
+        "comparison": "at_least",
+        "value": "The technical courses identified in Footnote 1",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae2ece7cbb5bc09657709fe2",
+            "quote": "Earn a cumulative GPA of at least 2.50"
+          }
+        ]
+      },
+      {
+        "id": "admit-footnote",
+        "parent_id": "admit-technical",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "unresolved",
+        "label": "Which courses are the Footnote 1 technical courses?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Admission names the technical courses of Footnote 1 of the requirement table; the captured table has no footnotes",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ae2ece7cbb5bc09657709fe2",
+            "quote": "Footnote 1 of the Bachelor of Science in Chemical Engineering requirement table below"
+          }
+        ]
+      },
+      {
+        "id": "admit-engl1110",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "ENGL 1110 or the equivalent with C or better",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "ENGL 1110 or the equivalent with a grade of C or better; ENGL 1110 is not in this capture's course registry",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4941508ec7ad4fe13767c0fd",
+            "quote": "Complete ENGL 1110 or the equivalent with a grade of"
+          }
+        ]
+      },
+      {
+        "id": "admit-standing",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "restriction",
+        "label": "Good academic standing with the School of Engineering",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Good academic standing with the School of Engineering, as its section of the Catalog defines it",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-dc49a10604fd0a0cd62ac61b",
+            "quote": "Be in good academic standing with the School of Engineering."
+          }
+        ]
+      },
+      {
+        "id": "admit-candidacy",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "admission",
+        "kind": "program_admission",
+        "label": "Admission as a major in the department is required for candidacy",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Admission as a major in the Department of Chemical and Biological Engineering is required for consideration of candidacy for the B.S.Ch.E.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "programs:Sy7aQgQci9",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-919714eb6fe0771cbe8e9193",
+            "quote": "Admission as a major in the Department of Chemical and Biological Engineering is required for consideration of candidacy for the B.S.Ch.E. degree program."
+          }
+        ]
+      },
+      {
+        "id": "grades",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "C- or better in every CBE course and C or better in every other course",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "A minimum grade of C- for all CBE courses and of C for all other courses",
+        "minimum_grade": "C-",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6326d2392e66085857a4777f",
+            "quote": "A minimum grade of \"C-\" or better is required for all CBE courses. A minimum grade of \"C\" is required for all other courses."
+          },
+          {
+            "block_id": "b-2568ef6d0517bdbd57ee9f12",
+            "quote": "A minimum grade of \"C-\" or better is required for all CBE courses. A minimum grade of \"C\" is required for all other courses."
+          }
+        ]
+      },
+      {
+        "id": "d-policy",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "A course whose highest grade is D+ or less cannot count toward the degree",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Students admitted or readmitted to the B.S.Ch.E. may not apply a course whose highest grade is D+ or less, wherever earned",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-952218181b783f3558937952",
+            "quote": "may not apply a course toward the degree if the highest grade earned in the course is a \"D+\" or less, regardless of where that grade was earned"
+          },
+          {
+            "block_id": "b-604e17b61b312604f7cb250a",
+            "quote": "Policy on \"D\" or \"D+\" Grades"
+          }
+        ]
+      },
+      {
+        "id": "core-sequence",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "policy",
+        "kind": "restriction",
+        "label": "Program core courses are taken in the order and semester the curriculum lists them, to avoid delaying graduation",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Program core courses must be taken in the order and semester in which they are listed in the curriculum to avoid a delay in graduation",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ceebd6ceb57603425f35353c",
+            "quote": "Program core courses must be taken in the order and semester in which they are listed in the curriculum to avoid a delay in graduation."
+          }
+        ]
+      },
+      {
+        "id": "graduation-application",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "File an application for graduation in the junior year of the program",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Students file an application for graduation in the junior year of the CBE program",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-677c822e26a12b3947a13134",
+            "quote": "Students must file an application for graduation in the Junior year of the CBE program."
+          }
+        ]
+      },
+      {
+        "id": "required",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Complete every required course",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d5154f2e0f0d2e4a4f778fa3",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe101",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE101 - Introduction to Chemical and Biological Engineering (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1zFlcE5s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e4227f46ffd4770064dcc841",
+            "quote": "CBE101 - Introduction to Chemical and Biological Engineering (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1215",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215 - General Chemistry I for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyFq5N9i9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9a535d1c75e9e03897cba14b",
+            "quote": "CHEM1215 - General Chemistry I for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1215l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJxj7cVqo9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-97771f6122c8ba8a9316080a",
+            "quote": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-engl1120",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ENGL1120 - Composition II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1fVV5N5sq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3db3a0f8a26b9537178edea8",
+            "quote": "ENGL1120 - Composition II (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math1512",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1512 - Calculus I (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hkf4V545s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-029b5d7a6679f54120e716b4",
+            "quote": "MATH1512 - Calculus I (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe102",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE102 - Addressing Societal Challenges using the Tools of Chemical and Biological Engineering (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByDm5Vcj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-157fa0bdcc990c64358d3221",
+            "quote": "CBE102 - Addressing Societal Challenges using the Tools of Chemical and Biological Engineering (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1225",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225 - General Chemistry II for STEM Majors (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJLYX5N9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-99db40b0a3d628571cc0ef69",
+            "quote": "CHEM1225 - General Chemistry II for STEM Majors (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem1225l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1yh54qs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-83fb040bcee638d317ea6dcc",
+            "quote": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-math1522",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH1522 - Calculus II (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyyUq45s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-41b7277c97b8c27239e69eb9",
+            "quote": "MATH1522 - Calculus II (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-phys1310",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1310 - Calculus-Based Physics I (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJws9N9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d064c54f4c43780a9181a337",
+            "quote": "PHYS1310 - Calculus-Based Physics I (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe251",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE251 - Chemical Process Calculations (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJxHRFN5iq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-391f7f4a63531d2b242014b1",
+            "quote": "CBE251 - Chemical Process Calculations (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem303l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM303L - Organic Chemistry Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkrNmqNcs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a006b966b5177e1f91cd3202",
+            "quote": "CHEM303L - Organic Chemistry Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem301",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM301 - Organic Chemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B12N9E9jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c4178779cee534b92e672f8a",
+            "quote": "CHEM301 - Organic Chemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math2531",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH2531 - Calculus III (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SybO_545oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-b22e493e7ed78b100500dd9a",
+            "quote": "MATH2531 - Calculus III (4)"
+          }
+        ]
+      },
+      {
+        "id": "req-phys1320",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "PHYS1320 - Calculus-Based Physics II (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkAa545oq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-738eb502d9a671f4679c6a67",
+            "quote": "PHYS1320 - Calculus-Based Physics II (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe253",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE253 - Chemical and Biological Engineering Computing (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rk8GoVqs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e2fd4eb9338c0b6d528facd7",
+            "quote": "CBE253 - Chemical and Biological Engineering Computing (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe302",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE302 - Chemical Engineering Thermodynamics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkJ-j45oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c75e16c68d013bc2be589b36",
+            "quote": "CBE302 - Chemical Engineering Thermodynamics (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem302",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM302 - Organic Chemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1U-6949o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-744b4727519ecafcd069e8c9",
+            "quote": "CHEM302 - Organic Chemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-chem312",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM312 - Physical Chemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hk7xsN5j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9dfc795f9fdb20ffa2495758",
+            "quote": "CHEM312 - Physical Chemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-math316",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH316 - Applied Ordinary Differential Equations (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hy-iMcV9s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-921e215a189d4b091393285d",
+            "quote": "MATH316 - Applied Ordinary Differential Equations (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe311",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE311 - Introduction to Transport Phenomena (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJPbAK4qo5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3d07e0c993ae2573996024df",
+            "quote": "CBE311 - Introduction to Transport Phenomena (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe317",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE317 - Numerical Methods for Chemical and Biological Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1xYjqEco5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-57f5a49aaa3f855c716a06da",
+            "quote": "CBE317 - Numerical Methods for Chemical and Biological Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe318l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE318L - Chemical Engineering Laboratory I : Introduction to Experimentation (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJ3D9E5o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0bafb9353ab5e04056e88a4d",
+            "quote": "CBE318L - Chemical Engineering Laboratory I : Introduction to Experimentation (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe213",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE213 - Laboratory Electronics for Nuclear, Chemical and Biological Engineers (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1GCFEqi5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d1dd1d16330baeefb842ceb6",
+            "quote": "CBE213 - Laboratory Electronics for Nuclear, Chemical and Biological Engineers (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe319l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE319L - Chemical Engineering Laboratory II (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByZd5Ncsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c10da73a668eaae079e00f39",
+            "quote": "CBE319L - Chemical Engineering Laboratory II (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe321",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE321 - Mass Transfer (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJBXcE9o9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7a8bc8c64f4751a85d6fd0cb",
+            "quote": "CBE321 - Mass Transfer (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe371",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE371 - Introduction to Materials Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SklPB9N5jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-149d914a83e1595edf8b3690",
+            "quote": "CBE371 - Introduction to Materials Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-ce350",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE350 - Engineering Economy (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryZEyjEcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4ce45635af760fda68c4a0f4",
+            "quote": "CE350 - Engineering Economy (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe312",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE312 - Unit Operations (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1XMhqNqj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e487f03a93588bbf11f83c91",
+            "quote": "CBE312 - Unit Operations (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe418l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE418L - Chemical Engineering Laboratory III (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkGwxoE5jq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a868a4f8d2b769044e2bd17e",
+            "quote": "CBE418L - Chemical Engineering Laboratory III (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe454",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE454 - Process Dynamics and Control (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Sk0aq4co5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d3cb55d84879535080f65d11",
+            "quote": "CBE454 - Process Dynamics and Control (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe461",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE461 - Chemical Reactor Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyVAaKE9sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c5e053126162f19aca1f163e",
+            "quote": "CBE461 - Chemical Reactor Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe486",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE486 - Introduction to Statistics and Design of Experiments (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1vgcVcj5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-01a5509c3e72ee1c4b961a84",
+            "quote": "CBE486 - Introduction to Statistics and Design of Experiments (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe493l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE493L - Chemical Engineering Design (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByBCB54cjq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ef213efbdc7e7eddfd7d244b",
+            "quote": "CBE493L - Chemical Engineering Design (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe419l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE419L - Chemical Engineering Laboratory IV (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rkg7054coq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6f4c6b9c4cb18fc792697084",
+            "quote": "CBE419L - Chemical Engineering Laboratory IV (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe451",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE451 - Senior Seminar (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BygwxsEcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-21dd6e8d6faf80e1a849d4e9",
+            "quote": "CBE451 - Senior Seminar (1)"
+          }
+        ]
+      },
+      {
+        "id": "req-cbe494l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE494L - Advanced Chemical Engineering Design (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkWUq4qo5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4ad34edf84e6b3de3b8254df",
+            "quote": "CBE494L - Advanced Chemical Engineering Design (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-biol2101",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2101 - Principles of Biology: Molecules to Cells (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkBGJYYNi"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ff62a45ec37c1978849c891a",
+            "quote": "BIOL2101 - Principles of Biology: Molecules to Cells (3)"
+          }
+        ]
+      },
+      {
+        "id": "req-biol2103l",
+        "parent_id": "required",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2103L - Principles of Biology: Introductory Laboratory (1)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJ5cydt4o"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-be30e87d1b9922f625c364a6",
+            "quote": "BIOL2103L - Principles of Biology: Introductory Laboratory (1)"
+          }
+        ]
+      },
+      {
+        "id": "technical-electives",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 6 credits of technical electives within a concentration",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Technical electives within a concentration",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7d165f566d6dfff4d158a367",
+            "quote": "Earn at least 6 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-13c20778ad0542a528e448c1",
+            "quote": "Technical electives within a concentration."
+          },
+          {
+            "block_id": "b-96d258fbba8abee677b85f3d",
+            "quote": "B.S.Ch.E. concentrations consist of 6 credit hours of technical electives."
+          },
+          {
+            "block_id": "b-51d998bced97f6f7674ddb34",
+            "quote": "\"concentrationRequiredYes\""
+          }
+        ]
+      },
+      {
+        "id": "other-degree",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 15 credits of additional course work toward the remaining University requirements",
+        "minimum": 15,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "Additional course work to meet remaining University requirements, including UNM's General Education Program",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-aa068b89d8cda6f643bcfb92",
+            "quote": "Earn at least 15 credits from the following types of courses:"
+          },
+          {
+            "block_id": "b-2fce31590afe710c9cc288ee",
+            "quote": "Additional coursework to meet remaining University requirements."
+          }
+        ]
+      },
+      {
+        "id": "general-education",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Complete UNM's General Education and other general undergraduate degree requirements",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "All undergraduate students fulfill UNM's General Education Program requirements and other general undergraduate degree requirements to earn a minimum of 120 credits; some courses in a program's requirements may also fulfill General Education; General Education courses may be taken whenever convenient.",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2fce31590afe710c9cc288ee",
+            "quote": "all undergraduate students are required to fulfill UNM"
+          },
+          {
+            "block_id": "b-11b87b546f1ce33b04bbe9f5",
+            "quote": "General Education curriculum courses may be taken whenever convenient."
+          }
+        ]
+      },
+      {
+        "id": "degree-total",
+        "parent_id": "",
+        "entity_id": "programs:Sy7aQgQci9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "At least 121 degree credits",
+        "minimum": 121,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f40c60a1d9908ad0386a6ac1",
+            "quote": "Grand Total Credits: 121"
+          },
+          {
+            "block_id": "b-d999198df687a343062f46a7",
+            "quote": "Credit hours required for graduation: 121"
+          },
+          {
+            "block_id": "b-0f1461fd4ea3768a7ecdf044",
+            "quote": "\"121\""
+          }
+        ]
+      },
+      {
+        "id": "bio",
+        "parent_id": "",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Bioengineering concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e17d627807d13fb37eb355f9",
+            "quote": "Earn at least 6 credits from the following:"
+          },
+          {
+            "block_id": "b-867b83ad71d84c9c1b8f4173",
+            "quote": "Technical Electives"
+          }
+        ]
+      },
+      {
+        "id": "bio-electives",
+        "parent_id": "bio",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Bioengineering: at least 6 credits from the listed technical electives",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e17d627807d13fb37eb355f9",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "bio-bioc423",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOC423 - Introductory Biochemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skdz94co9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-7718ec6581970672e0a2091c",
+            "quote": "BIOC423 - Introductory Biochemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-biol2305",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2305 - Microbiology for Health Sciences (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HydOqE9oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2c0ed0debfbafc4d1fecef4d",
+            "quote": "BIOL2305 - Microbiology for Health Sciences (4)"
+          }
+        ]
+      },
+      {
+        "id": "bio-biol2410c",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL2410C - Principles of Biology: Genetics Lecture and Laboratory (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ryb-545s5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-895b9e9a5e9b61fb5add81a6",
+            "quote": "BIOL2410C - Principles of Biology: Genetics Lecture and Laboratory (4)"
+          }
+        ]
+      },
+      {
+        "id": "bio-biol492",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL492 - Introductory Mathematical Biology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1-p89Vcic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-aa525cb7d141f57841f51b82",
+            "quote": "BIOL492 - Introductory Mathematical Biology (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-biol592",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BIOL592 - Introductory Mathematical Biology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1E1w9E5oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-96dc83d687792cbb78ecbe50",
+            "quote": "BIOL592 - Introductory Mathematical Biology (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-bme575",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BME575 - Biomechanics (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJltIcVcjc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-80b7d086b6cc360fe6f7eab3",
+            "quote": "BME575 - Biomechanics (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-bme581",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BME581 - Colloidal Nanocrystals for Biomedical Applications (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1HgqV5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1764dbe98ef076d12e3accbb",
+            "quote": "BME581 - Colloidal Nanocrystals for Biomedical Applications (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-bme558",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "BME558 - Methods of Analysis in Bioengineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJYgcE5o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-51a8342a09e5f32123a2c6ed",
+            "quote": "BME558 - Methods of Analysis in Bioengineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe417",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE417 - Applied Biology for Biomedical Engineers (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1bK9qVcsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-cb2f1ac60b67b2b3ac9e2a2c",
+            "quote": "CBE417 - Applied Biology for Biomedical Engineers (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe472",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE472 - Biomaterials Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1zSyqE9j9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-94d391fdbb113446a17484c1",
+            "quote": "CBE472 - Biomaterials Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe479",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE479 - Tissue Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyUvgoV5oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-20fdf905b7a03d0db3c430eb",
+            "quote": "CBE479 - Tissue Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe499",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE499 - Selected Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hyx89Nqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-76665ae3e39666acb6e38628",
+            "quote": "CBE499 - Selected Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-chem471",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM471 - Advanced Topics in Chemistry (2 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1b47qV5jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-034cc951c60cda3d90ac9fe1",
+            "quote": "CHEM471 - Advanced Topics in Chemistry (2 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe412",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE412 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1nJq49j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-1c11d3d6b7bcad9f23d8b562",
+            "quote": "CBE412 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe512",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE512 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJ7-oVqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4773d358ed226aaa6319589c",
+            "quote": "CBE512 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe517",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE517 - Applied Biology for Biomedical Engineers (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1rS9N9j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-69096559c663b9d29fae6931",
+            "quote": "CBE517 - Applied Biology for Biomedical Engineers (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe572",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE572 - Biomaterials Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Skg9Iq49i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-511baf7a9d759b96703fa1ea",
+            "quote": "CBE572 - Biomaterials Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-cbe515",
+        "parent_id": "bio-electives",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE515 - Special Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJWvd9Vci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a8bb6bc3ac4a043ddf54e006",
+            "quote": "CBE515 - Special Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "bio-total",
+        "parent_id": "",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Bioengineering concentration: 6 credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e4de25ff5b9f6b9f053dccdb",
+            "quote": "Grand Total Credits: 6"
+          }
+        ]
+      },
+      {
+        "id": "bio-policy",
+        "parent_id": "",
+        "entity_id": "specializations:SytLQ_jiq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Bioengineering: technical electives chosen with the Faculty Advisor; ROTC and CBE 491 substitutions",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "6 credit hours of technical electives chosen in consultation with the Faculty Advisor; the Director of Undergraduate Programs may allow up to 6 credit hours for students taking required ROTC courses in aerospace or naval science; one technical elective can be replaced with 3 credit hours of CBE 491, a research project supervised by departmental faculty, with the advance approval of the Director of Undergraduate Programs",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-80589700b2e1eeca6a00b65e",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          },
+          {
+            "block_id": "b-80589700b2e1eeca6a00b65e",
+            "quote": "The Director of Undergraduate Programs may allow up to 6 credit hours of technical electives for students taking required ROTC courses in aerospace or naval science."
+          },
+          {
+            "block_id": "b-80589700b2e1eeca6a00b65e",
+            "quote": "One technical elective can be replaced with 3 credit hours of CBE 491"
+          }
+        ]
+      },
+      {
+        "id": "process",
+        "parent_id": "",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Chemical Process Engineering concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-47aa7e58f6d9ff5d04049678",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "process-electives",
+        "parent_id": "process",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Chemical Process Engineering: at least 6 credits from the listed technical electives",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-47aa7e58f6d9ff5d04049678",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "process-math311",
+        "parent_id": "process-electives",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH311 - Vector Analysis (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ByEzo49j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bfdb8913ffa2e4a4c372ec8f",
+            "quote": "MATH311 - Vector Analysis (3)"
+          }
+        ]
+      },
+      {
+        "id": "process-math312",
+        "parent_id": "process-electives",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH312 - Partial Differential Equations for Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkepYEciq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f44dd18d55369335babdaf01",
+            "quote": "MATH312 - Partial Differential Equations for Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "process-math313",
+        "parent_id": "process-electives",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH313 - Complex Variables (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HygfL54qs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-df44e20e3628edf095c53cbf",
+            "quote": "MATH313 - Complex Variables (3)"
+          }
+        ]
+      },
+      {
+        "id": "process-math314",
+        "parent_id": "process-electives",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "MATH314 - Linear Algebra with Applications (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJ-NMj49sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0ecd6b84e32de5a342aa246c",
+            "quote": "MATH314 - Linear Algebra with Applications (3)"
+          }
+        ]
+      },
+      {
+        "id": "process-stat345",
+        "parent_id": "process-electives",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "course",
+        "label": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkgPvcV5sc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-67e08ddbbcd2a86be5763d50",
+            "quote": "STAT345 - Elements of Mathematical Statistics and Probability Theory (3)"
+          }
+        ]
+      },
+      {
+        "id": "process-total",
+        "parent_id": "",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Chemical Process Engineering concentration: 6 credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-8362751fc022937452c86380",
+            "quote": "Grand Total Credits: 6"
+          }
+        ]
+      },
+      {
+        "id": "process-policy",
+        "parent_id": "",
+        "entity_id": "specializations:rkgtI7doj9",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Chemical Process Engineering: technical electives chosen with the Faculty Advisor; ROTC and CBE 491 substitutions",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "6 credit hours of technical electives chosen in consultation with the Faculty Advisor; the Director of Undergraduate Programs may allow up to 6 credit hours for students taking required ROTC courses in aerospace or naval science; one technical elective can be replaced with 3 credit hours of CBE 491, a research project supervised by departmental faculty, with the advance approval of the Director of Undergraduate Programs",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e6f322755f98cff68e2067c4",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          },
+          {
+            "block_id": "b-e6f322755f98cff68e2067c4",
+            "quote": "The Director of Undergraduate Programs may allow up to 6 credit hours of technical electives for students taking required ROTC courses in aerospace or naval science."
+          },
+          {
+            "block_id": "b-e6f322755f98cff68e2067c4",
+            "quote": "One technical elective can be replaced with 3 credit hours of CBE 491"
+          }
+        ]
+      },
+      {
+        "id": "env",
+        "parent_id": "",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Environmental Engineering concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c9e9e3164fa73a79d93b46d5",
+            "quote": "Earn at least 6 credits from the following:"
+          },
+          {
+            "block_id": "b-eb3f9ec50b553ba5a8f1b0e1",
+            "quote": "Technical Electives"
+          }
+        ]
+      },
+      {
+        "id": "env-electives",
+        "parent_id": "env",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Environmental Engineering: at least 6 credits from the listed technical electives",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c9e9e3164fa73a79d93b46d5",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "env-ce335",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE335 - Environmental and Water Resources Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJxz8qEcsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-35ce293b0b8744c7ae73e93f",
+            "quote": "CE335 - Environmental and Water Resources Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce431",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE431 - Physical-Chemical Water and Wastewater Treatment (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SJ4Y3cNcs5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f6eb206f0c4a69bbc7beb196",
+            "quote": "CE431 - Physical-Chemical Water and Wastewater Treatment (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce436",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE436 - Biological Wastewater Treatment (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJWuz9Nqo5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a7498e1a7cac5b0e3cce06fd",
+            "quote": "CE436 - Biological Wastewater Treatment (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce438",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE438 - Sustainable Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkxHU9Vcs9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-030d1e8cafeccbe289b58cf3",
+            "quote": "CE438 - Sustainable Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-eps462",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS462 - Hydrogeology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HyWs1qEqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-d2fd994bd44f94716e0e0fc0",
+            "quote": "EPS462 - Hydrogeology (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-eps415",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS415 - Geochemistry of Natural Waters (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJNbitVci9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-de9e5af57a89c8249577d1ed",
+            "quote": "EPS415 - Geochemistry of Natural Waters (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce531",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE531 - Physical-Chemical Water and Wastewater Treatment (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SyGvqN9o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-815ef53f4ef2390bfd784adb",
+            "quote": "CE531 - Physical-Chemical Water and Wastewater Treatment (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce536",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE536 - Biological Wastewater Treatment (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:SkG0y5E5o5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c4470ab8c0941217de1d58dc",
+            "quote": "CE536 - Biological Wastewater Treatment (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-ce538",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE538 - Sustainable Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B14TW94qi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a5ca389c5b6452c6a9101e21",
+            "quote": "CE538 - Sustainable Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-eps515",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS515 - Geochemistry of Natural Waters (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Bylqz9Eqsq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-9cc78ae11d1ea8355cf9fd95",
+            "quote": "EPS515 - Geochemistry of Natural Waters (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-eps562",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS562 - Hydrogeology (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1eWpq45i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-2b92b421ec18ec9866a90550",
+            "quote": "EPS562 - Hydrogeology (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-cbe512",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE512 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJ7-oVqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-240edec48ede1050045c8dfc",
+            "quote": "CBE512 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-cbe477",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE477 - Electrochemical Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJLZ9V5ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-479404e9b0dff499247a90f6",
+            "quote": "CBE477 - Electrochemical Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-cbe577",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE577 - Electrochemical Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJfJoNcj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-6890570e557fb83d968798ed",
+            "quote": "CBE577 - Electrochemical Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "env-cbe499",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE499 - Selected Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hyx89Nqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-bb8fff093c4204ed70101732",
+            "quote": "CBE499 - Selected Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "env-cbe515",
+        "parent_id": "env-electives",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE515 - Special Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJWvd9Vci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3c98ad45a0fa2302fe331cc4",
+            "quote": "CBE515 - Special Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "env-total",
+        "parent_id": "",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Environmental Engineering concentration: 6 credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f2a6ac4b3105fa73223c1fb1",
+            "quote": "Grand Total Credits: 6"
+          }
+        ]
+      },
+      {
+        "id": "env-policy",
+        "parent_id": "",
+        "entity_id": "specializations:HytI7uioq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Environmental Engineering: technical electives chosen with the Faculty Advisor; ROTC and CBE 491 substitutions",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "6 credit hours of technical electives chosen in consultation with the Faculty Advisor; the Director of Undergraduate Programs may allow up to 6 credit hours for students taking required ROTC courses in aerospace or naval science; one technical elective can be replaced with 3 credit hours of CBE 491, a research project supervised by departmental faculty, with the advance approval of the Director of Undergraduate Programs",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0028f6ec2bb6061913b3781a",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          },
+          {
+            "block_id": "b-0028f6ec2bb6061913b3781a",
+            "quote": "The Director of Undergraduate Programs may allow up to 6 credit hours of technical electives for students taking required ROTC courses in aerospace or naval science."
+          },
+          {
+            "block_id": "b-0028f6ec2bb6061913b3781a",
+            "quote": "One technical elective can be replaced with 3 credit hours of CBE 491"
+          }
+        ]
+      },
+      {
+        "id": "materials",
+        "parent_id": "",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Materials Processing concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-29fea9c344e390144218b44f",
+            "quote": "Earn at least 6 credits from the following:"
+          },
+          {
+            "block_id": "b-ba37ee634278e85fd082374e",
+            "quote": "Technical Electives"
+          }
+        ]
+      },
+      {
+        "id": "materials-electives",
+        "parent_id": "materials",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Materials Processing: at least 6 credits from the listed technical electives",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-29fea9c344e390144218b44f",
+            "quote": "Earn at least 6 credits from the following:"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe412",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE412 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1nJq49j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0c7768a874109a540d0964d6",
+            "quote": "CBE412 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe477",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE477 - Electrochemical Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJLZ9V5ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-e0e9a8d35110ada490910d16",
+            "quote": "CBE477 - Electrochemical Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-ce302",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CE302 - Mechanics of Materials (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:ry-cE9N9i5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-272267e9dfee5d4aed5091bd",
+            "quote": "CE302 - Mechanics of Materials (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-chem431",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM431 - Advanced Inorganic Chemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:H1eT1oNqoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f85697d4c6f94933ae0cf244",
+            "quote": "CHEM431 - Advanced Inorganic Chemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-eps301",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS301 - Mineralogy-Earth and Planetary Materials (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkgnVqE5s9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-db053622769c841225910ad5",
+            "quote": "EPS301 - Mineralogy-Earth and Planetary Materials (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-eps302l",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "EPS302L - Mineralogy Laboratory (2)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BkWjYNcoc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-4700f5453819b5b5ed4510e7",
+            "quote": "EPS302L - Mineralogy Laboratory (2)"
+          }
+        ]
+      },
+      {
+        "id": "materials-me419",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ME419 - Advanced Micro- and Nanosystems Engineering (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HkkN5E9ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-0267b3d505494e8bc8bb9548",
+            "quote": "ME419 - Advanced Micro- and Nanosystems Engineering (4)"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe512",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE512 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJ7-oVqsc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-342915ed11d9349b5840c158",
+            "quote": "CBE512 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe577",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE577 - Electrochemical Engineering (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:rJfJoNcj9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-f51f12312edf3301ae151570",
+            "quote": "CBE577 - Electrochemical Engineering (3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-chem471",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM471 - Advanced Topics in Chemistry (2 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:B1b47qV5jc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-587a767a470de3f1ea5c81df",
+            "quote": "CHEM471 - Advanced Topics in Chemistry (2 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-me519",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ME519 - Advanced Micro- and Nanosystems Engineering (4)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:S1jWcV5oc"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3e3faad350dfe89bbc6b24b9",
+            "quote": "ME519 - Advanced Micro- and Nanosystems Engineering (4)"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe499",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE499 - Selected Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:Hyx89Nqi9"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-753da473e99e6e9bed3b2e14",
+            "quote": "CBE499 - Selected Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-cbe515",
+        "parent_id": "materials-electives",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE515 - Special Topics (1 - 3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:HJWvd9Vci5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c827ba5fa93573baece773fe",
+            "quote": "CBE515 - Special Topics (1 - 3)"
+          }
+        ]
+      },
+      {
+        "id": "materials-total",
+        "parent_id": "",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Materials Processing concentration: 6 credits",
+        "minimum": 6,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-c0751335a640d501f48b82c6",
+            "quote": "Grand Total Credits: 6"
+          }
+        ]
+      },
+      {
+        "id": "materials-policy",
+        "parent_id": "",
+        "entity_id": "specializations:SyF8Qdis5",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Materials Processing: technical electives chosen with the Faculty Advisor; ROTC and CBE 491 substitutions",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "6 credit hours of technical electives chosen in consultation with the Faculty Advisor; the Director of Undergraduate Programs may allow up to 6 credit hours for students taking required ROTC courses in aerospace or naval science; one technical elective can be replaced with 3 credit hours of CBE 491, a research project supervised by departmental faculty, with the advance approval of the Director of Undergraduate Programs",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-614c47d0c66fa6982952ea42",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          },
+          {
+            "block_id": "b-614c47d0c66fa6982952ea42",
+            "quote": "The Director of Undergraduate Programs may allow up to 6 credit hours of technical electives for students taking required ROTC courses in aerospace or naval science."
+          },
+          {
+            "block_id": "b-614c47d0c66fa6982952ea42",
+            "quote": "One technical elective can be replaced with 3 credit hours of CBE 491"
+          }
+        ]
+      },
+      {
+        "id": "semi",
+        "parent_id": "",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Semiconductor Manufacturing concentration curriculum",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-737377665e489bcf660c490a",
+            "quote": "Technical Electives"
+          },
+          {
+            "block_id": "b-8bbda2bea90a59a0eaf57d54",
+            "quote": "Complete all of the following"
+          }
+        ]
+      },
+      {
+        "id": "semi-required",
+        "parent_id": "semi",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "all",
+        "label": "Semiconductor Manufacturing: CHEM311, ECE371 and CBE412",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-a40fd92d32d2b4ac164a8abc",
+            "quote": "Complete the following:"
+          }
+        ]
+      },
+      {
+        "id": "semi-chem311",
+        "parent_id": "semi-required",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CHEM311 - Physical Chemistry (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJBTU5Eqoq"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-194c2dbfa1b038c51ae5b537",
+            "quote": "CHEM311 - Physical Chemistry (3)"
+          }
+        ]
+      },
+      {
+        "id": "semi-ece371",
+        "parent_id": "semi-required",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "ECE371 - Materials and Devices (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:BJW6lcE9ic"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-96e10179b3c4db28079617e0",
+            "quote": "ECE371 - Materials and Devices (3)"
+          }
+        ]
+      },
+      {
+        "id": "semi-cbe412",
+        "parent_id": "semi-required",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "course",
+        "label": "CBE412 - Characterization Methods for Nanostructures (3)",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [
+          "courses:r1nJq49j5"
+        ],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-3d2f8058496cb1d19478a8f7",
+            "quote": "CBE412 - Characterization Methods for Nanostructures (3)"
+          }
+        ]
+      },
+      {
+        "id": "semi-override",
+        "parent_id": "",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "prerequisite",
+        "kind": "permission",
+        "label": "A department registration override for ECE 371 after C or better in CHEM 311 and MATH 316",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "Students may receive a registration override from the department for ECE 371 after earning a grade of C or better in CHEM 311 and MATH 316",
+        "minimum_grade": "C",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-ee5ac33e9d9fbf8540cb52b5",
+            "quote": "Students may receive a registration override from the department for ECE **371"
+          }
+        ]
+      },
+      {
+        "id": "semi-total",
+        "parent_id": "",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "credits",
+        "label": "Semiconductor Manufacturing concentration: 9 credits",
+        "minimum": 9,
+        "maximum": null,
+        "unit": "credits",
+        "comparison": "at_least",
+        "value": "",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fb172557337934801a57d437",
+            "quote": "Grand Total Credits: 9"
+          }
+        ]
+      },
+      {
+        "id": "semi-credits",
+        "parent_id": "",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "unresolved",
+        "label": "Semiconductor Manufacturing: 9 credits, or the 6 every concentration has?",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "The program says B.S.Ch.E. concentrations consist of 6 credit hours of technical electives, and the concentration's own description says students choose 6; its requirements name three 3-credit courses and total 9",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-fb172557337934801a57d437",
+            "quote": "Grand Total Credits: 9"
+          },
+          {
+            "block_id": "b-069bcb0043da303e84723eb1",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          }
+        ]
+      },
+      {
+        "id": "semi-policy",
+        "parent_id": "",
+        "entity_id": "specializations:Skmt8musoq",
+        "phase": "degree",
+        "kind": "restriction",
+        "label": "Semiconductor Manufacturing: technical electives chosen with the Faculty Advisor; ROTC and CBE 491 substitutions",
+        "minimum": null,
+        "maximum": null,
+        "unit": "none",
+        "comparison": "none",
+        "value": "6 credit hours of technical electives chosen in consultation with the Faculty Advisor; the Director of Undergraduate Programs may allow up to 6 credit hours for students taking required ROTC courses in aerospace or naval science; one technical elective can be replaced with 3 credit hours of CBE 491, a research project supervised by departmental faculty, with the advance approval of the Director of Undergraduate Programs",
+        "minimum_grade": "",
+        "course_refs": [],
+        "program_ref": "",
+        "timing": "not_applicable",
+        "citations": [
+          {
+            "block_id": "b-069bcb0043da303e84723eb1",
+            "quote": "Students choose 6 credit hours of technical electives, which are chosen with the consultation of the student’s Faculty Advisor"
+          },
+          {
+            "block_id": "b-069bcb0043da303e84723eb1",
+            "quote": "The Director of Undergraduate Programs may allow up to 6 credit hours of technical electives for students taking required ROTC courses in aerospace or naval science."
+          },
+          {
+            "block_id": "b-069bcb0043da303e84723eb1",
+            "quote": "One technical elective can be replaced with 3 credit hours of CBE 491"
+          }
+        ]
+      }
+    ],
+    "coverage": [
+      {
+        "block_id": "b-fda5453e5a5edd4e78fcabda",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-3381f7220f33e12b597b06a3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-cd9c4fcba90b3713b817c32b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-e1a68e84c74bb222bed30e50",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-678c3146d8a0d9e16e54ea05",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-a5d21efda6584c691f7f4fc4",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-215be6095d281b783445d66c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-0463da97b94a8a84bcb59c09",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-15ebe0d7e1cec78001b9c68d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-413335f5cd9659ad8de08f46",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-4c49e3b20830f50b27e2e36c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-bf1d79e7fde9acd775bfd3c3",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-a7a3afece9d2e8cc59ba6074",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Program description; no course or eligibility condition."
+      },
+      {
+        "block_id": "b-96d258fbba8abee677b85f3d",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical-electives"
+        ],
+        "explanation": "Concentrations are 6 credits of technical electives."
+      },
+      {
+        "block_id": "b-d999198df687a343062f46a7",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-6326d2392e66085857a4777f",
+        "disposition": "requirements",
+        "node_ids": [
+          "grades"
+        ],
+        "explanation": "Grade thresholds for CBE and other courses."
+      },
+      {
+        "block_id": "b-bef5fafb8e6e0d9cfe3d1731",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-technical"
+        ],
+        "explanation": "Admission requires the technical courses."
+      },
+      {
+        "block_id": "b-11b87b546f1ce33b04bbe9f5",
+        "disposition": "requirements",
+        "node_ids": [
+          "general-education"
+        ],
+        "explanation": "General Education timing."
+      },
+      {
+        "block_id": "b-ceebd6ceb57603425f35353c",
+        "disposition": "requirements",
+        "node_ids": [
+          "core-sequence"
+        ],
+        "explanation": "The program core is taken in its listed order."
+      },
+      {
+        "block_id": "b-677c822e26a12b3947a13134",
+        "disposition": "requirements",
+        "node_ids": [
+          "graduation-application"
+        ],
+        "explanation": "The graduation application."
+      },
+      {
+        "block_id": "b-19c98f1a8e80c08d8efa6951",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The FE exam is encouraged, not required."
+      },
+      {
+        "block_id": "b-604e17b61b312604f7cb250a",
+        "disposition": "requirements",
+        "node_ids": [
+          "d-policy"
+        ],
+        "explanation": "Heading of the D-grade policy."
+      },
+      {
+        "block_id": "b-952218181b783f3558937952",
+        "disposition": "requirements",
+        "node_ids": [
+          "d-policy"
+        ],
+        "explanation": "The D-grade policy."
+      },
+      {
+        "block_id": "b-2568ef6d0517bdbd57ee9f12",
+        "disposition": "requirements",
+        "node_ids": [
+          "grades"
+        ],
+        "explanation": "The same grade thresholds, repeated."
+      },
+      {
+        "block_id": "b-0763c349361d6fcd130a917d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of an optional shared-credit graduate program."
+      },
+      {
+        "block_id": "b-4103fb00f9e2808b808b4890",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "An optional shared-credit graduate program; its admission is in the School of Engineering section."
+      },
+      {
+        "block_id": "b-59c90cee135bfecf9e655764",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of optional honors."
+      },
+      {
+        "block_id": "b-5df2b239a5f595c4802ceaf8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Optional honors distinctions."
+      },
+      {
+        "block_id": "b-31e47fb53b60bf9c72e2d07a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Heading of optional cooperative education."
+      },
+      {
+        "block_id": "b-b0b58174036f6cff854f40f2",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Optional cooperative education and internships."
+      },
+      {
+        "block_id": "b-008a4b950c69296454b29171",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-premajor"
+        ],
+        "explanation": "Entry as a pre-major and review for admission."
+      },
+      {
+        "block_id": "b-cf7d74476e323921ffcb4f1b",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-gpa"
+        ],
+        "explanation": "The cumulative grade point for admission."
+      },
+      {
+        "block_id": "b-ae2ece7cbb5bc09657709fe2",
+        "disposition": "unresolved",
+        "node_ids": [
+          "admit-technical",
+          "admit-technical-gpa",
+          "admit-technical-grades",
+          "admit-footnote"
+        ],
+        "explanation": "The technical-course grade point and grades, for courses the capture does not list."
+      },
+      {
+        "block_id": "b-4941508ec7ad4fe13767c0fd",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-engl1110"
+        ],
+        "explanation": "Composition before admission."
+      },
+      {
+        "block_id": "b-dc49a10604fd0a0cd62ac61b",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-standing"
+        ],
+        "explanation": "Academic standing for admission."
+      },
+      {
+        "block_id": "b-919714eb6fe0771cbe8e9193",
+        "disposition": "requirements",
+        "node_ids": [
+          "admit-candidacy"
+        ],
+        "explanation": "Admission as a major before candidacy."
+      },
+      {
+        "block_id": "b-21038e332e93d20b4446c34d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Structural introduction to the degree's parts, each represented individually."
+      },
+      {
+        "block_id": "b-d5154f2e0f0d2e4a4f778fa3",
+        "disposition": "requirements",
+        "node_ids": [
+          "required"
+        ],
+        "explanation": "Every listed course is required."
+      },
+      {
+        "block_id": "b-e4227f46ffd4770064dcc841",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe101"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-9a535d1c75e9e03897cba14b",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1215"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-97771f6122c8ba8a9316080a",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1215l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-3db3a0f8a26b9537178edea8",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-engl1120"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-029b5d7a6679f54120e716b4",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math1512"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-157fa0bdcc990c64358d3221",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe102"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-99db40b0a3d628571cc0ef69",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1225"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-83fb040bcee638d317ea6dcc",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem1225l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-41b7277c97b8c27239e69eb9",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math1522"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-d064c54f4c43780a9181a337",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-phys1310"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-391f7f4a63531d2b242014b1",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe251"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-a006b966b5177e1f91cd3202",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem303l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-c4178779cee534b92e672f8a",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem301"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-b22e493e7ed78b100500dd9a",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math2531"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-738eb502d9a671f4679c6a67",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-phys1320"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-e2fd4eb9338c0b6d528facd7",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe253"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-c75e16c68d013bc2be589b36",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe302"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-744b4727519ecafcd069e8c9",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem302"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-9dfc795f9fdb20ffa2495758",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-chem312"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-921e215a189d4b091393285d",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-math316"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-3d07e0c993ae2573996024df",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe311"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-57f5a49aaa3f855c716a06da",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe317"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-0bafb9353ab5e04056e88a4d",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe318l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-d1dd1d16330baeefb842ceb6",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe213"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-c10da73a668eaae079e00f39",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe319l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-7a8bc8c64f4751a85d6fd0cb",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe321"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-149d914a83e1595edf8b3690",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe371"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-4ce45635af760fda68c4a0f4",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-ce350"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-e487f03a93588bbf11f83c91",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe312"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-a868a4f8d2b769044e2bd17e",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe418l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-d3cb55d84879535080f65d11",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe454"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-c5e053126162f19aca1f163e",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe461"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-01a5509c3e72ee1c4b961a84",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe486"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-ef213efbdc7e7eddfd7d244b",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe493l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-6f4c6b9c4cb18fc792697084",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe419l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-21dd6e8d6faf80e1a849d4e9",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe451"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-4ad34edf84e6b3de3b8254df",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-cbe494l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-ff62a45ec37c1978849c891a",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-biol2101"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-be30e87d1b9922f625c364a6",
+        "disposition": "requirements",
+        "node_ids": [
+          "req-biol2103l"
+        ],
+        "explanation": "A required course."
+      },
+      {
+        "block_id": "b-7d165f566d6dfff4d158a367",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical-electives"
+        ],
+        "explanation": "The technical elective credits."
+      },
+      {
+        "block_id": "b-13c20778ad0542a528e448c1",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical-electives"
+        ],
+        "explanation": "The pool's qualification: a concentration's electives."
+      },
+      {
+        "block_id": "b-aa068b89d8cda6f643bcfb92",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree"
+        ],
+        "explanation": "The remaining degree credits."
+      },
+      {
+        "block_id": "b-2fce31590afe710c9cc288ee",
+        "disposition": "requirements",
+        "node_ids": [
+          "other-degree",
+          "general-education"
+        ],
+        "explanation": "The remaining credits' qualification, and General Education."
+      },
+      {
+        "block_id": "b-f40c60a1d9908ad0386a6ac1",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The degree total."
+      },
+      {
+        "block_id": "b-d2f4ec0f7bad32eb0e0891f8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-3dbad38570edba26e07ca6ef",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-fe0455f85d5955ae3630b165",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-ddc47531a8c023067509de57",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-11ef233265b74b96f3a6cc94",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-3a17611678ef352984953ca8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-9a2f91dfe764469912b199db",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-e75b929873e8b79b31bd8b00",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "The record's graduation requirements field is empty: not supplied, not \"no requirements\"."
+      },
+      {
+        "block_id": "b-0f1461fd4ea3768a7ecdf044",
+        "disposition": "requirements",
+        "node_ids": [
+          "degree-total"
+        ],
+        "explanation": "The record's degree hours, 121, agree with the stated total."
+      },
+      {
+        "block_id": "b-82596bee8761554dc962e450",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-485b56f5354272c4188d875d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-8feb3925d8266186016a063c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-51d998bced97f6f7674ddb34",
+        "disposition": "requirements",
+        "node_ids": [
+          "technical-electives"
+        ],
+        "explanation": "The record requires a concentration."
+      },
+      {
+        "block_id": "b-9c39a86c288b3e417738187d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity, ownership, publication metadata or program classification; no course or eligibility condition is asserted by this record field."
+      },
+      {
+        "block_id": "b-80589700b2e1eeca6a00b65e",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-policy"
+        ],
+        "explanation": "Concentration description; its technical-elective policy is represented."
+      },
+      {
+        "block_id": "b-867b83ad71d84c9c1b8f4173",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio"
+        ],
+        "explanation": "Heading of the concentration's technical electives."
+      },
+      {
+        "block_id": "b-e17d627807d13fb37eb355f9",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio",
+          "bio-electives"
+        ],
+        "explanation": "Six credits from the listed courses."
+      },
+      {
+        "block_id": "b-7718ec6581970672e0a2091c",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-bioc423"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-2c0ed0debfbafc4d1fecef4d",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-biol2305"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-895b9e9a5e9b61fb5add81a6",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-biol2410c"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-aa525cb7d141f57841f51b82",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-biol492"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-96dc83d687792cbb78ecbe50",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-biol592"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-80b7d086b6cc360fe6f7eab3",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-bme575"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-1764dbe98ef076d12e3accbb",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-bme581"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-51a8342a09e5f32123a2c6ed",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-bme558"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-cb2f1ac60b67b2b3ac9e2a2c",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe417"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-94d391fdbb113446a17484c1",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe472"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-20fdf905b7a03d0db3c430eb",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe479"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-76665ae3e39666acb6e38628",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe499"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-034cc951c60cda3d90ac9fe1",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-chem471"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-1c11d3d6b7bcad9f23d8b562",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe412"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-4773d358ed226aaa6319589c",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe512"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-69096559c663b9d29fae6931",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe517"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-511baf7a9d759b96703fa1ea",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe572"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-a8bb6bc3ac4a043ddf54e006",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-cbe515"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-e4de25ff5b9f6b9f053dccdb",
+        "disposition": "requirements",
+        "node_ids": [
+          "bio-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-b012dbb0001295c536075695",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-74b297244f846167e76c5781",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-b6f65eab0ef352d4522f837b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-6b0fddc89d05a89a61a37246",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-7051b56f79755da6e32e3cf0",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-e6f322755f98cff68e2067c4",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-policy"
+        ],
+        "explanation": "Concentration description; its technical-elective policy is represented."
+      },
+      {
+        "block_id": "b-47aa7e58f6d9ff5d04049678",
+        "disposition": "requirements",
+        "node_ids": [
+          "process",
+          "process-electives"
+        ],
+        "explanation": "Six credits from the listed courses."
+      },
+      {
+        "block_id": "b-bfdb8913ffa2e4a4c372ec8f",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-math311"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-f44dd18d55369335babdaf01",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-math312"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-df44e20e3628edf095c53cbf",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-math313"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-0ecd6b84e32de5a342aa246c",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-math314"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-67e08ddbbcd2a86be5763d50",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-stat345"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-8362751fc022937452c86380",
+        "disposition": "requirements",
+        "node_ids": [
+          "process-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-c5fafe8d908c28a0a04de40c",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-bd3f8dd40aa763b13e66df91",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-4c10954967c9afb98071dc49",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-b4dd098d7534646037c7bb7a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-00ca2a52a9ce03e707aa4991",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-0028f6ec2bb6061913b3781a",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-policy"
+        ],
+        "explanation": "Concentration description; its technical-elective policy is represented."
+      },
+      {
+        "block_id": "b-eb3f9ec50b553ba5a8f1b0e1",
+        "disposition": "requirements",
+        "node_ids": [
+          "env"
+        ],
+        "explanation": "Heading of the concentration's technical electives."
+      },
+      {
+        "block_id": "b-c9e9e3164fa73a79d93b46d5",
+        "disposition": "requirements",
+        "node_ids": [
+          "env",
+          "env-electives"
+        ],
+        "explanation": "Six credits from the listed courses."
+      },
+      {
+        "block_id": "b-35ce293b0b8744c7ae73e93f",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce335"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-f6eb206f0c4a69bbc7beb196",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce431"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-a7498e1a7cac5b0e3cce06fd",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce436"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-030d1e8cafeccbe289b58cf3",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce438"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-d2fd994bd44f94716e0e0fc0",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-eps462"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-de9e5af57a89c8249577d1ed",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-eps415"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-815ef53f4ef2390bfd784adb",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce531"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-c4470ab8c0941217de1d58dc",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce536"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-a5ca389c5b6452c6a9101e21",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-ce538"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-9cc78ae11d1ea8355cf9fd95",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-eps515"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-2b92b421ec18ec9866a90550",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-eps562"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-240edec48ede1050045c8dfc",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-cbe512"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-479404e9b0dff499247a90f6",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-cbe477"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-6890570e557fb83d968798ed",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-cbe577"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-bb8fff093c4204ed70101732",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-cbe499"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-3c98ad45a0fa2302fe331cc4",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-cbe515"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-f2a6ac4b3105fa73223c1fb1",
+        "disposition": "requirements",
+        "node_ids": [
+          "env-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-41cf129141fce55414ac3f95",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-de854bb5496dd96d776e8cfb",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-f8404d660892b1e70fa049dc",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-35bf1335249560363bbd56ec",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-0ae9072be44759dc158b980a",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-614c47d0c66fa6982952ea42",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-policy"
+        ],
+        "explanation": "Concentration description; its technical-elective policy is represented."
+      },
+      {
+        "block_id": "b-ba37ee634278e85fd082374e",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials"
+        ],
+        "explanation": "Heading of the concentration's technical electives."
+      },
+      {
+        "block_id": "b-29fea9c344e390144218b44f",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials",
+          "materials-electives"
+        ],
+        "explanation": "Six credits from the listed courses."
+      },
+      {
+        "block_id": "b-0c7768a874109a540d0964d6",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe412"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-e0e9a8d35110ada490910d16",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe477"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-272267e9dfee5d4aed5091bd",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-ce302"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-f85697d4c6f94933ae0cf244",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-chem431"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-db053622769c841225910ad5",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-eps301"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-4700f5453819b5b5ed4510e7",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-eps302l"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-0267b3d505494e8bc8bb9548",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-me419"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-342915ed11d9349b5840c158",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe512"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-f51f12312edf3301ae151570",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe577"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-587a767a470de3f1ea5c81df",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-chem471"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-3e3faad350dfe89bbc6b24b9",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-me519"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-753da473e99e6e9bed3b2e14",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe499"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-c827ba5fa93573baece773fe",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-cbe515"
+        ],
+        "explanation": "One of the listed technical electives."
+      },
+      {
+        "block_id": "b-c0751335a640d501f48b82c6",
+        "disposition": "requirements",
+        "node_ids": [
+          "materials-total"
+        ],
+        "explanation": "The concentration's total."
+      },
+      {
+        "block_id": "b-3b4c75ff90e8421780306d09",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-1fa9c4412f378a167f5c57d8",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-5b3ae7fe9c528031b0369e04",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-3901816885caaf70a3ee9d11",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-c0af4d78ffa027974be7405d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-069bcb0043da303e84723eb1",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-policy",
+          "semi-credits"
+        ],
+        "explanation": "Concentration description; its technical-elective policy is represented and its 6 credits conflict with the 9 listed."
+      },
+      {
+        "block_id": "b-737377665e489bcf660c490a",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi"
+        ],
+        "explanation": "Heading of the concentration's technical electives."
+      },
+      {
+        "block_id": "b-8bbda2bea90a59a0eaf57d54",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi"
+        ],
+        "explanation": "Every part of the concentration is required."
+      },
+      {
+        "block_id": "b-a40fd92d32d2b4ac164a8abc",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-required"
+        ],
+        "explanation": "Three named required courses."
+      },
+      {
+        "block_id": "b-194c2dbfa1b038c51ae5b537",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-chem311"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-96e10179b3c4db28079617e0",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-ece371"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-3d2f8058496cb1d19478a8f7",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-cbe412"
+        ],
+        "explanation": "A required course of the concentration."
+      },
+      {
+        "block_id": "b-ee5ac33e9d9fbf8540cb52b5",
+        "disposition": "requirements",
+        "node_ids": [
+          "semi-override"
+        ],
+        "explanation": "A registration override for ECE 371."
+      },
+      {
+        "block_id": "b-fb172557337934801a57d437",
+        "disposition": "unresolved",
+        "node_ids": [
+          "semi-total",
+          "semi-credits"
+        ],
+        "explanation": "The concentration's total, which conflicts with the program's 6 credits."
+      },
+      {
+        "block_id": "b-44ae058d734929e74c1acb34",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-7814fe46f23f11476dca890d",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-9abb08834c105600c282ec1b",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-fa8b4f93da888902660122fc",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      },
+      {
+        "block_id": "b-9e430f244fa91b7ecbc9cc37",
+        "disposition": "information",
+        "node_ids": [],
+        "explanation": "Record identity or publication metadata of the concentration; no condition."
+      }
+    ],
+    "questions": [
+      {
+        "block_id": "b-ae2ece7cbb5bc09657709fe2",
+        "question": "Which courses are \"the technical courses identified in Footnote 1\" for admission? The captured requirement table has no footnotes, so neither the 2.50 grade point nor the C grades can be checked."
+      },
+      {
+        "block_id": "b-fb172557337934801a57d437",
+        "question": "The program says every B.S.Ch.E. concentration is 6 credits of technical electives, and the Semiconductor Manufacturing description says the same, but its requirements name CHEM 311, ECE 371 and CBE 412 (9 credits). Which is it, and do the extra 3 credits count toward the 15 additional credits?"
+      },
+      {
+        "block_id": "b-e17d627807d13fb37eb355f9",
+        "question": "The concentrations list 500-level courses (for example BIOL 592, BME 575, CBE 512) beside 400-level ones. May an undergraduate count a 500-level course, and is a 400/500 pair (CBE 412 and CBE 512) one choice or two?"
+      }
+    ]
+  },
+  "triage": [
+    {"item": "rule:admit-footnote", "settled_by": "capture"},
+    {"item": "rule:semi-credits", "settled_by": "catalog"},
+    {"item": "question:1", "settled_by": "capture"},
+    {"item": "question:2", "settled_by": "catalog"},
+    {"item": "question:3", "settled_by": "catalog"}
+  ]
+}

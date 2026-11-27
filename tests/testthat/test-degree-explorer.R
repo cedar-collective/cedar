@@ -694,7 +694,7 @@ test_that("each degree claims its own Banner program codes, keeping a B.A. apart
 test_that("readable plan rules expose the active graph and distinguish policy from scheduling", {
   v <- roadmap_view(HISTORY)
   rules <- build_degree_plan_rules(test_degree_catalog, test_degree_roadmaps, v)
-  expect_match(rules$scenario, "Math: Calculus-ready: take statistics", fixed = TRUE)
+  expect_match(rules$scenario, "Math: Calculus-ready", fixed = TRUE)
   rows <- rules$rows
   expect_equal(sum(rows$kind == "Prerequisite arrow"), nrow(v$links))
   expect_equal(sum(rows$kind == "Other enrollment condition"), nrow(v$conditions))
@@ -706,7 +706,8 @@ test_that("readable plan rules expose the active graph and distinguish policy fr
   preference <- rows[rows$kind == "Planning preference", ]
   expect_true(any(grepl("15 credits; never more than 16", preference$rule, fixed = TRUE)))
   expect_true(all(preference$source_url == "" & preference$quote == ""))
-  expect_true(any(rows$kind == "Suggested general coursework" & grepl("MATH 1350", rows$rule, fixed = TRUE)))
+  # No math course is suggested: the program names none, so math is Gen Ed space (I97).
+  expect_false(any(rows$kind == "Suggested general coursework" & grepl("MATH", rows$rule, fixed = TRUE)))
   expect_true(all(grepl("not evaluated", rows$effect[rows$kind == "Recorded catalog requirement"], fixed = TRUE)))
   prepared <- build_degree_plan_rules(test_degree_catalog, test_degree_roadmaps, roadmap_view(HISTORY, "intermediate"))$rows
   expect_true(any(prepared$kind == "Preparation" & grepl("MATH 1215", prepared$rule, fixed = TRUE)))
@@ -924,15 +925,24 @@ test_that("each picker opens on the start the institution's file marks, one per 
   expect_error(validate_degree_roadmaps(bad, test_degree_catalog), "opens must be TRUE or FALSE")
 })
 
-test_that("a statistics major takes its own math route and never inherits calculus", {
+test_that("the board's math sentence names the route's math course, or says what the start adds (I97)", {
+  testthat::local_edition(3)
+  expect_snapshot({
+    roadmap_view(BIOLOGY, "algebra")$math_note
+    roadmap_view(HISTORY, "intermediate")$math_note
+    roadmap_view(HISTORY, "algebra")$math_note
+  })
+})
+
+test_that("a program with no math course plans only its start's preparation and never inherits calculus (I97)", {
   h <- roadmap_plan(HISTORY, "intermediate")
-  expect_equal(h$nodes$code[h$nodes$track == "math"], c("MATH 1215", "MATH 1350"))
-  expect_equal(node_at(h, c("math1215", "math1350")), 1:2)
+  expect_equal(h$nodes$code[h$nodes$track == "math"], "MATH 1215")
+  expect_equal(node_at(h, "math1215"), 1L)
   expect_equal(h$preparation_credits, 3)
-  expect_false(any(c("calc1", "math1220", "math1250") %in% h$nodes$node_id))
+  expect_false(any(c("calc1", "math1220", "math1250", "math1350") %in% h$nodes$node_id))
   ready <- roadmap_plan(HISTORY, "algebra")
-  expect_equal(ready$math_target$code, "MATH 1350")
-  expect_equal(ready$math_target$semester, 1L)
+  expect_equal(nrow(ready$math_target), 0L)
+  expect_false(any(ready$nodes$track == "math"))
   expect_equal(ready$n_preparation, 0L)
   expect_setequal(unname(degree_math_start_choices(test_degree_roadmaps, HISTORY)),
     test_degree_roadmaps$starts$start_id[test_degree_roadmaps$starts$track == "math"])
@@ -982,7 +992,7 @@ test_that("course-count conditions schedule against the earliest qualifying pool
 test_that("Gen Ed suggestions are labelled while named requirements keep program styling", {
   h <- roadmap_view(HISTORY, "algebra")
   b <- roadmap_view()
-  suggestion <- h$nodes[h$nodes$node_id == "math1350", ]
+  suggestion <- h$nodes[h$nodes$node_id == "engl2", ]
   expect_true(suggestion$is_suggested)
   expect_equal(suggestion$basis, "general")
   expect_equal(suggestion$kind_label, "Suggested Gen Ed")

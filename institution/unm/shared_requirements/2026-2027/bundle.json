@@ -255,6 +255,96 @@
         "unm-architecture-planning"
       ],
       "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "art-studio-ba-2026",
+      "college_code": "FA",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-fine-arts"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "art-studio-bfa-2026",
+      "college_code": "FA",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-fine-arts"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "chemical-engineering-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "civil-engineering-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "computer-engineering-bs-2026",
+      "college_code": "EN",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-engineering"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "elementary-education-bsed-2026",
+      "college_code": "EH",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-education-human-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "journalism-ba-2026",
+      "college_code": "AS",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-arts-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "secondary-education-baed-2026",
+      "college_code": "EH",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-education-human-sciences"
+      ],
+      "status": "illustrative_planning"
+    },
+    {
+      "catalog_id": "secondary-education-bsed-2026",
+      "college_code": "EH",
+      "rule_set_ids": [
+        "unm-university",
+        "unm-general-education",
+        "unm-education-human-sciences"
+      ],
+      "status": "illustrative_planning"
     }
   ],
   "composition_policy": [
