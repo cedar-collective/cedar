@@ -16,6 +16,11 @@ test_that("the institution preserves its original cohort and copies complete his
   expect_equal(nrow(anti_join(cl, raw$DESRs,
     by = c("Academic Period Code" = "TERM", "Course Reference Number" = "CRN"))), 0L)
   expect_setequal(raw$DESRs$CAMP, c("ABQ", "EA", "GA"))
+  # Every graduate took classes: the six of the graduates fixture's people with
+  # a record, in each cohort. The pathway fixtures' graduates, described by
+  # declarations alone, and GG_NOREC stay unit-test inputs.
+  expect_true(all(raw$degrees$ID %in% cl$`Student ID`))
+  expect_equal(nrow(raw$degrees), 12L)
   # HIST 1110's hand-worked grade scenario: 21 registered and nine late drops.
   hist <- original %>% filter(`Academic Period Code` == 202010L,
                              `Subject Code` == "HIST", `Course Number` == "1110")

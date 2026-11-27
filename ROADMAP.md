@@ -345,6 +345,14 @@ Page-level legibility is [M43](ISSUES.md)–M48; these are the new pieces.
   rule, still `proposed`, and review the proposals after each term's first
   pull, largest first, stopping when the tail is under about 50 student-terms
   a term.
+- [ ] **A realistic demo population.** The synthetic institution is the test
+  fixtures, which hold only the rows each scenario needs: about two in three
+  of its declared people take no class, and the graduates who took none are
+  left out (2026-11-27), so History has majors and no graduates. Author a
+  demo-only population in `dev/`, never in the test fixtures, in which every
+  declared person has a course history and graduates finish one, so
+  Retention, Graduation and Dept Trends' Degrees can be shown for History
+  ([synthetic-institution.md](docs/developers/synthetic-institution.md#what-is-adapted)).
 - [ ] **Operational monitoring.** Shiny errors, usage logs, scheduled-refresh
   outcomes and cold-cache latency after release.
 - [ ] **Standard CSV export** across user-facing tables through a shared helper.

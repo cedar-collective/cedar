@@ -28,6 +28,9 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
   }
 
   const DEPT = synthetic ? 'HIST' : process.env.CEDAR_SMOKE_DEPT || 'HIST';
+  // The synthetic institution's graduates are the graduates fixture's, in
+  // Linguistics: its History majors graduate nobody (dev/demo-data.R).
+  const DEGREES_DEPT = synthetic ? 'LING' : DEPT;
   const COURSE = synthetic ? 'HIST 1110' : process.env.CEDAR_SMOKE_COURSE || 'HIST 1110';
   const TERM = synthetic ? '202080' : process.env.CEDAR_SMOKE_TERM || '202680';
   const CAMPUSES = (synthetic ? 'ABQ,EA' : process.env.CEDAR_SMOKE_CAMPUSES || 'ABQ,EA')
@@ -322,10 +325,18 @@ export async function runReportChecks({ scope = 'smoke', synthetic = false } = {
         { type: 'plotly', id: 'dept_trends-enrl_college_dept_dual_plot' },
       ], { all: true });
 
+      if (DEGREES_DEPT !== DEPT) {
+        await setInput(page, 'dept_trends-dept', DEGREES_DEPT);
+        await waitForIdle(page, { timeout: STEP_TIMEOUT });
+      }
       await clickSubTabIn(page, 'dept_trends-tabs', 'Degrees');
-      await waitForOutput(page, 'Dept Trends Degrees tab', [
+      await waitForOutput(page, `Dept Trends Degrees tab (${DEGREES_DEPT})`, [
         { type: 'plotly', id: 'dept_trends-degree_summary_faceted_by_major_plot' },
       ]);
+      if (DEGREES_DEPT !== DEPT) {
+        await setInput(page, 'dept_trends-dept', DEPT);
+        await waitForIdle(page, { timeout: STEP_TIMEOUT });
+      }
 
       await clickSubTabIn(page, 'dept_trends-tabs', 'Credit Hours');
       await waitForOutput(page, 'Dept Trends Credit Hours tab', [

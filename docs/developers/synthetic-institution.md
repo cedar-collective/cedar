@@ -73,5 +73,15 @@ The exporter does not invent students to force them to agree. Admissions records
 and saved projections are absent. Deliberately corrupt fixtures and standalone
 intermediate credit tables remain unit-test inputs.
 
+So does a degree whose holder takes no class in the demo. The pathway fixtures
+describe their graduates by declarations alone, and in an institution that is
+someone who graduated without a course; a term of such degrees also reads as a
+second student ID space to the transform's ID check. The exporter leaves them
+out and says how many, and invents no class for them. The demo's graduates
+are therefore the graduates fixture's, in Linguistics and Philosophy, and its
+History majors graduate nobody. Many declared people also take no class, for
+the same reason. A demo population with a course history for every declared
+person is on [ROADMAP](../../ROADMAP.md).
+
 Copied cohorts provide volume for exploring the app. They are not independent
 statistical observations, a performance benchmark, or institutional evidence.
