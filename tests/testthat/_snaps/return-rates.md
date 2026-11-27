@@ -32,12 +32,12 @@
     Output
                                                 Counted, Fall 2022 
                        "7 Undergraduate students, home campus ABQ" 
-                                               First-time students 
-                                                       "3 of them" 
-                                                 Transfer students 
-                                                       "2 of them" 
+                                                  New in Fall 2022 
+                               "2 first-time students, 1 transfer" 
+                                          Started before Fall 2022 
+                                "1 first-time student, 1 transfer" 
                                                Start not on record 
-                                                       "2 of them" 
+                                                      "2 students" 
                                                        Not counted 
       "students at another level: Graduate 2; no level recorded 1" 
     Code
@@ -45,12 +45,12 @@
     Output
                                                 Counted, Fall 2022 
                      "8 Undergraduate students, every home campus" 
-                                               First-time students 
-                                                       "3 of them" 
-                                                 Transfer students 
-                                                       "3 of them" 
+                                                  New in Fall 2022 
+                              "2 first-time students, 2 transfers" 
+                                          Started before Fall 2022 
+                                "1 first-time student, 1 transfer" 
                                                Start not on record 
-                                                       "2 of them" 
+                                                      "2 students" 
                                                        Not counted 
       "students at another level: Graduate 2; no level recorded 1" 
     Code
@@ -58,16 +58,29 @@
     Output
                                  Counted, Fall 2022 
       "10 students at every level, home campus ABQ" 
-                                First-time students 
-                                        "3 of them" 
-                                  Transfer students 
-                                        "2 of them" 
+                                   New in Fall 2022 
+                "2 first-time students, 1 transfer" 
+                           Started before Fall 2022 
+                 "1 first-time student, 1 transfer" 
                                 Start not on record 
-                                        "5 of them" 
+                                       "5 students" 
+    Code
+      describe_retention_scope(graduate)
+    Output
+                                                     Counted, Fall 2022 
+                                 "2 Graduate students, home campus ABQ" 
+                                                    Start not on record 
+                                                           "2 students" 
+                                                            Not counted 
+      "students at another level: Undergraduate 7; no level recorded 1" 
     Code
       cat(retention_who_note(who))
     Output
-      A transfer student is counted like any other, from their first term here. A student at another level is not counted: choose that level above to read them. Of the 7 counted in Fall 2022, the record calls 3 first-time students and 2 new transfers in the term they arrived; the other 2 it never calls new in the terms on record (readmitted after time away, moved from another campus or level, or here before the records begin). A student who arrived more than once is read by the latest.
+      A transfer student is counted like any other, from their first term here. A student at another level is not counted: choose that level above to read them. Of the 7 counted in Fall 2022, 3 are new that term (2 first-time students and 1 transfer, counting any who started the summer before); 2 started before it (1 first-time student and 1 transfer); and the other 2 the record never calls new in the terms on record (readmitted after time away, moved from another campus or level, or here before the records begin). A student who arrived more than once is read by the latest.
+    Code
+      cat(retention_who_note(graduate))
+    Output
+      A transfer student is counted like any other, from their first term here. A student at another level is not counted: choose that level above to read them. None of the 2 counted in Fall 2022 has a start on record at this level: the record never calls them first-time students or new transfers here, so which of them are new that term cannot be told.
     Code
       cat(retention_who_note(NULL))
     Output
@@ -79,7 +92,7 @@
       cat(format_retention_dashboard(rr01$dashboard), sep = "\n")
     Output
       Return to the next regular term, fall terms, level UG; settled through Fall 2024, grades through Fall 2022.
-      Left out: 8 awarded a degree that term or before the next regular term (0 in between, 0 applied for one not yet posted); 10 whose next regular term is not yet settled.
+      Left out: 8 awarded a degree that term or before the next regular term (0 in between, 0 applied for one not yet posted). Not read yet: 10 in Fall 2024, whose next term, Spring 2025, has not settled.
       Overall: 71.7% for Fall 2020, 81.7% for Fall 2023. Across the 4 terms the fitted line moves +3.3 points a year, where chance and the terms' own scatter give about 4.9: steady.
         Fall 2020: 43 of 60 returned, 71.7%.
         Fall 2021: 45 of 60 returned, 75.0%.

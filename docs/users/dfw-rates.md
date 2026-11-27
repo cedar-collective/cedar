@@ -12,7 +12,7 @@ nav_order: 11.5
 
 ---
 
-DFW Rates is the institution-wide view of D, F and withdrawal grades in lower-division courses. It lives under **Bird's Eye > DFW Rates**. It answers four questions, in order: is the rate going up or down; which courses hold the DFW grades; which courses are changing; and which courses' sections disagree term after term.
+DFW Rates is the institution-wide view of D, F and withdrawal grades in lower-division courses. It lives under **Bird's Eye > DFW Rates**. It answers four questions, in order: is the rate going up or down; which courses hold the DFW grades; which courses are changing; and how far apart each course's sections are.
 
 One course at a time, with its instructors, is **Course Dynamics > DFW**; a department's courses are **Dept Trends**.
 
@@ -39,7 +39,7 @@ The link button's **Copy link** copies a shareable URL for the current term type
 | **How UNM Is Doing** | The latest term's rate with its counts, the trend in points a year with its verdict (rising, falling or steady), and every term's rate as a bar split into what the DFW grades were: withdrawals, F, D or C-, and other nonpassing grades. |
 | **Where the DFW Grades Are** | How few courses hold a quarter and half of the last three terms' DFW grades, the fifteen courses with the most, coloured by their trend, and every listed course in a table with its share, running share and its rates as a small line (hover for the trend). |
 | **What Is Changing** | How many listed courses are rising, falling or swinging; the ten rising and ten falling courses with the most DFW grades, each bar the change in its rate a year along its trend (+2 means a 20% rate becomes 22% a year later); and the courses that swing from term to term more than courses usually do. |
-| **Sections That Disagree** | How many course-terms had sections whose rates differed by more than chance, and, for the courses uneven in two or more terms, every section of their uneven terms against the course's rate that term. |
+| **Sections That Disagree** | How far apart a course's sections are on DFW rate, in points beyond what chance gives sections of their sizes, averaged over its terms, with its lowest and highest section beside it; whether each course's sections are spreading, consolidating or showing no clear change; every course pooled, term by term; and the fifteen courses whose sections are furthest apart. |
 | **By Campus and College** | Each campus and college's first and last rate and its terms as a small line (hover for the trend). The campus table reads every campus; the college table reads the campuses picked. |
 
 Each section's **How this is counted** gives its thresholds and the edge it reads to.
@@ -52,6 +52,8 @@ Each section's **How this is counted** gives its thresholds and the edge it read
 - **A course on two campuses is two rows.** Each campus's attempts are its own.
 - **A trend needs four terms with 30 or more attempts.** Its slope is judged against what chance and the terms' own scatter would give with no trend; only a slope beyond that is called rising or falling.
 - **A swing is measured against how much courses usually move.** Every course's rate moves a few points a term beyond chance (a new instructor, another cohort). A course swings when it moves more than that, by more than luck explains across every course tested at once. It is a question to ask, not a verdict.
+- **Points apart is not the gap between the lowest and highest section.** It is about how far a section's rate sits from its course's, after taking out what chance alone gives sections of their sizes, so sections that differ only by chance read 0. The gap between the lowest and highest section grows with the number of sections by chance alone; it is shown beside the points and does not rank the courses.
+- **A course's sections get a direction from four terms.** Spreading or consolidating is called only when the line through its terms clears chance and the terms' own scatter, so most courses read no clear change. A course read in fewer terms is not listed.
 - **Sections are CRNs.** No instructor is named. Sections differ for reasons the grades do not record, such as time of day, delivery and which students chose them.
 - **NR grades count as DFW.** A term where many grades were not yet posted reads high; the page says so above the first section when that happens.
 

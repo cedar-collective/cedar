@@ -6,15 +6,18 @@
 # and the module's columns round once, for display.
 #
 #   calculation   dfw_overall_finding(), dfw_concentration_parts(),
-#                 dfw_change_counts(), dfw_section_parts(),
-#                 dfw_course_table(), dfw_swing_table(),
-#                 dfw_section_course_table(), dfw_group_table()
+#                 dfw_change_counts(), dfw_spread_finding(),
+#                 dfw_spread_direction_parts(), dfw_course_table(),
+#                 dfw_swing_table(), dfw_spread_course_table(),
+#                 dfw_group_table()
 #   plot prep     prepare_dfw_overall_plot_data(), prepare_dfw_course_bars(),
-#                 prepare_dfw_slope_plot_data(), prepare_dfw_section_strip_data()
+#                 prepare_dfw_slope_plot_data(), prepare_dfw_spread_term_plot_data(),
+#                 prepare_dfw_spread_course_bars()
 #   plotting      plot_dfw_overall(), plot_dfw_course_bars(), plot_dfw_slopes(),
-#                 plot_dfw_section_strip()
+#                 plot_dfw_spread_terms(), plot_dfw_spread_course_bars()
 #
-# Depends on: dfw_trend_sentence(), DFW_NR_NOTE_SHARE (features/dfw-dashboard.R),
+# Depends on: dfw_trend_sentence(), dfw_spread_direction_phrase(),
+#             DFW_SPREAD_DIRECTIONS, DFW_NR_NOTE_SHARE (features/dfw-dashboard.R),
 #             fmt_term(), term_axis_factor(), CEDAR_PALETTE,
 #             CEDAR_SEMANTIC_COLORS (trunk/utils.R)
 
@@ -26,8 +29,9 @@ DFW_GRADE_KIND_LABELS <- c(n_w = "Withdrew (W)", n_f = "F", n_dc = "D or C-",
 DFW_DIRECTION_LABELS <- c(rising = "Rising", falling = "Falling", steady = "Steady",
                           too_few_terms = "Too few terms", none = "No trend")
 
-DFW_SECTION_POSITION_LABELS <- c(above = "Above the course's rate", within = "Within chance",
-                                 below = "Below the course's rate")
+# The directions a spread between sections can take, in the order drawn
+# (get_dfw_section_spread()'s `direction`).
+DFW_SPREAD_DIRECTION_CODES <- c("rising", "falling", "steady")
 
 .dfw_view_check <- function(payload) {
   if (!inherits(payload, "dfw_dashboard")) {
@@ -42,6 +46,20 @@ DFW_SECTION_POSITION_LABELS <- c(above = "Above the course's rate", within = "Wi
 .dfw_view_direction_colors <- function() {
   stats::setNames(unname(CEDAR_SEMANTIC_COLORS[c("negative", "positive", "reference", "other", "other")]),
                   unname(DFW_DIRECTION_LABELS))
+}
+
+# A spread's direction as the page names it: DFW_SPREAD_DIRECTIONS' words,
+# opening a cell or a legend entry.
+.dfw_view_spread_direction <- function(x) {
+  word <- unname(DFW_SPREAD_DIRECTIONS[x])
+  paste0(toupper(substr(word, 1, 1)), substring(word, 2))
+}
+
+# The courses the page lists: read in enough terms for a direction, widest
+# first. A course read in fewer is one or two terms, not an average.
+.dfw_view_spread_listed <- function(payload) {
+  courses <- payload$sections$spread_courses
+  courses[courses$direction != "too_few_terms", , drop = FALSE]
 }
 
 # Each course's rates, oldest term first, over the terms its trend reads.
@@ -113,19 +131,47 @@ dfw_change_counts <- function(payload) {
              stringsAsFactors = FALSE)
 }
 
-#' Tested course-terms split by whether their sections agreed
+#' How far apart sections are, over every course and term in scope
 #'
 #' @param payload build_dfw_dashboard() output.
-#' @return One row each for `uneven` and `even`: `part`, `n` (course-terms),
-#'   `label`; attribute `n_repeat` (courses uneven in two or more terms).
-dfw_section_parts <- function(payload) {
+#' @return A list: `n_courses` and `n_course_terms` read (0 when no course in
+#'   scope has enough sections to compare, and the rest NA), `first_term`,
+#'   `last_term`, `spread_pts` (points, beyond chance), `lo_pct`, `hi_pct`
+#'   (the lowest and highest section, averaged over the course-terms), and
+#'   `direction_phrase` (dfw_spread_direction_phrase() of the term-by-term
+#'   series).
+dfw_spread_finding <- function(payload) {
   .dfw_view_check(payload)
-  ct <- payload$sections$course_terms
-  out <- data.frame(part = c("uneven", "even"), n = c(sum(ct$uneven), sum(!ct$uneven)),
-                    label = c("course-terms whose sections differed more than chance allows",
-                              "course-terms whose sections agreed within chance"),
-                    stringsAsFactors = FALSE)
-  attr(out, "n_repeat") <- sum(payload$sections$courses$terms_uneven >= 2L)
+  s <- payload$sections
+  avg <- s$overall$average
+  if (nrow(avg) == 0L) {
+    return(list(n_courses = 0L, n_course_terms = 0L, first_term = NA_integer_, last_term = NA_integer_,
+                spread_pts = NA_real_, lo_pct = NA_real_, hi_pct = NA_real_, direction_phrase = NA_character_))
+  }
+  # MAX-TERM-OK: the first and last terms of the series the payload already
+  # holds, stated as its range; the build bounded it at its edge.
+  list(n_courses = avg$n_courses, n_course_terms = avg$n_course_terms,
+       first_term = min(s$overall$terms$term), last_term = max(s$overall$terms$term),
+       spread_pts = avg$spread_pts, lo_pct = avg$lo_pct, hi_pct = avg$hi_pct,
+       direction_phrase = dfw_spread_direction_phrase(s$overall$trend))
+}
+
+#' The listed courses split by where their sections are heading
+#'
+#' @param payload build_dfw_dashboard() output.
+#' @return One row each for `rising` (spreading), `falling` (consolidating)
+#'   and `steady` (no clear change): `part`, `n` (courses), `label`;
+#'   attributes `n_short` (courses read in too few terms for a direction, not
+#'   listed) and `min_trend_terms`.
+dfw_spread_direction_parts <- function(payload) {
+  .dfw_view_check(payload)
+  s <- payload$sections
+  out <- data.frame(part = DFW_SPREAD_DIRECTION_CODES,
+                    n = vapply(DFW_SPREAD_DIRECTION_CODES, function(d) sum(s$spread_courses$direction == d), integer(1)),
+                    label = unname(DFW_SPREAD_DIRECTIONS[DFW_SPREAD_DIRECTION_CODES]),
+                    row.names = NULL, stringsAsFactors = FALSE)
+  attr(out, "n_short") <- sum(s$spread_courses$direction == "too_few_terms")
+  attr(out, "min_trend_terms") <- s$meta$min_trend_terms
   out
 }
 
@@ -163,16 +209,26 @@ dfw_swing_table <- function(payload) {
                  series = .dfw_view_series(b$terms, rows))
 }
 
-#' Every course with a tested course-term, most uneven first
+#' The listed courses' sections, furthest apart first
 #'
 #' @param payload build_dfw_dashboard() output.
-#' @return The section spread's `courses`, with `dfw_pct` over its tested
-#'   terms.
-dfw_section_course_table <- function(payload) {
+#' @return One row per campus-course read in enough terms for a direction:
+#'   `subject_course`, `campus`, `spread_pts` (points, beyond chance, its
+#'   terms pooled), `lo_pct`, `hi_pct` (its lowest and highest section,
+#'   averaged over its terms), `direction` (as the page names it), `dfw_pct`
+#'   (over the terms read), `terms_read`, `sections_per_term`, `n_attempts`,
+#'   and `series` (a list: its spread each term, oldest first).
+dfw_spread_course_table <- function(payload) {
   .dfw_view_check(payload)
-  dplyr::mutate(payload$sections$courses, dfw_pct = 100 * n_dfw / n_attempts) %>%
-    dplyr::relocate(subject_course, campus) %>%
-    dplyr::relocate(dfw_pct, .after = n_dfw)
+  rows <- .dfw_view_spread_listed(payload)
+  terms <- payload$sections$spread_terms
+  keyed <- split(terms$spread_pts, paste(terms$campus, terms$subject_course))
+  tibble::tibble(subject_course = rows$subject_course, campus = rows$campus, spread_pts = rows$spread_pts,
+                 lo_pct = rows$lo_pct, hi_pct = rows$hi_pct,
+                 direction = .dfw_view_spread_direction(rows$direction), dfw_pct = rows$dfw_pct,
+                 terms_read = rows$terms_read, sections_per_term = rows$sections_per_term,
+                 n_attempts = rows$n_attempts,
+                 series = unname(keyed[paste(rows$campus, rows$subject_course)]))
 }
 
 #' One row per group of a term series: where it started, ended and is heading
@@ -252,33 +308,32 @@ prepare_dfw_slope_plot_data <- function(payload, n = 10L) {
     dplyr::arrange(dplyr::desc(slope))
 }
 
-#' The sections of the courses uneven term after term
+#' How far apart sections were each term, every course pooled
 #'
 #' @param payload build_dfw_dashboard() output.
-#' @param n_courses How many courses uneven in two or more terms.
-#' @return A list: `sections` (one row per section in those courses' uneven
-#'   terms: `row` (course, campus and term), `crn`, `n_attempts`, `n_dfw`,
-#'   `dfw_pct`, `band_lo`, `band_hi`, `position` (a factor of
-#'   DFW_SECTION_POSITION_LABELS)), `course_terms` (one row per `row`: its
-#'   pooled `dfw_pct`), `rows` (the row labels, in the order drawn).
-prepare_dfw_section_strip_data <- function(payload, n_courses = 6L) {
+#' @return One row per term with a spread to read: `term`, `term_label`,
+#'   `spread_pts` (points, beyond chance), `n_courses`.
+prepare_dfw_spread_term_plot_data <- function(payload) {
   .dfw_view_check(payload)
-  s <- payload$sections
-  picked <- utils::head(s$courses[s$courses$terms_uneven >= 2L, c("campus", "subject_course"), drop = FALSE],
-                        n_courses)
-  ct <- s$course_terms %>%
-    dplyr::semi_join(picked, by = c("campus", "subject_course")) %>%
-    dplyr::filter(uneven) %>%
-    dplyr::mutate(.order = match(paste(campus, subject_course), paste(picked$campus, picked$subject_course))) %>%
-    dplyr::arrange(.order, term) %>%
-    dplyr::mutate(row = paste0(.dfw_view_label(subject_course, campus), " · ",
-                               vapply(term, fmt_term, character(1))))
-  sections <- s$sections %>%
-    dplyr::inner_join(dplyr::select(ct, campus, subject_course, term, row), by = c("campus", "subject_course", "term")) %>%
-    dplyr::transmute(row, crn, n_attempts, n_dfw, dfw_pct, band_lo, band_hi,
-                     position = factor(unname(DFW_SECTION_POSITION_LABELS[position]),
-                                       levels = unname(DFW_SECTION_POSITION_LABELS)))
-  list(sections = sections, course_terms = dplyr::select(ct, row, dfw_pct, n_sections), rows = ct$row)
+  terms <- payload$sections$overall$terms
+  tibble::tibble(term = terms$term, term_label = term_axis_factor(terms$term),
+                 spread_pts = terms$spread_pts, n_courses = terms$n_courses)
+}
+
+#' The listed courses whose sections are furthest apart, for a bar each
+#'
+#' @param payload build_dfw_dashboard() output.
+#' @param n How many courses.
+#' @return One row per course, furthest apart first: `label`, `spread_pts`,
+#'   `lo_pct`, `hi_pct`, `dfw_pct`, `terms_read`, `direction` (a factor, in
+#'   DFW_SPREAD_DIRECTION_CODES' order, as the page names each).
+prepare_dfw_spread_course_bars <- function(payload, n = 15L) {
+  .dfw_view_check(payload)
+  rows <- utils::head(.dfw_view_spread_listed(payload), n)
+  tibble::tibble(label = .dfw_view_label(rows$subject_course, rows$campus), spread_pts = rows$spread_pts,
+                 lo_pct = rows$lo_pct, hi_pct = rows$hi_pct, dfw_pct = rows$dfw_pct, terms_read = rows$terms_read,
+                 direction = factor(.dfw_view_spread_direction(rows$direction),
+                                    levels = .dfw_view_spread_direction(DFW_SPREAD_DIRECTION_CODES)))
 }
 
 # ── Plotting ─────────────────────────────────────────────────────────────────
@@ -364,38 +419,47 @@ plot_dfw_slopes <- function(slopes) {
                  legend = .dfw_plot_legend, margin = list(l = 140))
 }
 
-#' Each uneven course-term's sections against the course's rate that term
+#' How far apart sections were, term by term
 #'
-#' @param strip prepare_dfw_section_strip_data() output.
-plot_dfw_section_strip <- function(strip) {
-  colors <- stats::setNames(unname(CEDAR_SEMANTIC_COLORS[c("negative", "reference", "positive")]),
-                            unname(DFW_SECTION_POSITION_LABELS))
-  sec <- strip$sections
+#' @param plot_data prepare_dfw_spread_term_plot_data() output.
+plot_dfw_spread_terms <- function(plot_data) {
+  labels <- as.character(plot_data$term_label)
   p <- plotly::plot_ly()
   p <- plotly::add_trace(
-    p, x = strip$course_terms$dfw_pct, y = strip$course_terms$row, type = "scatter", mode = "markers",
-    name = "The course's rate that term",
-    marker = list(symbol = "line-ns-open", size = 18, color = unname(CEDAR_SEMANTIC_COLORS["neutral"]),
-                  line = list(width = 2)),
-    hovertext = paste0(strip$course_terms$row, "<br>", sprintf("%.1f%%", strip$course_terms$dfw_pct),
-                       " across ", strip$course_terms$n_sections, " sections"),
+    p, x = labels, y = plot_data$spread_pts, type = "scatter", mode = "lines+markers", name = "Every course",
+    line = list(color = unname(CEDAR_SEMANTIC_COLORS["neutral"]), width = 2),
+    marker = list(color = unname(CEDAR_SEMANTIC_COLORS["neutral"]), size = 8),
+    hovertext = paste0(labels, "<br>", sprintf("%.1f", plot_data$spread_pts),
+                       " points between a section's DFW rate and its course's, beyond chance<br>",
+                       fmt_count(plot_data$n_courses), " courses read"),
     hoverinfo = "text"
   )
-  for (pos in intersect(levels(sec$position), as.character(sec$position))) {
-    rows <- sec[sec$position == pos, , drop = FALSE]
+  plotly::layout(p, showlegend = FALSE,
+                 xaxis = list(title = "", type = "category", categoryorder = "array", categoryarray = labels),
+                 yaxis = list(title = "Points apart, beyond chance", rangemode = "tozero"))
+}
+
+#' The courses whose sections are furthest apart, a bar each, coloured by direction
+#'
+#' @param bars prepare_dfw_spread_course_bars() output.
+plot_dfw_spread_course_bars <- function(bars) {
+  colors <- stats::setNames(unname(CEDAR_SEMANTIC_COLORS[c("warning", "positive", "reference")]),
+                            levels(bars$direction))
+  p <- plotly::plot_ly()
+  for (d in intersect(levels(bars$direction), as.character(bars$direction))) {
+    rows <- bars[bars$direction == d, , drop = FALSE]
     p <- plotly::add_trace(
-      p, x = rows$dfw_pct, y = rows$row, type = "scatter", mode = "markers", name = pos,
-      marker = list(color = colors[[pos]], size = 6 + 2 * sqrt(rows$n_attempts),
-                    line = list(color = "#FFFFFF", width = 1)),
-      hovertext = paste0("CRN ", rows$crn, ": ", fmt_count(rows$n_dfw), " DFW of ", fmt_count(rows$n_attempts),
-                         " (", sprintf("%.1f%%", rows$dfw_pct), ")<br>Chance allows ",
-                         sprintf("%.0f", rows$band_lo), "–", sprintf("%.0f%%", rows$band_hi),
-                         " for a section this size"),
+      p, x = rows$spread_pts, y = rows$label, type = "bar", orientation = "h", name = d,
+      marker = list(color = colors[[d]]),
+      hovertext = paste0(rows$label, "<br>", sprintf("%.1f", rows$spread_pts), " points apart, beyond chance, over ",
+                         rows$terms_read, " terms<br>Lowest section ", sprintf("%.1f%%", rows$lo_pct), ", highest ",
+                         sprintf("%.1f%%", rows$hi_pct), " on average; the course ", sprintf("%.1f%%", rows$dfw_pct),
+                         "<br>Direction: ", d),
       hoverinfo = "text"
     )
   }
-  plotly::layout(p,
-                 xaxis = list(title = "Section DFW rate", ticksuffix = "%", range = c(-3, 103)),
-                 yaxis = list(title = "", categoryorder = "array", categoryarray = rev(strip$rows)),
-                 legend = list(orientation = "h", x = 0, y = -0.16), margin = list(l = 210))
+  plotly::layout(p, barmode = "overlay",
+                 xaxis = list(title = "Points between a section's DFW rate and its course's, beyond chance"),
+                 yaxis = list(title = "", categoryorder = "array", categoryarray = rev(bars$label)),
+                 legend = .dfw_plot_legend, margin = list(l = 140))
 }

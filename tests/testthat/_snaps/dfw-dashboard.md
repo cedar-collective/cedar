@@ -4,6 +4,7 @@
       cat(.dfw_dash_spread(p$sections, 15L), sep = "\n")
     Output
         How far apart, in points beyond what chance gives sections of their sizes (Fall 2019 to Fall 2022; a direction is read from 4 or more terms):
+          Every course and term: 17.3 over 12 course-terms in 3 courses (lowest section 16.7%, highest 45.8% on average).
           Every course, by term: 17.0, 16.3, 17.0, 19.0 (3, 3, 3, 3 courses): no clear change, the fitted line from 16.3 to 18.3.
           MATH 1220 (ABQ)    24.9 over 4 terms (3.0 sections a term; lowest 17.5%, highest 57.5% on average): spreading, the fitted line from 0.0 to 39.9.
           MATH 1220 (GA)     24.9 over 4 terms (3.0 sections a term; lowest 17.5%, highest 57.5% on average): consolidating, the fitted line from 39.9 to 0.0.
@@ -15,6 +16,7 @@
       cat(.dfw_dash_spread(three_falls, 15L), sep = "\n")
     Output
         How far apart, in points beyond what chance gives sections of their sizes (Fall 2020 to Fall 2022; a direction is read from 4 or more terms):
+          Every course and term: 17.1 over 6 course-terms in 2 courses (lowest section 13.3%, highest 45.0% on average).
           Every course, by term: 0.0, 22.1, 23.8 (2, 2, 2 courses): too few terms for a direction.
           Not listed: 2 courses read in fewer than 4 terms.
 
@@ -31,6 +33,7 @@
       cat(.dfw_dash_spread(s, 15L), sep = "\n")
     Output
         How far apart, in points beyond what chance gives sections of their sizes (Fall 2019 to Fall 2022; a direction is read from 4 or more terms):
+          Every course and term: 14.5 over 7 course-terms in 2 courses (lowest section 18.6%, highest 44.3% on average).
           Every course, by term: 0.0, 0.0, 22.1, 38.5 (2, 2, 2, 1 courses): spreading, the fitted line from 0.0 to 35.4.
           MATH 1220 (ABQ)    24.9 over 4 terms (3.0 sections a term; lowest 17.5%, highest 57.5% on average): spreading, the fitted line from 0.0 to 39.9.
           Not listed: 1 course read in fewer than 4 terms.
@@ -66,11 +69,9 @@
         Swinging more than courses usually do (a typical course moves 0.0 points a term beyond chance; 4 courses tested at once): 1, most DFW grades first:
           PSYC 1110 (ABQ)    19.0 points a term around its line
       
-      4. Sections that disagree (Fall 2020, Fall 2021, Fall 2022)
-        6 course-terms had 3 or more sections of 10+ attempts; in 2 the sections' rates differed more than chance allows.
-        Uneven in two or more terms: 1 course:
-          MATH 1220 (ABQ)    uneven in 2 of 3 terms: Fall 2021 0-80% across 3; Fall 2022 20-100% across 3
+      4. Sections that disagree
         How far apart, in points beyond what chance gives sections of their sizes (Fall 2019 to Fall 2022; a direction is read from 4 or more terms):
+          Every course and term: 13.1 over 8 course-terms in 2 courses (lowest section 16.2%, highest 40.0% on average).
           Every course, by term: 0.0, 0.0, 22.1, 23.8 (2, 2, 2, 2 courses): spreading, the fitted line from 0.0 to 24.8.
           MATH 1220 (ABQ)    24.9 over 4 terms (3.0 sections a term; lowest 17.5%, highest 57.5% on average): spreading, the fitted line from 0.0 to 39.9.
           ENGL 1110 (ABQ)    0.0 over 4 terms (4.0 sections a term; lowest 15.0%, highest 22.5% on average): no clear change, the fitted line from 0.0 to 0.0.
