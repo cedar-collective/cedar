@@ -244,7 +244,7 @@ provides `prepare_catalog_normalization(payload, program_id, root, prompt, schem
 `load_catalog_normalization_program(root, key)`, `import_catalog_normalization(root,
 unit, path, model)`, `read_catalog_normalization_review(root, unit, imported)`,
 `save_catalog_normalization_review(root, unit, imported, state, reviewer, expected_head)`,
-`stage_catalog_normalization_drafts(root, directory, capture_root)`, `check_catalog_reading(path, root, capture_root)` and `format_catalog_reading_check()` (every problem in one reading before it is committed: `normalize-degree-catalog.R check`) and
+`stage_catalog_normalization_drafts(root, directory, capture_root)`, `check_catalog_reading(path, root, capture_root)` and `format_catalog_reading_check()` (every problem in one reading before it is committed: `normalize-degree-catalog.R check`), `catalog_normalization_current_packet(root, program, prompt, schema)` and `format_catalog_normalization_unit()` (the passages and references a new reading is written from: `normalize-degree-catalog.R blocks`) and
 `export_catalog_normalization(program, unit, imported, state)`. Source-bound
 packets, original AI responses and attributed review revisions are separate
 files; no model calls or runtime compilation. See [catalog-normalization.md](catalog-normalization.md).

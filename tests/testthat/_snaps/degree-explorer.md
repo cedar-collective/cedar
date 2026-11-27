@@ -1,3 +1,52 @@
+# a new reading is written from the packet prepared under the current prompt and schema
+
+    Code
+      cat(format_catalog_normalization_unit(f$program), sep = "\n")
+    Output
+      Biology B.S. · 2026-2027 Designed Catalog
+      The reading's fields: program_id biology, catalog_id demo-edition, unit_key <key>
+      Packet <key>
+      Targets (a node's entity_id): programs:biology, specializations:cellular
+      
+      15 passages, each covered exactly once:
+      [b-7dcbcb97cd7ee63e0e5368a9] programs:biology · degreeRequirements · Requirements
+          Complete all of the following
+      [b-d393fa921001d2c885dde016] programs:biology · degreeRequirements · Requirements
+          Complete at least 1 of the following:
+      [b-944c096cfb5151e26839fa49] programs:biology · degreeRequirements · Requirements
+          Complete the following:
+      [b-f22d0c38b4ae90977f7c5b99] programs:biology · degreeRequirements · Requirements
+          BIOL2110 - Biology I (3)
+      [b-9e466020241662f635910b1d] programs:biology · degreeRequirements · Requirements
+          BIOL2110L - Biology I Lab (1)
+      [b-12cf2b1d2a007e540e5f8c49] programs:biology · degreeRequirements · Requirements
+          BIOL200 - Combined Biology (4)
+      [b-c83ed948337af5e15eada1e2] programs:biology · graduateAdmissionsRequirements · Admissions Requirements
+          At least two upper-level courses and department permission.
+      [b-5450e022abf0d057ec85a9ce] programs:biology · title · Record field: title
+          "Biology B.S."
+      [b-f5c805f0f7ad0f3f03b55b63] programs:biology · code · Record field: code
+          "BS Biology"
+      [b-cd9154d612042d822e5c8bc2] programs:biology · ugGrDegree · Record field: ugGrDegree
+          "undergraduateProgram"
+      [b-f94d4b00cf84a04d3bcca5d1] programs:biology · degreeType · Record field: degreeType
+          {"name":"Bachelor of Science"}
+      [b-70866de17388f7d2b5a24491] programs:biology · degreeHours · Record field: degreeHours
+          "120"
+      [b-d0c4bcb6e7a2da072eaa9347] specializations:cellular · concentrationRequirements · Concentration Requirements
+          Complete the following:
+      [b-5bd56eb0159be765a0e60837] specializations:cellular · concentrationRequirements · Concentration Requirements
+          BIOL200 - Combined Biology (4)
+      [b-5d7913605fd3394402fa1faf] specializations:cellular · title · Record field: title
+          "Cellular Biology"
+      
+      5 references a node may name:
+          programs:biology  BS Biology  Biology B.S.
+          specializations:cellular    Cellular Biology
+          courses:course-one  BIOL2110  Biology I
+          courses:course-lab  BIOL2110L  Biology I Lab
+          courses:course-two  BIOL200  Combined Biology
+
 # checking a reading names every problem at once, by node or block, before it is committed
 
     Code

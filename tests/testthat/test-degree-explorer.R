@@ -217,6 +217,32 @@ test_that("every reading short of its packet or captured pages is named at once,
     "(?s)1 of 1 catalog readings.*biology[.]v1[.]json: .*source capture is unavailable", perl = TRUE)
 })
 
+test_that("a new reading is written from the packet prepared under the current prompt and schema", {
+  root <- tempfile("catalog-blocks-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root)
+  prompt <- f$unit$request$instructions; schema <- f$unit$request$response_schema
+  # Change: the same program prepared again under other instructions, as an
+  # earlier prompt's packet stays in the store for the readings written from it.
+  prepare_catalog_normalization(f$payload, "biology", f$root, paste(prompt, "Changed instruction"), schema)
+  expect_identical(catalog_normalization_current_packet(f$root, "biology", prompt, schema)$meta$key, f$program$meta$key)
+  expect_identical(catalog_normalization_current_packet(f$root, f$program$meta$key, "", list())$meta$key, f$program$meta$key)
+  expect_error(catalog_normalization_current_packet(f$root, "biology", paste(prompt, "Edited again"), schema),
+    "None of program biology's 2 packets")
+  # Change: prepared again from a copy of its archive elsewhere, the same unit
+  # in a packet that differs only in the archive's path (ISSUES I103).
+  elsewhere <- file.path(root, "moved"); dir.create(elsewhere)
+  file.copy(f$capture, elsewhere, recursive = TRUE)
+  moved <- f$payload; moved$source_directory <- file.path(elsewhere, basename(f$capture))
+  prepare_catalog_normalization(moved, "biology", f$root, prompt, schema)
+  expect_equal(nrow(list_catalog_normalization_programs(f$root)), 3L)
+  expect_identical(catalog_normalization_program_unit(
+    catalog_normalization_current_packet(f$root, "biology", prompt, schema))$key, f$unit$key)
+  expect_error(catalog_normalization_current_packet(f$root, "chemistry", prompt, schema), "No packet for program chemistry")
+  testthat::local_edition(3)
+  expect_snapshot(cat(format_catalog_normalization_unit(f$program), sep = "\n"),
+    transform = function(x) gsub("[0-9a-f]{64}", "<key>", x))
+})
+
 test_that("checking a reading names every problem at once, by node or block, before it is committed", {
   root <- tempfile("catalog-check-"); withr::defer(unlink(root, recursive = TRUE))
   f <- normalization_fixture(root); directory <- file.path(root, "drafts"); dir.create(directory)

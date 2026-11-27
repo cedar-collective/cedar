@@ -261,14 +261,16 @@ catalog_normalization_draft_units <- function(root, directory, capture_root,
 
 #' Every problem in one catalog reading, found before it is committed
 #'
-#' What staging and the board compiler would refuse, all in one pass, so a
-#' reading is fixed in one round rather than one error at a time: the file's
-#' own fields and its source packet and captured pages
+#' What staging would refuse, and the triage the board compiler checks, all
+#' in one pass, so a reading is fixed in one round rather than one error at a
+#' time: the file's own fields and its source packet and captured pages
 #' (`catalog_normalization_draft_units()`), every problem in its proposal
 #' (`catalog_normalization_problems()`, each naming its node, block or
 #' question), and its triage against the open items
 #' (`degree_reading_question_rows()`). A problem that stops the rest from
 #' being read (no packet, a proposal of the wrong shape) is reported alone.
+#' What needs the board too (`gen_ed_pools`, the degree total, a catalog row)
+#' is checked when the readings are compiled.
 #'
 #' @param path The reading file.
 #' @param root The institution's catalog-normalization store.
@@ -308,6 +310,82 @@ format_catalog_reading_check <- function(check) {
   c(paste0(check$path, ": ready to commit; ", nrow(check$open), if (nrow(check$open) == 1L) " open item" else " open items",
            if (length(counts)) paste0(" (", paste(paste0(names(counts), " ", counts), collapse = ", "), ")")),
     if (nrow(check$open)) paste0("  ", check$open$item, " [", who, "]: ", check$open$label))
+}
+
+# A packet's one unit for its program and embedded concentrations; the rest
+# are its linked courses' units.
+catalog_normalization_program_unit <- function(program) {
+  units <- Filter(function(u) identical(u$title, "Program and concentrations"), program$packet$units)
+  if (length(units) != 1L) stop("[catalog-normalization.R] Packet ", program$meta$key, " has ", length(units), " program units, not one")
+  units[[1]]
+}
+
+#' The packet a new reading of a program is written from
+#'
+#' A program can have several packets in the store, one for each prompt and
+#' schema it was prepared under, kept for the readings written from them. A
+#' new reading is written from the one prepared under the current prompt and
+#' schema; passing a packet key selects that packet instead. Packets whose
+#' program units are the same unit (the same sources, prepared again from an
+#' archive somewhere else: ISSUES I103) are one choice, and the most recently
+#' prepared is returned.
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param program The catalog's program id (as in the program's catalog
+#'   page), or a packet key.
+#' @param prompt,schema The current instructions and response schema
+#'   (`config/catalog-normalization-prompt.txt`, `...schema.json`).
+#' @return `load_catalog_normalization_program()` output.
+catalog_normalization_current_packet <- function(root, program, prompt, schema) {
+  if (grepl("^[a-f0-9]{64}$", program)) return(load_catalog_normalization_program(root, program))
+  loaded <- lapply(list_catalog_normalization_programs(root)$key, function(key) load_catalog_normalization_program(root, key))
+  mine <- Filter(function(x) identical(x$packet$program_id, program), loaded)
+  if (!length(mine)) {
+    stop("[catalog-normalization.R] No packet for program ", program, " in ", root,
+         ": prepare it first (scripts/normalize-degree-catalog.R prepare)", call. = FALSE)
+  }
+  current <- Filter(function(x) {
+    request <- catalog_normalization_program_unit(x)$request
+    identical(request$instructions, prompt) && identical(request$response_schema, schema)
+  }, mine)
+  # The listing is newest first, so the first packet of each unit is kept.
+  units <- vapply(current, function(x) catalog_normalization_program_unit(x)$key, "")
+  current <- current[!duplicated(units)]
+  if (!length(current)) {
+    stop("[catalog-normalization.R] None of program ", program, "'s ", length(mine),
+         " packets was prepared under the current prompt and schema: prepare it again", call. = FALSE)
+  }
+  if (length(current) > 1L) {
+    stop("[catalog-normalization.R] Program ", program, " has ", length(current),
+         " packets from different sources under the current prompt and schema; pass one of their keys: ",
+         paste(vapply(current, function(x) paste(x$meta$key, x$packet$catalog_title), ""), collapse = "; "), call. = FALSE)
+  }
+  current[[1]]
+}
+
+#' A program unit as the lines a reading is written from
+#'
+#' Everything a reading needs from its packet, in one place: the fields its
+#' file names, every passage it must cover (full id, entity, record field,
+#' section, text) and every reference a node may name.
+#'
+#' @param program `load_catalog_normalization_program()` output.
+#' @return Character vector.
+format_catalog_normalization_unit <- function(program) {
+  packet <- program$packet; unit <- catalog_normalization_program_unit(program); request <- unit$request
+  blocks <- request$source_blocks; registry <- request$reference_registry
+  links <- vapply(request$unresolved_links, function(x) paste(unlist(x), collapse = " "), "")
+  c(paste0(packet$title, " · ", packet$catalog_title),
+    paste0("The reading's fields: program_id ", packet$program_id, ", catalog_id ", packet$catalog_id,
+           ", unit_key ", unit$key),
+    paste0("Packet ", program$meta$key),
+    paste0("Targets (a node's entity_id): ", paste(unlist(request$target_entities), collapse = ", ")),
+    if (length(links)) paste0("Linked, not captured: ", paste(links, collapse = "; ")),
+    "", paste0(length(blocks), " passages, each covered exactly once:"),
+    unlist(lapply(blocks, function(b) c(paste0("[", b$id, "] ", b$entity_id, " · ", b$field, " · ", b$section),
+                                        paste0("    ", b$text)))),
+    "", paste0(length(registry), " references a node may name:"),
+    vapply(registry, function(r) paste0("    ", r$id, "  ", r$code, "  ", r$title), ""))
 }
 
 # Maintainer-authored AI drafts live in Git beside the institution's data. Stage

@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I103](#i103--preparing-a-program-again-after-its-archive-moved-makes-a-second-packet-for-the-same-unit) | Defect | A packet's key hashes its archive's absolute path, so preparing a program again since the archive moved to `CEDAR_DATA_DIR` (I101) writes a duplicate packet for the same unit |
 | [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
 | [I96](#i96--the-demo-browser-suites-dept-trends-step-can-read-the-course-list-before-the-server-has-filtered-it) | Defect | The demo browser suite's Dept Trends step failed twice in three runs: it read the course list after "Other departments" was set and still found the department's own course; the page filters correctly by hand |
 | [I95](#i95--retention-looks-dead-for-most-of-a-minute-on-its-first-visit-after-a-start) | Defect | Retention's first visit after a start takes about 45 s on production with nothing saying it is working past the first 8 s: its view is not built ahead, and the overlay covers one of its seven builds |
@@ -214,6 +215,34 @@ an option (a `credits` node with no courses), and staging accepts it.
 **Fix:** draw the choice as elective space of its smallest option's credits,
 naming the options in its detail. Failing that, list it for the reviewer. In
 neither case may one reading stop the others.
+
+## I103 — Preparing a program again after its archive moved makes a second packet for the same unit
+
+**Status:** open.
+**Found:** 2026-11-27, writing the catalog-reading skill.
+**Severity:** low. A reading binds to its unit's key, which does not change,
+so nothing reads wrongly; the store gains a duplicate packet for every program
+prepared again, and Draft interpretations lists the program twice.
+
+A packet's key is the hash of the whole packet, and the packet records its
+archive's absolute path (`source_directory`, `prepare_catalog_normalization()`).
+I101 moved the archive from the repository's `data/` into `CEDAR_DATA_DIR`,
+so preparing a program the store already holds writes a second packet that
+differs only in that path. Its program unit, and every reading's `unit_key`,
+are the same. Preparing on another machine does the same. The path is only a
+fallback when a packet's sources are verified: the archive is found as
+`capture_root/<the path's last folder>` first
+(`catalog_normalization_capture_directory()`).
+
+**Reproduction:** `scripts/normalize-degree-catalog.R prepare --analysis
+<archive>/analysis-requisite-timing-1.4.0 --programs SypQxQ9j5 --output
+<scratch>` writes packet `c4b2ae66…`; the store's packet for Civil
+Engineering is `0ee14a62…`. Both program units' keys are `c3baaa2b…`, and the
+two packets differ only in `source_directory`.
+
+**Done when:** a packet's identity does not depend on where its archive sits
+(only the archive's folder name kept, say), with the store's existing packets
+still loading and their readings still matched.
 
 ## I102 — Every refresh of Draft interpretations restages every reading, and the admin browser suite times out waiting
 
