@@ -1049,6 +1049,15 @@ catalog_questions_designed <- data.frame(
               "Earned at least 12 credits from HIST 300 - 499."),
   settled_by = c("catalog", "", "reading"))
 
+# One degree total the catalog states two ways, as the compile script adds it
+# from the catalog scan (catalog_total_conflict_questions()): it names no
+# reading, so no reading file can make it stale (test-degree-drafts.R).
+catalog_total_question_designed <- data.frame(reading = "", reading_file_sha256 = "", program_id = "biology",
+  program_title = "Bachelor of Science in Biology", catalog_url = "https://catalog.example.invalid/#/programs/biology",
+  catalog_id = "", item = "total", kind = "total", label = "Degree total",
+  question = "The catalog gives this degree two totals. Which is right?", block_id = "", section = "Total credits",
+  passage = "Degree Hours field: 120; Grand Total Credits: 130", settled_by = "catalog")
+
 # ── test-enrollment-projection-scenario.R, test-projection-inputs.R, ─────────────
 # ── test-projection-model.R, test-projection-view.R ─────────────────────────────
 

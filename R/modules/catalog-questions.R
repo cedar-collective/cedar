@@ -9,7 +9,8 @@ catalog_questions_method <- function() {
       tags$li(tags$strong(CATALOG_QUESTION_SETTLERS[["catalog"]]), ": the catalog contradicts itself, is unclear or names nothing. The department or the catalog office answers, and the catalog changes."),
       tags$li(tags$strong(CATALOG_QUESTION_SETTLERS[["capture"]]), ": the catalog says it on a linked page or in a footnote that CEDAR's copy did not keep. The catalog scan is fixed."),
       tags$li(tags$strong(CATALOG_QUESTION_SETTLERS[["reading"]]), ": the catalog leaves a choice and the reading planned it one way. A reviewer confirms or changes the reading.")),
-    p("Who can settle each item is the reading's own judgment, in its file's triage. To change an answer, edit the file the item names, then recompile the boards (scripts/compile-degree-interpretations.R --write)."))
+    p("Who can settle each item is the reading's own judgment, in its file's triage. To change an answer, edit the file the item names, then recompile the boards (scripts/compile-degree-interpretations.R --write)."),
+    p("The list also holds every program whose catalog page gives the degree two totals: the Degree Hours field and a total printed on the page, such as Grand Total Credits. CEDAR's catalog scan finds these whether or not CEDAR has read the program, and only the catalog can settle them."))
 }
 
 catalogQuestionsUI <- function(id, drafts) {

@@ -238,8 +238,8 @@ review_root, shared, drafts, boards)` module mounts under Admin > Data & Usage.
 It defaults to `degreePlanRulesUI/Server(id, catalog, roadmaps)`, using
 `build_degree_plan_rules(catalog, roadmaps, view)` for the actual graph. Optional
 `catalogNormalizationUI(id)` / `catalogNormalizationServer(id, root, capture_root, active, draft_dir)` is under
-Draft interpretations;
-legacy extraction diagnostics remain lazy. `features/catalog-normalization.R`
+Draft interpretations, and `catalogQuestionsUI/Server` under Catalog questions
+(the Extraction diagnostics tab was retired on 2026-11-27). `features/catalog-normalization.R`
 provides `prepare_catalog_normalization(payload, program_id, root, prompt, schema)`,
 `load_catalog_normalization_program(root, key)`, `import_catalog_normalization(root,
 unit, path, model)`, `read_catalog_normalization_review(root, unit, imported)`,

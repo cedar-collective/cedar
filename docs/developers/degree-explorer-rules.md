@@ -46,10 +46,11 @@ optional styling suggestions. The data/API contract is in
   recorded catalog policy, displayed course/choice, enforced ordering/budget
   constraint, or CEDAR planning preference. Recording GPA/admission rules does
   not mean the scheduler checks student eligibility.
-- This list explains the prototype and requires no individual approvals. Older
-  parser flags belong in **Extraction diagnostics**, labeled as parser limits;
-  they are not broken chart rules or a student/advisor approval checklist.
-  Optional future ingestion proposals stay under **Draft interpretations**.
+- This list explains the prototype and requires no individual approvals. The
+  catalog scanner's parser flags are not shown in the app (the Extraction
+  diagnostics tab was retired on 2026-11-27); a degree total the catalog states
+  two ways is a **Catalog questions** item for the catalog to settle. Optional
+  future ingestion proposals stay under **Draft interpretations**.
 - Label entry routes/concentrations explicitly. Required same-level clinical
   blocks may contain more than two courses and mixed levels; retain every
   component, respect the semester maximum, and count actual components in chains.

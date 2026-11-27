@@ -17,9 +17,43 @@ catalog_question_settler_label <- function(settled_by) {
   ifelse(nzchar(settled_by), unname(CATALOG_QUESTION_SETTLERS[settled_by]), CATALOG_QUESTION_NOT_SORTED)
 }
 
-# Where to change an item: its reading file and the item within it.
+# Where to change an item: its reading file and the item within it. An item
+# the catalog scan found on a page CEDAR has not read changes in the catalog.
 catalog_question_location <- function(reading, item) {
-  paste0(reading, " · ", sub(":", " ", item, fixed = TRUE))
+  ifelse(nzchar(reading), paste0(reading, " · ", sub(":", " ", item, fixed = TRUE)),
+    "the catalog page, then a new catalog scan")
+}
+
+#' The programs whose catalog page states the degree's total two ways, as open items
+#'
+#' The catalog scan flags a program whose Degree Hours field disagrees with a
+#' total printed on its own page (`catalog_credit_conflict_rows()`, saved in
+#' the analysis's `source-issues.csv`). Each is an item for the catalog to
+#' settle, whether or not CEDAR has read the program, so it names no reading:
+#' `reading`, `reading_file_sha256`, `catalog_id` and `block_id` are empty.
+#' These were the one flag of the retired Extraction diagnostics tab worth
+#' acting on.
+#'
+#' @param issues The analysis's `source-issues.csv`, as character columns.
+#' @param landing_url The catalog's landing page, from the capture's settings.
+#' @return The `degree_reading_questions` columns, one row per flagged program.
+catalog_total_conflict_questions <- function(issues, landing_url) {
+  absent <- setdiff(c("issue", "entity", "title", "detail"), names(issues))
+  if (length(absent)) stop("[catalog-questions.R] source-issues.csv lacks: ", paste(absent, collapse = ", "))
+  if (length(landing_url) != 1L || !nzchar(landing_url)) stop("[catalog-questions.R] The capture names no catalog landing page")
+  rows <- issues[issues$issue == "total_credit_conflict", , drop = FALSE]
+  pattern <- "^Conflicting total-credit mentions on this program's own captured page \u2014 (.+)\\. This flag does not say which number is correct"
+  odd <- !grepl(pattern, rows$detail, perl = TRUE) | !startsWith(rows$entity, "programs:")
+  if (any(odd)) stop("[catalog-questions.R] A total-credit flag is not in the analyser's form: ", rows$entity[odd][1])
+  totals <- gsub(" \\(/[^)]*\\)", "", sub(paste0(pattern, ".*$"), "\\1", rows$detail, perl = TRUE))
+  totals <- gsub("(structured field)", "field", totals, fixed = TRUE)
+  pid <- sub("^programs:", "", rows$entity)
+  data.frame(reading = rep("", nrow(rows)), reading_file_sha256 = "", program_id = pid, program_title = rows$title,
+    catalog_url = paste0(sub("#.*$", "", landing_url), "#/programs/", pid), catalog_id = "",
+    item = "total", kind = "total", label = "Degree total",
+    question = "The catalog gives this degree two totals. Which is right?", block_id = "",
+    section = "Total credits", passage = totals, settled_by = "catalog", stringsAsFactors = FALSE)[
+      CEDAR_CONFIG_FILE_SPECS$degree_reading_questions]
 }
 
 #' The "Who can settle it" picker: every settler and "Not sorted yet", each with its count
