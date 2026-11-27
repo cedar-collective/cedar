@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I100](#i100--a-compiled-boards-catalog-note-is-shown-nowhere-for-a-program-with-no-hand-built-board) | Defect | A compiled board's catalog note (what the board leaves out) is shown nowhere for the eight programs whose board comes only from a reading |
 | [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
@@ -124,6 +125,34 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 ---
 
 # Defects
+
+## I100 — A compiled board's catalog note is shown nowhere for a program with no hand-built board
+
+**Status:** open.
+**Found:** 2026-11-26, looking at the Secondary Education B.S.Ed. board
+(branch `degree/compiler-i98-i99`).
+**Severity:** low, Degree Explorer only. Nothing wrong is drawn, but a
+caveat the board depends on is hidden. Examples: "The board does not include
+the concentration-teaching fields", and Journalism's concentration that is
+not drawn.
+**Cause:** a catalog row's `notes` is rendered in one place only: the rules
+summary of Admin > Catalog Review > Visualization rules
+(`degreePlanRulesServer()`, `R/modules/degree-explorer.R`). That tab reads
+the hand-built boards (`CEDAR_DEGREE_CATALOG`; `global.R` keeps them as the
+compiler's baseline), so it does not list the eight programs whose board
+comes only from a row in `degree_reading_catalogs.csv`. Degree Explorer reads
+the published boards (`CEDAR_DEGREE_BOARDS`). Its footer shows the generic
+"Illustrative plan" note and its "Rules behind this plan" dialog shows the
+rules table, neither the row's `notes`. PR #432 said each note "shows under
+the program on the rules summary"; that is true only for a program with a
+hand-built board.
+**Reproduction:** open Degree Explorer on Secondary Education B.S.Ed. and
+search the page and the rules dialog for "concentration-teaching fields". Then
+open Admin > Data & Usage > Catalog Review > Visualization rules: its degree
+list holds 24 boards and none of the eight.
+**Fix:** show the published board's `notes` with the board (its footer or
+the rules dialog), and decide whether the Visualization rules tab lists the
+published boards or keeps the baseline and says so.
 
 ## I99 — Degree hours stated in words stop a compiled board: "A minimum of 128 hours" is read as NA
 
