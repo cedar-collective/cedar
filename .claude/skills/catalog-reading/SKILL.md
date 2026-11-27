@@ -44,9 +44,8 @@ Rscript --vanilla scripts/normalize-degree-catalog.R prepare \
   --output "$CEDAR_DATA_DIR"/catalog-normalizations/unm
 ```
 
-Skip this when `blocks` (next step) already finds the program. Preparing a
-program the store holds writes a duplicate packet for the same unit (ISSUES
-I103).
+Preparing a program the store already holds returns its packet and writes
+nothing.
 
 ### 2. Print the unit, and read all of it before writing anything
 

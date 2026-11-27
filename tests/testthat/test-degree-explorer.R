@@ -228,12 +228,13 @@ test_that("a new reading is written from the packet prepared under the current p
   expect_identical(catalog_normalization_current_packet(f$root, f$program$meta$key, "", list())$meta$key, f$program$meta$key)
   expect_error(catalog_normalization_current_packet(f$root, "biology", paste(prompt, "Edited again"), schema),
     "None of program biology's 2 packets")
-  # Change: prepared again from a copy of its archive elsewhere, the same unit
-  # in a packet that differs only in the archive's path (ISSUES I103).
-  elsewhere <- file.path(root, "moved"); dir.create(elsewhere)
-  file.copy(f$capture, elsewhere, recursive = TRUE)
-  moved <- f$payload; moved$source_directory <- file.path(elsewhere, basename(f$capture))
-  prepare_catalog_normalization(moved, "biology", f$root, prompt, schema)
+  # Change: a second capture holding the same text, under another folder: a
+  # third packet, of the same unit, which counts once.
+  second <- file.path(root, "second"); dir.create(second)
+  file.copy(f$capture, second, recursive = TRUE)
+  again <- f$payload; again$source_directory <- file.path(second, "designed-again")
+  file.rename(file.path(second, basename(f$capture)), again$source_directory)
+  prepare_catalog_normalization(again, "biology", f$root, prompt, schema)
   expect_equal(nrow(list_catalog_normalization_programs(f$root)), 3L)
   expect_identical(catalog_normalization_program_unit(
     catalog_normalization_current_packet(f$root, "biology", prompt, schema))$key, f$unit$key)
@@ -241,6 +242,37 @@ test_that("a new reading is written from the packet prepared under the current p
   testthat::local_edition(3)
   expect_snapshot(cat(format_catalog_normalization_unit(f$program), sep = "\n"),
     transform = function(x) gsub("[0-9a-f]{64}", "<key>", x))
+})
+
+test_that("a packet is the same wherever its archive sits, and one that recorded a path is kept (I103)", {
+  root <- tempfile("catalog-moved-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root)
+  prompt <- f$unit$request$instructions; schema <- f$unit$request$response_schema
+  expect_identical(f$program$packet$source_directory, basename(f$capture))
+  # Change: the archive moved, as I101 moved it into CEDAR_DATA_DIR. The same
+  # program prepared again is the same packet, found under its new root.
+  moved_root <- file.path(root, "moved"); dir.create(moved_root)
+  file.copy(f$capture, moved_root, recursive = TRUE)
+  moved <- f$payload; moved$source_directory <- file.path(moved_root, basename(f$capture))
+  expect_identical(basename(prepare_catalog_normalization(moved, "biology", f$root, prompt, schema)), f$program$meta$key)
+  expect_equal(nrow(list_catalog_normalization_programs(f$root)), 1L)
+  expect_silent(verify_catalog_normalization_sources(f$program, f$unit, moved_root))
+  # A folder name is looked for under the capture root only, never from the
+  # working directory.
+  empty <- file.path(root, "empty"); dir.create(empty)
+  expect_error(withr::with_dir(dirname(f$capture), verify_catalog_normalization_sources(f$program, f$unit, empty)),
+    "source capture is unavailable")
+  # Change: a store holding this packet as it was prepared before the fix,
+  # with the archive's absolute path. Preparing again keeps it.
+  earlier_store <- file.path(root, "earlier")
+  recorded <- f$program$packet; recorded$source_directory <- normalizePath(f$capture)
+  earlier <- write_catalog_normalization_packet(earlier_store, recorded)
+  expect_identical(prepare_catalog_normalization(f$payload, "biology", earlier_store, prompt, schema), earlier)
+  expect_equal(nrow(list_catalog_normalization_programs(earlier_store)), 1L)
+  # Its archive is found under the capture root first, then at its recorded path.
+  program <- load_catalog_normalization_program(earlier_store, basename(earlier))
+  expect_silent(verify_catalog_normalization_sources(program, f$unit, moved_root))
+  expect_silent(verify_catalog_normalization_sources(program, f$unit, empty))
 })
 
 test_that("checking a reading names every problem at once, by node or block, before it is committed", {

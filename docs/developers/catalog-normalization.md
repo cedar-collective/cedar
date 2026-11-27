@@ -195,6 +195,11 @@ not in Git:
 | `proposals/<unit-key>/<proposal-key>/` | Original proposal bytes, producer attribution and manifest |
 | `reviews/<proposal-key>/` | Complete, hash-linked, attributed review revisions |
 
+A packet names its archive by folder, found under the capture root, so the
+same sources make the same packet on every machine. A packet prepared before
+2026-11-27 recorded the archive's absolute path; its program prepared again
+keeps that packet rather than writing a second (ISSUES I103).
+
 Review stores must be writable by the Shiny worker for staging and decisions;
 keep those directories owned by the application's deployment user. The store
 is inside the data directory's read/write mount; Compose mounts the catalog

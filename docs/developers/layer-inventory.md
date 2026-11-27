@@ -240,7 +240,7 @@ It defaults to `degreePlanRulesUI/Server(id, catalog, roadmaps)`, using
 `catalogNormalizationUI(id)` / `catalogNormalizationServer(id, root, capture_root, active, draft_dir)` is under
 Draft interpretations, and `catalogQuestionsUI/Server` under Catalog questions
 (the Extraction diagnostics tab was retired on 2026-11-27). `features/catalog-normalization.R`
-provides `prepare_catalog_normalization(payload, program_id, root, prompt, schema)`,
+provides `prepare_catalog_normalization(payload, program_id, root, prompt, schema)` (with `write_catalog_normalization_packet()`, and `catalog_normalization_path_packet()` for a packet prepared before its archive was named by folder),
 `load_catalog_normalization_program(root, key)`, `import_catalog_normalization(root,
 unit, path, model)`, `read_catalog_normalization_review(root, unit, imported)`,
 `save_catalog_normalization_review(root, unit, imported, state, reviewer, expected_head)`,

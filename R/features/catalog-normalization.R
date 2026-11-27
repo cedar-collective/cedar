@@ -96,9 +96,11 @@ prepare_catalog_normalization <- function(payload, program_id, root, prompt, sch
       "Program and concentrations" else paste(own[[1]]$code, own[[1]]$title), request = request)
   })
   program <- records[[match(paste0("programs:", program_id), ids)]]
+  # The archive by its folder name, found under the capture root wherever the
+  # archive sits, so the packet is the same on every machine (ISSUES I103).
   packet <- list(schema_version = "1.0.0", program_id = program_id, title = program$title,
     catalog_title = payload$meta$catalog_title, catalog_id = payload$meta$catalog_id,
-    source_directory = normalizePath(payload$source_directory),
+    source_directory = basename(normalizePath(payload$source_directory)),
     source_manifest_sha256 = payload$meta$source_manifest_sha256, units = units)
   key <- source_sha256(source_json_bytes(packet))
   directory <- file.path(root, "programs", key)
@@ -107,12 +109,48 @@ prepare_catalog_normalization <- function(payload, program_id, root, prompt, sch
     if (!identical(existing$packet, packet)) stop("[catalog-normalization.R] Existing program packet differs")
     return(invisible(directory))
   }
+  earlier <- catalog_normalization_path_packet(root, packet)
+  if (!is.null(earlier)) return(invisible(earlier))
+  invisible(write_catalog_normalization_packet(root, packet))
+}
+
+#' Write a packet into the store, keyed by its content
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param packet The packet (`prepare_catalog_normalization()`).
+#' @return The packet's directory.
+write_catalog_normalization_packet <- function(root, packet) {
+  key <- source_sha256(source_json_bytes(packet))
+  directory <- file.path(root, "programs", key)
   dir.create(directory, recursive = TRUE)
   write_source_json(packet, file.path(directory, "packet.json"))
   write_source_json(list(schema_version = "1.0.0", packet_sha256 = catalog_normalization_hash_file(file.path(directory, "packet.json")),
-    key = key, title = packet$title, program_id = program_id, catalog_title = packet$catalog_title,
+    key = key, title = packet$title, program_id = packet$program_id, catalog_title = packet$catalog_title,
     created_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")), file.path(directory, "program-manifest.json"))
-  invisible(directory)
+  directory
+}
+
+#' The packet prepared before 2026-11-27 that holds these same sources
+#'
+#' Packets prepared until then recorded their archive's absolute path, so the
+#' same sources prepared now have another key (ISSUES I103). Such a packet is
+#' the one a program prepared again keeps, not a second: its readings, staged
+#' proposals and `degree_drafts.csv` name it, and a packet is never rewritten.
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param packet A packet that names its archive by folder.
+#' @return The earlier packet's directory, or NULL.
+catalog_normalization_path_packet <- function(root, packet) {
+  manifests <- list.files(file.path(root, "programs"), pattern = "^program-manifest[.]json$", recursive = TRUE, full.names = TRUE)
+  for (path in manifests) {
+    if (!identical(read_source_json(path)$program_id, packet$program_id)) next
+    earlier <- load_catalog_normalization_program(root, basename(dirname(path)))
+    recorded <- earlier$packet$source_directory
+    if (identical(recorded, packet$source_directory) || !identical(basename(recorded), packet$source_directory)) next
+    earlier$packet$source_directory <- packet$source_directory
+    if (identical(earlier$packet, packet)) return(earlier$directory)
+  }
+  NULL
 }
 
 list_catalog_normalization_programs <- function(root) {
@@ -153,7 +191,12 @@ catalog_normalization_unit <- function(program, key) {
 # Original bytes are rechecked when a reviewer opens a unit or source passage.
 catalog_normalization_capture_directory <- function(program, capture_root) {
   packet <- program$packet
-  candidates <- unique(c(file.path(capture_root, basename(packet$source_directory)), packet$source_directory))
+  # A packet names its archive's folder, under the capture root. One prepared
+  # before 2026-11-27 recorded where the archive then was, which is tried
+  # second; a bare folder name is never looked up from the working directory.
+  folder <- basename(packet$source_directory)
+  candidates <- file.path(capture_root, folder)
+  if (!identical(folder, packet$source_directory)) candidates <- unique(c(candidates, packet$source_directory))
   matches <- vapply(candidates, function(x) file.exists(file.path(x, "source-manifest.json")) &&
     identical(catalog_normalization_hash_file(file.path(x, "source-manifest.json")), packet$source_manifest_sha256), logical(1))
   if (!any(matches)) stop("[catalog-normalization.R] The matching source capture is unavailable")
@@ -326,9 +369,8 @@ catalog_normalization_program_unit <- function(program) {
 #' schema it was prepared under, kept for the readings written from them. A
 #' new reading is written from the one prepared under the current prompt and
 #' schema; passing a packet key selects that packet instead. Packets whose
-#' program units are the same unit (the same sources, prepared again from an
-#' archive somewhere else: ISSUES I103) are one choice, and the most recently
-#' prepared is returned.
+#' program units are the same unit (the same text in two captures of the
+#' catalog) are one choice, and the most recently prepared is returned.
 #'
 #' @param root The institution's catalog-normalization store.
 #' @param program The catalog's program id (as in the program's catalog

@@ -38,7 +38,6 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I103](#i103--preparing-a-program-again-after-its-archive-moved-makes-a-second-packet-for-the-same-unit) | Defect | A packet's key hashes its archive's absolute path, so preparing a program again since the archive moved to `CEDAR_DATA_DIR` (I101) writes a duplicate packet for the same unit |
 | [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
 | [I96](#i96--the-demo-browser-suites-dept-trends-step-can-read-the-course-list-before-the-server-has-filtered-it) | Defect | The demo browser suite's Dept Trends step failed twice in three runs: it read the course list after "Other departments" was set and still found the department's own course; the page filters correctly by hand |
 | [I95](#i95--retention-looks-dead-for-most-of-a-minute-on-its-first-visit-after-a-start) | Defect | Retention's first visit after a start takes about 45 s on production with nothing saying it is working past the first 8 s: its view is not built ahead, and the overlay covers one of its seven builds |
@@ -218,7 +217,15 @@ neither case may one reading stop the others.
 
 ## I103 — Preparing a program again after its archive moved makes a second packet for the same unit
 
-**Status:** open.
+**Status:** resolved 2026-11-27 (branch `catalog/reading-skill`). A packet
+now names its archive by folder (`source_directory` is the folder's name),
+found under the capture root, so the same sources make the same packet on
+every machine. A packet prepared before the fix keeps its absolute path and
+key: preparing its program again finds it and writes nothing
+(`catalog_normalization_path_packet()`); its archive is looked for under the
+capture root first, then at the recorded path. Checked on a copy of the
+store: Civil Engineering and English Studies prepared again returned their
+packets, and the store still held 20.
 **Found:** 2026-11-27, writing the catalog-reading skill.
 **Severity:** low. A reading binds to its unit's key, which does not change,
 so nothing reads wrongly; the store gains a duplicate packet for every program
