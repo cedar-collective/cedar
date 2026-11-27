@@ -336,6 +336,8 @@ The full contract and the one summary of its rules: [enrollment-projections.md](
 
 Before changing Degree Explorer, read [degree-explorer-rules.md](docs/developers/degree-explorer-rules.md). Its catalog excerpts, roadmap templates and shared requirements live under `institution/<id>/`; they are illustrative plans, **not student audits or forecast inputs**. Catalog acquisition runs offline (`scripts/scan-degree-catalog.R`), never in Shiny, and never edits reviewed degree files. Extracted rules stay unreviewed until a person signs off a complete unit; no AI API calls or automatic approvals occur. Where each piece lives: [degree-requirements.md](docs/developers/degree-requirements.md), [catalog-scanning.md](docs/developers/catalog-scanning.md), [catalog-normalization.md](docs/developers/catalog-normalization.md).
 
+**A catalog reading ships with its files.** Its source packet and the catalog pages it cites live in the data directory (`CEDAR_DATA_DIR`: `catalog-normalizations/`, `catalog-scans/`), never in Git. Copy them to production with `scripts/sync-catalog-store.sh` before merging the reading: the deploy stops on a reading without them (`scripts/check-catalog-store.R`, I101).
+
 ## Sample data
 
 `bash scripts/dev.sh up` starts the synthetic institution (`compose.dev.yml`) on port 3838, with source mounted read-only and no institutional data; `restart` after edits. `dev/demo-data.R` adapts the fixture scenarios into a multi-year institution with provenance columns; extend `test-demo-data.R` when its answers change. **Do not weaken analytical rules or small-cell guards to populate a demo.** [synthetic-institution.md](docs/developers/synthetic-institution.md), `docs/developers/first-hour.md`.

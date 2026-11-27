@@ -39,7 +39,6 @@ fix each needs, and which of them are one piece of work, are under
 | ID | Kind | Summary |
 |---|---|---|
 | [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
-| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
 | [I96](#i96--the-demo-browser-suites-dept-trends-step-can-read-the-course-list-before-the-server-has-filtered-it) | Defect | The demo browser suite's Dept Trends step failed twice in three runs: it read the course list after "Other departments" was set and still found the department's own course; the page filters correctly by hand |
 | [I95](#i95--retention-looks-dead-for-most-of-a-minute-on-its-first-visit-after-a-start) | Defect | Retention's first visit after a start takes about 45 s on production with nothing saying it is working past the first 8 s: its view is not built ahead, and the overlay covers one of its seven builds |
 | [I94](#i94--retention-reads-no-graduate-start-so-it-says-graduate-students-have-none-on-record) | Defect | Retention reads no graduate start: `student_term_entry_type()` knows freshman and new-transfer codes only, so the page says graduate students have no start on record while about a quarter of a fall's graduate declarations say first-time graduate |
@@ -67,6 +66,7 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I101](#i101--one-reading-without-its-source-packet-on-a-server-empties-catalog-reviews-draft-interpretations-tab) | Defect | Resolved 2026-11-27: One reading whose source packet is not on the server stops Catalog Review > Draft interpretations for every program: production since #434 |
 | [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | Resolved 2026-11-27: A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I93](#i93--retentions-scope-bar-read-as-if-every-student-who-ever-started-first-time-was-new-that-term) | Defect | Retention's scope bar and method note gave each student's start, in any term, as a count for the latest term: a reader took its first-time count for Fall 2025's new class, which is about a third of it |
 | [I91](#i91--the-running-credit-total-counts-attempted-credits-and-read-as-earned-it-disagrees-with-classification) | Not a defect | `build_credit_timeline()`'s `total_credits_entering` put 27% of Fall 2025 juniors at 90 credits or more. It counts attempted credits, as its code says; classification counts earned. On earned credits the two agree for 84% of juniors and 92% of seniors. Found and explained 2026-11-26; no code was wrong |
@@ -248,7 +248,18 @@ bytes changed) and the suite passes; the staging pass is the same as I101's.
 
 ## I101 — One reading without its source packet on a server empties Catalog Review's Draft interpretations tab
 
-**Status:** open.
+**Status:** resolved 2026-11-27 (branch `catalog/store-in-data-dir`).
+Production lacked every packet, not only the ten new ones: its store was an
+empty directory owned by root, which the app's user could not have written
+either. The packets and the catalog archive were copied into production's data
+directory, owned by the app's user. The store and the archive now live in the
+data directory (`CEDAR_DATA_DIR`) on every machine, mounted from there by
+Compose, so one directory holds everything a server needs that is not in Git.
+`catalog_normalization_draft_units()` names every reading short of its packet
+or captured pages in one error, before anything is staged. The deploy runs
+`scripts/check-catalog-store.R` in the new image before it replaces the app
+and stops when any reading is short, so a reading cannot ship without its
+files. `scripts/sync-catalog-store.sh` copies them.
 **Found:** 2026-11-27, by the user on production, after #434 deployed.
 **Severity:** moderate, Admin only. No program can be opened in Draft
 interpretations; Degree Explorer is unaffected (its compiled boards are

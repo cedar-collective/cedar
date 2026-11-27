@@ -129,8 +129,10 @@ docker exec shiny-proxy-nginx-1 nginx -s reload
 ## 7. Deploys from GitHub
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which reaches the
-server over SSH, updates the checkout, rebuilds stale tables, builds the
-image and replaces the container. Set these repository secrets:
+server over SSH, updates the checkout, builds the image, checks that every
+committed catalog reading has its files in the data directory
+(`scripts/check-catalog-store.R`; copy them with `scripts/sync-catalog-store.sh`),
+replaces the container and rebuilds stale tables. Set these repository secrets:
 
 | Secret | Holds |
 |---|---|

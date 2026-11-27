@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Offline public catalog capture, extraction and comparison. No Banner data or AI key needed.
-# Rscript --vanilla scripts/scan-degree-catalog.R scan --output data/catalog-scans/current
+# CEDAR_DATA_DIR=... Rscript --vanilla scripts/scan-degree-catalog.R scan   (or --output DIRECTORY)
 # Rscript --vanilla scripts/scan-degree-catalog.R analyze --input CAPTURE --output NEW_ANALYSIS
 # Rscript --vanilla scripts/scan-degree-catalog.R compare --before OLD_ANALYSIS --after NEW_ANALYSIS --output DIFF
 
@@ -49,8 +49,14 @@ if (command %in% c("scan", "capture")) {
   id <- options[["--source-id"]]
   if (!is.null(id)) sources <- sources[sources$source_id == id, ]
   if (nrow(sources) != 1L) stop("Select one configured --source-id", call. = FALSE)
-  if (is.null(output)) output <- file.path(root, "data/catalog-scans", cedar_institution_id(),
-    format(Sys.time(), "%Y%m%dT%H%M%SZ", tz = "UTC"))
+  # The archive lives in the app's data directory beside the Banner tables,
+  # which is not the repository's data/ on a host (ISSUES I101).
+  if (is.null(output)) {
+    data_dir <- Sys.getenv("CEDAR_DATA_DIR")
+    if (!nzchar(data_dir)) stop("Pass --output, or set CEDAR_DATA_DIR to the app's data directory", call. = FALSE)
+    output <- file.path(path.expand(data_dir), "catalog-scans", cedar_institution_id(),
+      format(Sys.time(), "%Y%m%dT%H%M%SZ", tz = "UTC"))
+  }
   capture_degree_catalog(as.list(sources[1, ]), read_institution_file("catalog_scan_credentials", dir),
     read_institution_file("catalog_scan_fields", dir), output, catalog_id = options[["--catalog-id"]],
     include_courses = !isTRUE(options[["--programs-only"]]), resume = isTRUE(options[["--resume"]]))

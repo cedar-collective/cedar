@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { launch, connect, setInput, click, clickNavTab, openSubTab, waitForIdle, readReactable, colIndex, BASE } from './lib.mjs';
+import { launch, connect, setInput, click, clickNavTab, openSubTab, waitForIdle, readReactable, colIndex, BASE, cedarDataDir } from './lib.mjs';
 
 const { browser, page, jsErrors } = await launch();
 let passed = 0;
@@ -218,7 +218,7 @@ try {
     // Exercise save/sign-off using a uniquely attributed, disposable response.
     // This deliberately informational fixture is not an academic interpretation.
     // The retained maintenance CLI stages it; upload controls stay absent.
-    const store = path.resolve('data/catalog-normalizations/unm');
+    const store = path.join(cedarDataDir(), 'catalog-normalizations/unm');
     const programPacket = JSON.parse(fs.readFileSync(path.join(store, 'programs', selectedProgram, 'packet.json'), 'utf8'));
     const unit = programPacket.units[0]; const packet = unit.request;
     const proposal = {
@@ -453,7 +453,7 @@ try {
 } finally {
   fs.rmSync(exchangeFixture, { force: true });
   if (importedFixture && /^[a-f0-9]{64}$/.test(importedFixture.key) && /^[a-f0-9]{64}$/.test(importedFixture.unit)) {
-    const store = path.resolve('data/catalog-normalizations/unm');
+    const store = path.join(cedarDataDir(), 'catalog-normalizations/unm');
     const proposalDir = path.join(store, 'proposals', importedFixture.unit, importedFixture.key);
     const manifest = path.join(proposalDir, 'proposal-manifest.json');
     if (fs.existsSync(manifest) && JSON.parse(fs.readFileSync(manifest, 'utf8')).model === fixtureModel) {

@@ -210,27 +210,65 @@ list_catalog_normalization_proposals <- function(root, unit) {
   lapply(paths, read_source_json)
 }
 
-# Maintainer-authored AI drafts live in Git beside the institution's data. Stage
-# them through the same validator/immutable store as future API or file input.
-# Merely discovering a draft never creates a human review or inherits approval.
-stage_catalog_normalization_drafts <- function(root, directory, capture_root) {
+#' Every committed catalog reading, matched to its files
+#'
+#' A reading is staged from its source packet (in the store, `root`) and the
+#' catalog pages that packet cites (in the archive, `capture_root`); neither
+#' is in Git. A reading short of either is named, every such reading in one
+#' error, so a server without the files says which (ISSUES I101). The deploy
+#' runs this before it recreates the app (`scripts/check-catalog-store.R`),
+#' so a reading cannot ship without its files; staging runs it first.
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param directory The committed readings (`catalog_interpretations/`).
+#' @param capture_root The institution's catalog archive.
+#' @return One list per reading: `path`, `draft` and its packet's `unit`.
+catalog_normalization_draft_units <- function(root, directory, capture_root) {
   paths <- sort(list.files(directory, pattern = "[.]json$", recursive = TRUE, full.names = TRUE))
-  if (!length(paths)) return(invisible(character()))
+  if (!length(paths)) return(list())
   programs <- lapply(list_catalog_normalization_programs(root)$key, function(key) load_catalog_normalization_program(root, key))
-  staged <- vapply(paths, function(path) {
+  short <- character()
+  drafts <- lapply(paths, function(path) {
     draft <- read_source_json(path)
     if (!identical(draft$schema_version, "1.0.0") || !is.numeric(draft$version) || length(draft$version) != 1L ||
         draft$version < 1 || draft$version != floor(draft$version) || !nzchar(trimws(draft$producer))) stop("[catalog-normalization.R] Invalid versioned draft: ", path)
     matches <- Filter(function(x) identical(x$packet$program_id, draft$program_id) && identical(x$packet$catalog_id, draft$catalog_id) &&
       draft$unit_key %in% vapply(x$packet$units, function(u) u$key, character(1)), programs)
-    if (!length(matches)) stop("[catalog-normalization.R] Prepare the matching source packet before loading draft: ", path)
+    if (!length(matches)) {
+      short <<- c(short, paste0(path, ": no matching source packet in ", root))
+      return(NULL)
+    }
     program <- matches[[1]]; unit <- catalog_normalization_unit(program, draft$unit_key)
-    verify_catalog_normalization_sources(program, unit, capture_root)
+    # Collected, not recovered: every reading short of its sources is named below.
+    missing <- tryCatch({
+      verify_catalog_normalization_sources(program, unit, capture_root)
+      NULL
+    }, error = function(e) conditionMessage(e))
+    if (!is.null(missing)) {
+      short <<- c(short, paste0(path, ": ", missing))
+      return(NULL)
+    }
+    list(path = path, draft = draft, unit = unit)
+  })
+  if (length(short)) stop("[catalog-normalization.R] ", length(short), " of ", length(paths),
+    " catalog readings are missing their source packet or captured pages here. Copy them from the machine ",
+    "that prepared them with scripts/sync-catalog-store.sh.\n", paste(short, collapse = "\n"), call. = FALSE)
+  drafts
+}
+
+# Maintainer-authored AI drafts live in Git beside the institution's data. Stage
+# them through the same validator/immutable store as future API or file input.
+# Merely discovering a draft never creates a human review or inherits approval.
+stage_catalog_normalization_drafts <- function(root, directory, capture_root) {
+  drafts <- catalog_normalization_draft_units(root, directory, capture_root)
+  if (!length(drafts)) return(invisible(character()))
+  staged <- vapply(drafts, function(x) {
     response <- tempfile("cedar-draft-", fileext = ".json")
     on.exit(unlink(response), add = TRUE)
-    write_source_json(draft$proposal, response)
-    import_catalog_normalization(root, unit, response, paste(draft$producer, paste0("draft v", draft$version), sep = " · "))
+    write_source_json(x$draft$proposal, response)
+    import_catalog_normalization(root, x$unit, response, paste(x$draft$producer, paste0("draft v", x$draft$version), sep = " · "))
   }, character(1))
+  names(staged) <- vapply(drafts, function(x) x$path, character(1))
   invisible(staged)
 }
 

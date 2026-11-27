@@ -129,6 +129,13 @@ jobs:
             # while the new image is prepared.
             docker compose build cedar-shiny
 
+            # Every committed catalog reading ships with its source packet and
+            # captured pages in the data directory, or the deploy stops here
+            # and the running app is left as it is (ISSUES I101). The fix is
+            # scripts/sync-catalog-store.sh from the machine that holds them.
+            docker compose run --rm --no-deps -T cedar-projections \
+              scripts/check-catalog-store.R < /dev/null
+
             RESTARTING_FLAG="${{ secrets.CEDAR_RESTARTING_FLAG }}"
             if [ -z "$RESTARTING_FLAG" ]; then
               RESTARTING_FLAG="/var/www/cedar-maintenance/restarting.flag"

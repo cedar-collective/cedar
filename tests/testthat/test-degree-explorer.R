@@ -193,6 +193,30 @@ test_that("versioned local drafts stage automatically without creating human app
   expect_error(stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture)), "matching source packet")
 })
 
+test_that("every reading short of its packet or captured pages is named at once, and nothing is staged (I101)", {
+  root <- tempfile("catalog-short-"); withr::defer(unlink(root, recursive = TRUE))
+  f <- normalization_fixture(root); directory <- file.path(root, "drafts"); dir.create(directory)
+  artifact <- list(schema_version = "1.0.0", version = 1L, producer = "Designed maintainer draft",
+    program_id = f$program$packet$program_id, catalog_id = f$program$packet$catalog_id,
+    unit_key = f$unit$key, proposal = normalization_proposal(f$unit$request))
+  write_source_json(artifact, file.path(directory, "biology.v1.json"))
+  expect_length(catalog_normalization_draft_units(f$root, directory, dirname(f$capture)), 1)
+  # Two readings whose packets this store never received.
+  stray <- artifact
+  stray$unit_key <- strrep("a", 64)
+  write_source_json(stray, file.path(directory, "chemistry.v1.json"))
+  write_source_json(stray, file.path(directory, "physics.v1.json"))
+  expect_error(stage_catalog_normalization_drafts(f$root, directory, dirname(f$capture)),
+    "(?s)^\\S+ 2 of 3 catalog readings.*chemistry[.]v1[.]json: no matching source packet.*physics[.]v1[.]json: no matching source packet",
+    perl = TRUE)
+  expect_length(list_catalog_normalization_proposals(f$root, f$unit), 0)
+  # The packet is here but the catalog pages it cites are not.
+  unlink(file.path(directory, c("chemistry.v1.json", "physics.v1.json")))
+  unlink(file.path(f$capture, "source-manifest.json"))
+  expect_error(catalog_normalization_draft_units(f$root, directory, dirname(f$capture)),
+    "(?s)1 of 1 catalog readings.*biology[.]v1[.]json: .*source capture is unavailable", perl = TRUE)
+})
+
 test_that("catalog extraction preserves OR options containing AND course bundles", {
   fixture <- scan_fixture
   tree <- extract_catalog_rule_tree(fixture$programs$biology$degreeRequirements)
