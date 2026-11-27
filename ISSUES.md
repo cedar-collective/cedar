@@ -38,9 +38,8 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
-| [I99](#i99--degree-hours-stated-in-words-stop-a-compiled-board-a-minimum-of-128-hours-is-read-as-na) | Defect | Secondary Education B.S.Ed.'s board cannot be built: its record gives degree hours as "A minimum of 128 hours", read as NA |
-| [I98](#i98--one-reading-whose-choice-has-an-option-with-no-listed-course-stops-the-compile-script-for-every-program) | Defect | A reading whose choice has an option with no listed course stops the compile script for every program; the Elementary Education reading waits on its own branch |
-| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: Civil Engineering's board exceeds its 122 credits and cannot be built |
+| [I100](#i100--a-compiled-boards-catalog-note-is-shown-nowhere-for-a-program-with-no-hand-built-board) | Defect | A compiled board's catalog note (what the board leaves out) is shown nowhere for the eight programs whose board comes only from a reading |
+| [I97](#i97--a-compiled-board-counts-a-readings-gen-ed-credits-twice-as-elective-tiles-and-as-the-starting-routes-courses) | Defect | A compiled board counts a reading's Gen Ed pool as elective tiles beside the starting routes' Gen Ed courses: the Civil Engineering and Elementary Education boards exceed their credits and cannot be built |
 | [I92](#i92--classification-changed-meaning-from-summer-2025-a-student-now-sits-a-step-lower-and-every-reading-by-classification-crosses-the-change-unmarked) | Defect | Classification changed meaning from Summer 2025: academic studies places a quarter of Fall 2025 undergraduates a step lower than the class list (agreement 99%+ in every other term), so first-semester freshmen read 1.7 times as many and seniors 18% fewer; Pathways Course Timing and Regstats' fall sophomores read across it unmarked (Retention no longer reads it) |
 | [I68](#i68--the-compiled-computer-science-board-plans-composition-i-twice) | Defect | The compiled CS board plans Composition I twice: the English route's ENGL 1110 (`engl1`) and the reading's "Composition I: ENGL1110Y, ENGL1110Z or ENGL1110" choice (`composition_one_1`), 3 credits too many |
 | [I67](#i67--a-compiled-business-board-plans-its-writing-choice-before-composition-ii) | Defect | With stretch English, the compiled Business board plans "3 credits: ENGL2120 or ENGL2210" (`writing_1`) in semester 2, before Composition II in semester 3, though both options require it: a compiled choice tile carries no prerequisite its options share |
@@ -127,9 +126,42 @@ Kept until the next release, so a recurrence is recognisable; each entry below g
 
 # Defects
 
-## I99 — Degree hours stated in words stop a compiled board: "A minimum of 128 hours" is read as NA
+## I100 — A compiled board's catalog note is shown nowhere for a program with no hand-built board
 
 **Status:** open.
+**Found:** 2026-11-26, looking at the Secondary Education B.S.Ed. board
+(branch `degree/compiler-i98-i99`).
+**Severity:** low, Degree Explorer only. Nothing wrong is drawn, but a
+caveat the board depends on is hidden. Examples: "The board does not include
+the concentration-teaching fields", and Journalism's concentration that is
+not drawn.
+**Cause:** a catalog row's `notes` is rendered in one place only: the rules
+summary of Admin > Catalog Review > Visualization rules
+(`degreePlanRulesServer()`, `R/modules/degree-explorer.R`). That tab reads
+the hand-built boards (`CEDAR_DEGREE_CATALOG`; `global.R` keeps them as the
+compiler's baseline), so it does not list the eight programs whose board
+comes only from a row in `degree_reading_catalogs.csv`. Degree Explorer reads
+the published boards (`CEDAR_DEGREE_BOARDS`). Its footer shows the generic
+"Illustrative plan" note and its "Rules behind this plan" dialog shows the
+rules table, neither the row's `notes`. PR #432 said each note "shows under
+the program on the rules summary"; that is true only for a program with a
+hand-built board.
+**Reproduction:** open Degree Explorer on Secondary Education B.S.Ed. and
+search the page and the rules dialog for "concentration-teaching fields". Then
+open Admin > Data & Usage > Catalog Review > Visualization rules: its degree
+list holds 24 boards and none of the eight.
+**Fix:** show the published board's `notes` with the board (its footer or
+the rules dialog), and decide whether the Visualization rules tab lists the
+published boards or keeps the baseline and says so.
+
+## I99 — Degree hours stated in words stop a compiled board: "A minimum of 128 hours" is read as NA
+
+**Status:** resolved 2026-11-26 (branch `degree/compiler-i98-i99`). The board
+plans to the reading's total: `degree_reading_degree_hours()` takes the one
+top-level credit rule that cites the record's Degree Hours field, and stops
+with the program and the record's text when there is not exactly one, or when
+a bare number in the record disagrees with it. Secondary Education B.S.Ed. has
+its row and a draft board that plans to 128 credits.
 **Found:** 2026-11-26, compiling the readings for the largest unmapped
 programs (branch `degree/largest-unmapped-readings`).
 **Severity:** low, Degree Explorer only. Secondary Education B.S.Ed.'s board
@@ -152,7 +184,12 @@ at the read with the program and the text.
 
 ## I98 — One reading whose choice has an option with no listed course stops the compile script for every program
 
-**Status:** open.
+**Status:** resolved 2026-11-26 (branch `degree/compiler-i98-i99`). A choice
+with an option that names no course is drawn as elective space: k of its
+smallest option's credits, or k tiles of unknown credits when an option does
+not say. Its options are not listed again as credit rules. The Elementary
+Education reading is on `main` and compiles ("One Diversity/Specialty Strand",
+3 tiles, 9 credits). Its board is held for I97.
 **Found:** 2026-11-26, as I99.
 **Severity:** moderate, Degree Explorer only. Such a reading in
 `catalog_interpretations/` stops `compile-degree-interpretations.R` before any
@@ -174,9 +211,11 @@ neither case may one reading stop the others.
 **Status:** open.
 **Found:** 2026-11-26, as I99.
 **Severity:** moderate, Degree Explorer only.
-- **Civil Engineering:** the board cannot be built. The compile stops with
-  "Shown degree courses exceed the planning credit target", so its row is held
-  out of `degree_reading_catalogs.csv`.
+- **Civil Engineering and Elementary Education:** the boards cannot be built.
+  The compile stops with "Shown degree courses exceed the planning credit
+  target", so their rows are held out of `degree_reading_catalogs.csv`.
+  Elementary Education's own tiles, its Gen Ed areas among them, add to exactly
+  its 120 credits before the starting routes' tiles are added.
 - **Where the total leaves room:** the area is planned twice. Secondary
   Education B.A.Ed. shows a Mathematics and Statistics Gen Ed tile beside the
   math route's MATH 1350.
@@ -197,7 +236,9 @@ is added. Composition I counted twice (I68) is the same mismatch, for one
 course.
 
 **Reproduction:** add a row for program SypQxQ9j5
-(`civil-engineering-bs-2026`, `BSCE`, `BSCE-CE-EN|BSCE-FCE-EN`) to
+(`civil-engineering-bs-2026`, `BSCE`, `BSCE-CE-EN|BSCE-FCE-EN`), or for
+program HJxPjJOii9 (`elementary-education-bsed-2026`, `BSED`,
+`BSED-ELED-EH|BSED-FELE-EH|BSED-ELED-ED|BSED-FELE-ED`), to
 `institution/unm/degree_reading_catalogs.csv` and compile.
 **Fix:** needs a decision about which stands for the area. Either a reading's
 Gen Ed pool takes the place of the route's illustrative tiles for that area,

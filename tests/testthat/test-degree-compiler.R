@@ -102,6 +102,49 @@ test_that("an elective slot takes the band of the lowest number its reading allo
   expect_error(board_level(modifyList(pool, list(minimum_course_number = 500))), "not an undergraduate course number")
 })
 
+test_that("a choice with an option that names no course is elective space for its smallest option (I98)", {
+  f <- normalization_fixture(withr::local_tempdir())
+  courses <- degree_packet_course_facts(f$program$packet)
+  # Change: the opening choice also offers "at least 2 credits of approved
+  # coursework", with no course listed (not in the fixture's text).
+  pool <- compiler_biology_proposal$nodes[[match("degree-total", vapply(compiler_biology_proposal$nodes, `[[`, "", "id"))]]
+  reading <- compiler_biology_proposal
+  reading$nodes <- c(reading$nodes, list(modifyList(pool, list(id = "approved", parent_id = "start", minimum = 2,
+    label = "At least 2 credits of approved coursework"))))
+  compiled <- compile_degree_interpretation(reading, courses)
+  start <- compiled$rules[compiled$rules$rule_id == "start", ]
+  expect_equal(start$role, "slot")
+  # The pair is 4 credits, Combined Biology 4, the pool 2: one of the smallest.
+  expect_equal(start$credits, 2)
+  expect_equal(start$tiles, 1L)
+  expect_equal(nrow(compiled$options), 0L)  # the fixture's only choice is now elective space
+  # The pool is the choice's option, not a credit rule of its own.
+  expect_equal(compiled$credit_rules$id, "degree-total")
+})
+
+test_that("the board plans to the reading's degree total, which a bare number in the record must match (I99)", {
+  f <- normalization_fixture(withr::local_tempdir())
+  courses <- degree_packet_course_facts(f$program$packet)
+  nodes <- utils::read.csv(file.path(f$capture, "analysis", "rule-nodes.csv"), colClasses = "character")
+  program <- degree_packet_program_facts(f$program$packet)
+  expect_equal(degree_reading_degree_hours(compiler_biology_proposal, program), 120)
+  # Change: the record writes its hours in words, and the reading reads 128.
+  ids <- vapply(compiler_biology_proposal$nodes, `[[`, "", "id")
+  reading <- compiler_biology_proposal
+  reading$nodes[[match("degree-total", ids)]]$minimum <- 128
+  worded <- modifyList(program, list(hours_quote = "\"A minimum of 128 hours\""))
+  expect_equal(degree_reading_degree_hours(reading, worded), 128)
+  draft <- assemble_compiled_degree_board(compile_degree_interpretation(reading, courses), courses, worded,
+    degree_course_requisites(nodes, courses), compiler_biology_catalog_row, test_degree_roadmaps, test_degree_catalog$evidence,
+    "math1350", degree_course_conditions(nodes, courses), reading)
+  expect_equal(draft$roadmaps$plans$degree_credit_target, "128")
+  # A bare number the reading contradicts stops; so does a reading with no credit rule on the field.
+  expect_error(degree_reading_degree_hours(reading, program), "disagree with the record's Degree Hours, 120")
+  none <- compiler_biology_proposal
+  none$nodes <- none$nodes[ids != "degree-total"]
+  expect_error(degree_reading_degree_hours(none, program), "one top-level credit rule citing the Degree Hours field")
+})
+
 test_that("a credit group whose listed courses add up to its minimum requires each of them", {
   f <- normalization_fixture(withr::local_tempdir())
   # Change: the pair is "4 credits" rather than "all of", outside any choice.

@@ -192,6 +192,7 @@ record) and writes nothing.
 |---|---|
 | a required `course` | one tile |
 | `choose_n` / `any`, or credits from a listed set | one choice, with its options; a two-course option fills two tiles |
+| `choose_n` / `any` with an option that names no course ("one strand", three of them 9 credits of endorsement courses) | elective space for k of its smallest option's credits; k tiles of unknown credits when an option states none (ISSUES I98) |
 | a credit group whose listed courses add to its minimum | each course required |
 | an unlisted credit pool inside a group | elective space, credits ÷ 3 tiles (rounded, at least one) |
 | an unlisted credit rule at the top of the tree | listed for a reviewer, never a tile: the schema cannot tell an elective pool from a total or a residency rule |
@@ -222,6 +223,11 @@ through the same validators (`validate_degree_catalog()`,
 unchanged. With `--analysis DIR` the script builds each draft and prints it
 beside its hand-built board, semester by semester.
 
+- **The degree total** is the reading's: its one top-level credit rule that
+  cites the record's Degree Hours field. The record's field is text ("120", or
+  "A minimum of 128 hours"), so it is never parsed for the number; when it is
+  a bare number, the two must agree, and the build stops naming the program
+  otherwise (ISSUES I99).
 - **Placement.** A lower-division tile starts in semester 1 and an upper-division
   one at the semester most authored plans use (5). The scheduler moves each one
   later for prerequisites and load, as it does for an authored board. An elective

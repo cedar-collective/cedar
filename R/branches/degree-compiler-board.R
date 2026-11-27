@@ -42,8 +42,10 @@ degree_board_split_credits <- function(total, n) {
 #' The program page's own facts a board cites
 #'
 #' @param packet A prepared packet.
-#' @return List: `entity_id`, `title`, `catalog_url`, `degree_hours`, `blocks`
-#'   (every program and concentration source block, for citation sections).
+#' @return List: `entity_id`, `title`, `catalog_url`, `hours_block` and
+#'   `hours_quote` (the record's Degree Hours field, as written: "120", or "A
+#'   minimum of 128 hours"; `degree_reading_degree_hours()` reads the number),
+#'   `blocks` (every program and concentration source block, for citation sections).
 degree_packet_program_facts <- function(packet) {
   unit <- Filter(function(u) any(startsWith(vapply(u$request$documents, function(d) d$id, ""), "programs:")), packet$units)
   if (length(unit) != 1L) stop("[degree-compiler-board.R] The packet has no single program unit")
@@ -52,8 +54,34 @@ degree_packet_program_facts <- function(packet) {
   hours <- Filter(function(b) identical(b$field, "degreeHours") && identical(b$entity_id, doc$id), request$source_blocks)
   if (length(hours) != 1L) stop("[degree-compiler-board.R] The program record has no Degree Hours field")
   list(entity_id = doc$id, title = doc$title, catalog_url = doc$catalog_url,
-       degree_hours = as.numeric(jsonlite::fromJSON(hours[[1]]$text)), hours_quote = hours[[1]]$text,
-       blocks = request$source_blocks)
+       hours_block = hours[[1]]$id, hours_quote = hours[[1]]$text, blocks = request$source_blocks)
+}
+
+#' The degree's credit total: the reading's credit rule on the Degree Hours field
+#'
+#' The record writes the total as text, a number or words ("A minimum of 128
+#' hours"); the reading states it as a top-level credit rule citing that field,
+#' and a reviewer signs the reading off. The board plans to the reading's number
+#' (I99). When the record's text is a bare number, the two must agree.
+#'
+#' @param proposal The reading's `proposal`. @param program `degree_packet_program_facts()`.
+#' @return The total, in credits.
+degree_reading_degree_hours <- function(proposal, program) {
+  cites_hours <- vapply(proposal$nodes, function(n)
+    any(vapply(n$citations, function(x) identical(x$block_id, program$hours_block), TRUE)), TRUE)
+  totals <- Filter(function(n) identical(n$kind, "credits") && identical(n$unit, "credits") && !nzchar(n$parent_id),
+                   proposal$nodes[cites_hours])
+  if (length(totals) != 1L) {
+    stop("[degree-compiler-board.R] ", program$title, ": the reading needs one top-level credit rule citing the Degree Hours field (",
+         program$hours_quote, "); it has ", length(totals))
+  }
+  hours <- as.numeric(totals[[1]]$minimum)
+  stated <- as.character(jsonlite::fromJSON(program$hours_quote))
+  if (grepl("^[0-9]+$", stated) && as.numeric(stated) != hours) {
+    stop("[degree-compiler-board.R] ", program$title, ": the reading's ", hours,
+         " degree credits disagree with the record's Degree Hours, ", stated)
+  }
+  hours
 }
 
 #' Each course's structured requisites, from the catalog analysis
@@ -245,6 +273,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
                                            course_conditions, proposal) {
   id <- catalog_row$catalog_id
   if (catalog_row$source_url != program$catalog_url) stop("[degree-compiler-board.R] The draft's source must be its program page")
+  degree_hours <- degree_reading_degree_hours(proposal, program)
   year <- catalog_row$catalog_year
   blocks <- program$blocks
   section_of <- function(block) { hit <- Filter(function(b) identical(b$id, block), blocks); if (length(hit)) hit[[1]]$section else "Program requirements" }
@@ -454,7 +483,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
       source_url = d$source_url, evidence_id = eid)
   })))
 
-  plan <- data.frame(catalog_id = id, degree_credit_target = as.character(program$degree_hours),
+  plan <- data.frame(catalog_id = id, degree_credit_target = as.character(degree_hours),
     normal_load = as.character(degree_board_plan_default(shared$plans, "normal_load")),
     max_load = as.character(degree_board_plan_default(shared$plans, "max_load")),
     baseline_semesters = as.character(degree_board_plan_default(shared$plans, "baseline_semesters")),
@@ -466,7 +495,7 @@ assemble_compiled_degree_board <- function(compiled, courses, program, requisite
   catalog <- validate_degree_catalog(list(
     catalogs = as.data.frame(catalog_row),
     rules = rbind(data.frame(rule_id = paste0(id, "-total"), catalog_id = id, parent_id = "", phase = "degree", area = "completion",
-      target_course = "", label = "Minimum degree credits", operator = "credits", minimum = as.character(program$degree_hours),
+      target_course = "", label = "Minimum degree credits", operator = "credits", minimum = as.character(degree_hours),
       min_grade = "", review_status = "draft", detail = DEGREE_BOARD_DRAFT_NOTE), reading$rules),
     courses = reading$courses,
     evidence = rbind(shared_evidence[CEDAR_CONFIG_FILE_SPECS$degree_catalog_evidence], do.call(rbind, ev))))
