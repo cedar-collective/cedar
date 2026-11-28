@@ -215,6 +215,42 @@ an option (a `credits` node with no courses), and staging accepts it.
 naming the options in its detail. Failing that, list it for the reviewer. In
 neither case may one reading stop the others.
 
+## I103 — Preparing a program again after its archive moved makes a second packet for the same unit
+
+**Status:** resolved 2026-11-27 (branch `catalog/reading-skill`). A packet
+now names its archive by folder (`source_directory` is the folder's name),
+found under the capture root, so the same sources make the same packet on
+every machine. A packet prepared before the fix keeps its absolute path and
+key: preparing its program again finds it and writes nothing
+(`catalog_normalization_path_packet()`); its archive is looked for under the
+capture root first, then at the recorded path. Checked on a copy of the
+store: Civil Engineering and English Studies prepared again returned their
+packets, and the store still held 20.
+**Found:** 2026-11-27, writing the catalog-reading skill.
+**Severity:** low. A reading binds to its unit's key, which does not change,
+so nothing reads wrongly; the store gains a duplicate packet for every program
+prepared again, and Draft interpretations lists the program twice.
+
+A packet's key is the hash of the whole packet, and the packet records its
+archive's absolute path (`source_directory`, `prepare_catalog_normalization()`).
+I101 moved the archive from the repository's `data/` into `CEDAR_DATA_DIR`,
+so preparing a program the store already holds writes a second packet that
+differs only in that path. Its program unit, and every reading's `unit_key`,
+are the same. Preparing on another machine does the same. The path is only a
+fallback when a packet's sources are verified: the archive is found as
+`capture_root/<the path's last folder>` first
+(`catalog_normalization_capture_directory()`).
+
+**Reproduction:** `scripts/normalize-degree-catalog.R prepare --analysis
+<archive>/analysis-requisite-timing-1.4.0 --programs SypQxQ9j5 --output
+<scratch>` writes packet `c4b2ae66…`; the store's packet for Civil
+Engineering is `0ee14a62…`. Both program units' keys are `c3baaa2b…`, and the
+two packets differ only in `source_directory`.
+
+**Done when:** a packet's identity does not depend on where its archive sits
+(only the archive's folder name kept, say), with the store's existing packets
+still loading and their readings still matched.
+
 ## I102 — Every refresh of Draft interpretations restages every reading, and the admin browser suite times out waiting
 
 **Status:** open.

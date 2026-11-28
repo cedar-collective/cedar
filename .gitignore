@@ -1,4 +1,6 @@
-.claude
+# Claude Code's local state and worktrees stay out; the project's skills are committed.
+.claude/*
+!.claude/skills/
 .DS_Store
 .Rhistory
 .RData

@@ -96,9 +96,11 @@ prepare_catalog_normalization <- function(payload, program_id, root, prompt, sch
       "Program and concentrations" else paste(own[[1]]$code, own[[1]]$title), request = request)
   })
   program <- records[[match(paste0("programs:", program_id), ids)]]
+  # The archive by its folder name, found under the capture root wherever the
+  # archive sits, so the packet is the same on every machine (ISSUES I103).
   packet <- list(schema_version = "1.0.0", program_id = program_id, title = program$title,
     catalog_title = payload$meta$catalog_title, catalog_id = payload$meta$catalog_id,
-    source_directory = normalizePath(payload$source_directory),
+    source_directory = basename(normalizePath(payload$source_directory)),
     source_manifest_sha256 = payload$meta$source_manifest_sha256, units = units)
   key <- source_sha256(source_json_bytes(packet))
   directory <- file.path(root, "programs", key)
@@ -107,12 +109,48 @@ prepare_catalog_normalization <- function(payload, program_id, root, prompt, sch
     if (!identical(existing$packet, packet)) stop("[catalog-normalization.R] Existing program packet differs")
     return(invisible(directory))
   }
+  earlier <- catalog_normalization_path_packet(root, packet)
+  if (!is.null(earlier)) return(invisible(earlier))
+  invisible(write_catalog_normalization_packet(root, packet))
+}
+
+#' Write a packet into the store, keyed by its content
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param packet The packet (`prepare_catalog_normalization()`).
+#' @return The packet's directory.
+write_catalog_normalization_packet <- function(root, packet) {
+  key <- source_sha256(source_json_bytes(packet))
+  directory <- file.path(root, "programs", key)
   dir.create(directory, recursive = TRUE)
   write_source_json(packet, file.path(directory, "packet.json"))
   write_source_json(list(schema_version = "1.0.0", packet_sha256 = catalog_normalization_hash_file(file.path(directory, "packet.json")),
-    key = key, title = packet$title, program_id = program_id, catalog_title = packet$catalog_title,
+    key = key, title = packet$title, program_id = packet$program_id, catalog_title = packet$catalog_title,
     created_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")), file.path(directory, "program-manifest.json"))
-  invisible(directory)
+  directory
+}
+
+#' The packet prepared before 2026-11-27 that holds these same sources
+#'
+#' Packets prepared until then recorded their archive's absolute path, so the
+#' same sources prepared now have another key (ISSUES I103). Such a packet is
+#' the one a program prepared again keeps, not a second: its readings, staged
+#' proposals and `degree_drafts.csv` name it, and a packet is never rewritten.
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param packet A packet that names its archive by folder.
+#' @return The earlier packet's directory, or NULL.
+catalog_normalization_path_packet <- function(root, packet) {
+  manifests <- list.files(file.path(root, "programs"), pattern = "^program-manifest[.]json$", recursive = TRUE, full.names = TRUE)
+  for (path in manifests) {
+    if (!identical(read_source_json(path)$program_id, packet$program_id)) next
+    earlier <- load_catalog_normalization_program(root, basename(dirname(path)))
+    recorded <- earlier$packet$source_directory
+    if (identical(recorded, packet$source_directory) || !identical(basename(recorded), packet$source_directory)) next
+    earlier$packet$source_directory <- packet$source_directory
+    if (identical(earlier$packet, packet)) return(earlier$directory)
+  }
+  NULL
 }
 
 list_catalog_normalization_programs <- function(root) {
@@ -153,7 +191,12 @@ catalog_normalization_unit <- function(program, key) {
 # Original bytes are rechecked when a reviewer opens a unit or source passage.
 catalog_normalization_capture_directory <- function(program, capture_root) {
   packet <- program$packet
-  candidates <- unique(c(file.path(capture_root, basename(packet$source_directory)), packet$source_directory))
+  # A packet names its archive's folder, under the capture root. One prepared
+  # before 2026-11-27 recorded where the archive then was, which is tried
+  # second; a bare folder name is never looked up from the working directory.
+  folder <- basename(packet$source_directory)
+  candidates <- file.path(capture_root, folder)
+  if (!identical(folder, packet$source_directory)) candidates <- unique(c(candidates, packet$source_directory))
   matches <- vapply(candidates, function(x) file.exists(file.path(x, "source-manifest.json")) &&
     identical(catalog_normalization_hash_file(file.path(x, "source-manifest.json")), packet$source_manifest_sha256), logical(1))
   if (!any(matches)) stop("[catalog-normalization.R] The matching source capture is unavailable")
@@ -261,14 +304,16 @@ catalog_normalization_draft_units <- function(root, directory, capture_root,
 
 #' Every problem in one catalog reading, found before it is committed
 #'
-#' What staging and the board compiler would refuse, all in one pass, so a
-#' reading is fixed in one round rather than one error at a time: the file's
-#' own fields and its source packet and captured pages
+#' What staging would refuse, and the triage the board compiler checks, all
+#' in one pass, so a reading is fixed in one round rather than one error at a
+#' time: the file's own fields and its source packet and captured pages
 #' (`catalog_normalization_draft_units()`), every problem in its proposal
 #' (`catalog_normalization_problems()`, each naming its node, block or
 #' question), and its triage against the open items
 #' (`degree_reading_question_rows()`). A problem that stops the rest from
 #' being read (no packet, a proposal of the wrong shape) is reported alone.
+#' What needs the board too (`gen_ed_pools`, the degree total, a catalog row)
+#' is checked when the readings are compiled.
 #'
 #' @param path The reading file.
 #' @param root The institution's catalog-normalization store.
@@ -308,6 +353,81 @@ format_catalog_reading_check <- function(check) {
   c(paste0(check$path, ": ready to commit; ", nrow(check$open), if (nrow(check$open) == 1L) " open item" else " open items",
            if (length(counts)) paste0(" (", paste(paste0(names(counts), " ", counts), collapse = ", "), ")")),
     if (nrow(check$open)) paste0("  ", check$open$item, " [", who, "]: ", check$open$label))
+}
+
+# A packet's one unit for its program and embedded concentrations; the rest
+# are its linked courses' units.
+catalog_normalization_program_unit <- function(program) {
+  units <- Filter(function(u) identical(u$title, "Program and concentrations"), program$packet$units)
+  if (length(units) != 1L) stop("[catalog-normalization.R] Packet ", program$meta$key, " has ", length(units), " program units, not one")
+  units[[1]]
+}
+
+#' The packet a new reading of a program is written from
+#'
+#' A program can have several packets in the store, one for each prompt and
+#' schema it was prepared under, kept for the readings written from them. A
+#' new reading is written from the one prepared under the current prompt and
+#' schema; passing a packet key selects that packet instead. Packets whose
+#' program units are the same unit (the same text in two captures of the
+#' catalog) are one choice, and the most recently prepared is returned.
+#'
+#' @param root The institution's catalog-normalization store.
+#' @param program The catalog's program id (as in the program's catalog
+#'   page), or a packet key.
+#' @param prompt,schema The current instructions and response schema
+#'   (`config/catalog-normalization-prompt.txt`, `...schema.json`).
+#' @return `load_catalog_normalization_program()` output.
+catalog_normalization_current_packet <- function(root, program, prompt, schema) {
+  if (grepl("^[a-f0-9]{64}$", program)) return(load_catalog_normalization_program(root, program))
+  loaded <- lapply(list_catalog_normalization_programs(root)$key, function(key) load_catalog_normalization_program(root, key))
+  mine <- Filter(function(x) identical(x$packet$program_id, program), loaded)
+  if (!length(mine)) {
+    stop("[catalog-normalization.R] No packet for program ", program, " in ", root,
+         ": prepare it first (scripts/normalize-degree-catalog.R prepare)", call. = FALSE)
+  }
+  current <- Filter(function(x) {
+    request <- catalog_normalization_program_unit(x)$request
+    identical(request$instructions, prompt) && identical(request$response_schema, schema)
+  }, mine)
+  # The listing is newest first, so the first packet of each unit is kept.
+  units <- vapply(current, function(x) catalog_normalization_program_unit(x)$key, "")
+  current <- current[!duplicated(units)]
+  if (!length(current)) {
+    stop("[catalog-normalization.R] None of program ", program, "'s ", length(mine),
+         " packets was prepared under the current prompt and schema: prepare it again", call. = FALSE)
+  }
+  if (length(current) > 1L) {
+    stop("[catalog-normalization.R] Program ", program, " has ", length(current),
+         " packets from different sources under the current prompt and schema; pass one of their keys: ",
+         paste(vapply(current, function(x) paste(x$meta$key, x$packet$catalog_title), ""), collapse = "; "), call. = FALSE)
+  }
+  current[[1]]
+}
+
+#' A program unit as the lines a reading is written from
+#'
+#' Everything a reading needs from its packet, in one place: the fields its
+#' file names, every passage it must cover (full id, entity, record field,
+#' section, text) and every reference a node may name.
+#'
+#' @param program `load_catalog_normalization_program()` output.
+#' @return Character vector.
+format_catalog_normalization_unit <- function(program) {
+  packet <- program$packet; unit <- catalog_normalization_program_unit(program); request <- unit$request
+  blocks <- request$source_blocks; registry <- request$reference_registry
+  links <- vapply(request$unresolved_links, function(x) paste(unlist(x), collapse = " "), "")
+  c(paste0(packet$title, " · ", packet$catalog_title),
+    paste0("The reading's fields: program_id ", packet$program_id, ", catalog_id ", packet$catalog_id,
+           ", unit_key ", unit$key),
+    paste0("Packet ", program$meta$key),
+    paste0("Targets (a node's entity_id): ", paste(unlist(request$target_entities), collapse = ", ")),
+    if (length(links)) paste0("Linked, not captured: ", paste(links, collapse = "; ")),
+    "", paste0(length(blocks), " passages, each covered exactly once:"),
+    unlist(lapply(blocks, function(b) c(paste0("[", b$id, "] ", b$entity_id, " · ", b$field, " · ", b$section),
+                                        paste0("    ", b$text)))),
+    "", paste0(length(registry), " references a node may name:"),
+    vapply(registry, function(r) paste0("    ", r$id, "  ", r$code, "  ", r$title), ""))
 }
 
 # Maintainer-authored AI drafts live in Git beside the institution's data. Stage

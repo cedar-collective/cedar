@@ -127,19 +127,37 @@ packets fail explicitly. Each validated version enters
 the immutable proposal store. Staging never writes a human decision. Previous
 responses and review receipts survive; approvals belong to the exact proposal.
 
-**Check a reading before committing it.** The same checks, on one file or a
-directory of them, with nothing staged:
+**Writing a reading.** The `catalog-reading` skill
+(`.claude/skills/catalog-reading/SKILL.md`) walks the steps, and each
+institution's conventions are beside its readings
+(`institution/unm/catalog_interpretations/README.md`). A reading is written
+from its program unit:
+
+```bash
+Rscript --vanilla scripts/normalize-degree-catalog.R blocks --program SypQxQ9j5
+```
+
+prints the fields the file names (`program_id`, `catalog_id`, `unit_key`),
+every passage with its full id, entity, record field and section, and every
+reference a node may name. `--program` takes the catalog's program id or a
+packet key; a program id selects the packet prepared under the current prompt
+and schema (`catalog_normalization_current_packet()`).
+
+**Check a reading before committing it.** The same checks as staging, on one
+file or a directory of them, with nothing staged:
 
 ```bash
 Rscript --vanilla scripts/normalize-degree-catalog.R check \
   --reading institution/unm/catalog_interpretations/2026-2027/history.v2.json
 ```
 
-It lists every problem staging and the board compiler would refuse, each
-naming its node, block or question: a quote its block does not contain, a block
-with no coverage or covered twice, a course outside the packet's registry, a
-group with no children, a triage entry naming no open item. It exits 1 when any
-reading has one. A reading ready to commit is listed with its open items by who
+It lists every problem staging would refuse, and the triage's, each naming its
+node, block or question: a quote its block does not contain, a block with no
+coverage or covered twice, a course outside the packet's registry, a group with
+no children, a triage entry naming no open item. It exits 1 when any reading
+has one. What needs the board as well is checked when the readings are
+compiled: `gen_ed_pools`, the degree total against the record's Degree Hours,
+and the catalog row of a program with no hand-built board. A reading ready to commit is listed with its open items by who
 can settle them. The store and archive default to the institution's under
 `$CEDAR_DATA_DIR` (`--root`, `--capture-root` and `--institution` override)
 (`check_catalog_reading()`).
@@ -176,6 +194,11 @@ not in Git:
 | `programs/<packet-key>/` | Immutable packet, embedded request/schema/prompt and manifest |
 | `proposals/<unit-key>/<proposal-key>/` | Original proposal bytes, producer attribution and manifest |
 | `reviews/<proposal-key>/` | Complete, hash-linked, attributed review revisions |
+
+A packet names its archive by folder, found under the capture root, so the
+same sources make the same packet on every machine. A packet prepared before
+2026-11-27 recorded the archive's absolute path; its program prepared again
+keeps that packet rather than writing a second (ISSUES I103).
 
 Review stores must be writable by the Shiny worker for staging and decisions;
 keep those directories owned by the application's deployment user. The store
