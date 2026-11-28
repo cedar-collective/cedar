@@ -40,16 +40,18 @@ dfwRatesUI <- function(id, campuses, terms) {
       "DFW Rates",
       "How lower-division courses are doing on D, F and withdrawal grades, and where to act.",
       fluidRow(
-        column(3, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
-                               selected = opens_on$term_type, inline = TRUE)),
         column(3, selectInput(ns("dr_campus"), "Campus", multiple = TRUE, choices = campuses,
                               selected = opens_on$campus)),
         column(2, selectizeInput(ns("dr_from_term"), "From term", choices = term_choices,
                                  selected = opens_on$from_term)),
         column(2, selectizeInput(ns("dr_to_term"), "To term", choices = term_choices,
                                  selected = opens_on$to_term)),
+        column(3, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
+                               selected = opens_on$term_type, inline = TRUE)),
         column(2, filter_actions(cedar_link_menu(ns("dr_copy_url"))))
-      )
+      ),
+      # What the page read, as facts (describe_dfw_rates_scope()).
+      filter_scope_stripe(uiOutput(ns("scope")))
     ),
     # Opened by the server while it reads (cedar_with_loading()).
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332",
@@ -424,6 +426,11 @@ dfwRatesServer <- function(id, attempts, dims, edges, active) {
           NULL
         })
       }))
+    })
+
+    output$scope <- renderUI({
+      p <- payload(); req(p)
+      headcount_scope_bar(describe_dfw_rates_scope(p))
     })
 
     output$caveat <- renderUI({

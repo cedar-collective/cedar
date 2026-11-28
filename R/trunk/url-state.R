@@ -51,6 +51,18 @@ CEDAR_SHARE_SPECS <- list(
     slug = "dfw-rates", prefix = "dfw_rates-dr", sep = "_", run = NULL,
     fields = c("term_type", "campus", "from_term", "to_term")
   ),
+  # Retention and Graduation rebuild when a control changes: restoring the
+  # fields is the run.
+  "Retention" = list(
+    slug = "retention", prefix = "retention_dashboard", sep = "-", run = NULL,
+    fields = c("campus", "level", "term_type"),
+    types = list(term_type = "radio")
+  ),
+  "Graduation" = list(
+    slug = "graduation", prefix = "graduation", sep = "-", run = NULL,
+    fields = c("campus", "level", "line"),
+    types = list(line = "radio")
+  ),
   "Cancellations" = list(
     slug = "cancellations", prefix = "cancellations-cn", sep = "_", run = "button",
     fields = c("campus", "college", "dept", "term", "pt", "im", "level"),
@@ -90,7 +102,7 @@ CEDAR_SHARE_SPECS <- list(
   ),
   "Enrollment" = list(
     slug = "enrollment", prefix = "enrl", sep = "_", run = "button",
-    fields = c("campus", "college", "dept", "term", "level", "course"),
+    fields = c("campus", "college", "dept", "term", "pt", "level", "course"),
     overlay = "enrl-loading-overlay",
     types = list(course = "select_server")
   ),

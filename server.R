@@ -418,44 +418,19 @@ enrl_data <- eventReactive(enrl_run(), {
   enrollment_table_display(result)
 }
 
-# Helper: derive dept display info from enrl_data() opt — used by both the
-# summary box and the modal so the logic doesn't have to be duplicated.
-.enrl_dept_info <- function(out) {
-  dept_filter <- out$opt$dept_code
-  if (is.null(dept_filter) || length(dept_filter) == 0 || all(!nzchar(dept_filter)))
-    return(NULL)
-
-  lkp <- unit_names(data_objects[["cedar_dims"]])
-  nms <- lkp$dept_name[lkp$dept_code %in% dept_filter]
-  dept_display <- if (length(nms) > 0) paste(nms, collapse = ", ") else paste(dept_filter, collapse = ", ")
-  dept_code_label <- paste(dept_filter, collapse = ", ")
-
-  matched_sections <- cedar_sections %>% filter(department %in% dept_filter)
-  subjects_included <- sort(unique(matched_sections$subject))
-
-  campus_filter  <- out$opt$course_campus
-  college_filter <- out$opt$course_college
-  term_filter    <- out$opt$term
-  scoped <- matched_sections
-  if (length(campus_filter)  > 0) scoped <- scoped %>% filter(campus  %in% campus_filter)
-  if (length(college_filter) > 0) scoped <- scoped %>% filter(college %in% college_filter)
-  if (length(term_filter)    > 0) scoped <- scoped %>% filter(term %in% term_filter | term_type %in% term_filter)
-
-  list(
-    dept_display    = dept_display,
-    dept_code_label = dept_code_label,
-    subjects        = subjects_included,
-    n_courses       = length(unique(scoped$subject_course)),
-    n_sections      = nrow(scoped)
-  )
+# Which codes the chosen departments count, each with its name: the
+# mapping-file rows behind them (unit_mapping_rows()), rendered by the shared
+# unit_codes_scope(). Enrollment, Dept Trends and Headcount show the same block.
+dept_codes_scope <- function(dept, time_facts = NULL, time_meaning = NULL) {
+  unit_codes_scope(unit_mapping_rows(dept, cedar_institution_files),
+                   time_facts = time_facts, time_meaning = time_meaning)
 }
 
 output$enrl_filter_summary <- renderUI({
   out <- enrl_data()
   if (is.null(out) || is.null(out$opt)) {
-    return(div(class = "enrl-scope-bar",
-      tags$span(style = "opacity:0.6;", icon("filter"), " Select filters above and click Gather Enrollments")
-    ))
+    return(div(class = "scope-bar scope-bar-placeholder",
+               "Set filters and click Gather Enrollments to see the current scope."))
   }
 
   opt <- out$opt
@@ -478,14 +453,9 @@ output$enrl_filter_summary <- renderUI({
   if (length(opt$pt)             > 0) labels[["PoT"]]     <- paste(opt$pt,              collapse = ", ")
 
   filter_chips <- if (length(labels) > 0) {
-    lapply(names(labels), function(k) {
-      tags$span(class = "scope-chip",
-        tags$span(class = "scope-chip-key", k), ": ",
-        tags$span(class = "scope-chip-val", labels[[k]])
-      )
-    })
+    lapply(names(labels), function(k) scope_chip(k, labels[[k]]))
   } else {
-    list(tags$span(style = "opacity:0.7;", "All sections"))
+    list(scope_chip("Sections", "all"))
   }
 
   tab <- as.character(input$enrl_crosslist_tabs %||% "home")[[1]]
@@ -547,72 +517,21 @@ output$enrl_filter_summary <- renderUI({
     count_facts <- c(count_facts, cedar_scope_time_facts(in_progress, data_objects[["cedar_edges"]])["In progress"])
   }
   count_facts <- Filter(Negate(is.null), count_facts)
-  fact_chips <- lapply(names(count_facts), function(k) {
-    tags$span(class = "scope-chip",
-      tags$span(class = "scope-chip-key", k), ": ",
-      tags$span(class = "scope-chip-val", paste(count_facts[[k]], collapse = "; "))
-    )
-  })
+  fact_chips <- lapply(names(count_facts), function(k) scope_chip(k, paste(count_facts[[k]], collapse = "; ")))
 
-  info     <- .enrl_dept_info(out)
-  dept_btn <- if (!is.null(info)) {
-    actionButton("enrl_dept_info_btn", label = NULL, icon = icon("circle-question"),
-                 class = "btn-link btn-sm",
-                 title = "How does the dept → subject mapping work?")
-  }
+  # The codes behind each department chosen, from the mapping files: the
+  # block Headcount, Dept Trends and the Dept Dashboard show.
+  codes <- if (length(opt$dept_code) > 0) dept_codes_scope(opt$dept_code)
 
-  div(class = "enrl-scope-bar",
-    tagList(filter_chips),
-    tags$span(class = "scope-count", count_str),
-    tagList(fact_chips),
-    dedup_note,
-    dept_btn
+  tagList(
+    div(class = "enrl-scope-bar",
+      tagList(filter_chips),
+      tags$span(class = "scope-count", count_str),
+      tagList(fact_chips),
+      dedup_note
+    ),
+    codes
   )
-})
-
-observeEvent(input$enrl_dept_info_btn, {
-  out <- enrl_data()
-  if (is.null(out) || is.null(out$opt)) return()
-  info <- .enrl_dept_info(out)
-  if (is.null(info)) return()
-
-  subj_list <- if (length(info$subjects) > 0)
-    tagList("Subject code", if (length(info$subjects) != 1) "s" else "",
-            " in ", tags$code("cedar_sections"), " for this dept code: ",
-            tags$strong(paste(info$subjects, collapse = ", ")), ".")
-  else
-    tags$em("No subject codes found in cedar_sections for this dept code.")
-
-  showModal(cedar_info_modal(
-    title = paste0("Department filter: how \"", info$dept_display, "\" maps to data"),
-    size = "m",
-    tagList(
-      h5("Name → code", style = "margin-top: 0;"),
-      p("The department dropdown displays human-readable names but passes the short dept code
-        to the filter. ", tags$code("R/lists/subj_dept_map.R"), " is the authoritative source:
-        it defines the full hierarchy of college → department → subject codes, and
-        provides the human-readable name for each dept code. When a dept code has no entry in
-        that file, CEDAR falls back to deriving a name from ", tags$code("cedar_programs"), "."),
-      p(tags$strong(paste0('"', info$dept_display, '" → "', info$dept_code_label, '"')),
-        " (from ", tags$code("subj_dept_map.R"), ")."),
-      hr(),
-      h5("Subject codes"),
-      p(tags$code("subj_dept_map.R"), " also maps subject codes to dept codes — the relationship
-        is many-to-one, so a single dept code can cover sections offered under multiple subject
-        prefixes (for example, a joint program or a department that absorbed another unit).
-        Subject codes are stored in ", tags$code("cedar_sections$subject"), "."),
-      p("The filter itself matches ", tags$code("cedar_sections$department"), ", not the subject
-        code. Subject codes are shown here so you can see which course prefixes are grouped under
-        the selected department — useful when a department's courses appear under more than one prefix."),
-      subj_list,
-      hr(),
-      h5("How the filter runs"),
-      p("CEDAR filters ", tags$code("cedar_sections$department == \"", info$dept_code_label, "\""),
-        " directly at query time. No further translation happens. Summarized course views
-        keep campus automatically whenever ", tags$code("subject_course"), " is in Group by,
-        so ABQ, EA, and branch-campus course histories are not merged.")
-    )
-  ))
 })
 
 # Build and copy a shareable URL for the current enrollment view to the clipboard.
@@ -625,6 +544,7 @@ cedar_copy_url_observer(
     college = input$enrl_college,
     dept    = input$enrl_dept,
     term    = input$enrl_term,
+    pt      = input$enrl_pt,
     level   = input$enrl_level,
     course  = input$enrl_course
   )
@@ -3863,12 +3783,9 @@ for (.download_key in names(.enrl_desr_view_ids)) {
   # Subject selector — populated from cedar_sections for the selected dept
   # Subject dropdown removed: dashboard now only uses campus and department selectors
 
-  # Which codes the selected department counts, each with its name: the
-  # mapping-file rows behind it (unit_mapping_rows()), rendered by the shared
-  # unit_codes_scope() that Headcount uses too.
+  # The selected department's codes (dept_codes_scope()), as a stripe.
   dept_scope_info_ui <- function(dept, time_facts = NULL, time_meaning = NULL) {
-    filter_scope_stripe(unit_codes_scope(unit_mapping_rows(dept, cedar_institution_files),
-                                         time_facts = time_facts, time_meaning = time_meaning))
+    filter_scope_stripe(dept_codes_scope(dept, time_facts = time_facts, time_meaning = time_meaning))
   }
 
   deptTrendsServer(

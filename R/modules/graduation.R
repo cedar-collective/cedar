@@ -34,13 +34,16 @@ graduationUI <- function(id, campuses) {
       "Graduation",
       "Where do students leave without a degree, and how far along were they?",
       fluidRow(
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = opens_on$level)),
-        column(4, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
+        column(3, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
                                  selected = opens_on$campus,
                                  options = list(placeholder = "Every home campus"))),
+        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = opens_on$level)),
         column(5, radioButtons(ns("line"), "Far along means", choices = lines,
-                               selected = opens_on$lines[[1]], inline = TRUE))
-      )
+                               selected = opens_on$lines[[1]], inline = TRUE)),
+        column(1, filter_actions(cedar_link_menu(ns("copy_url"))))
+      ),
+      # What the page counted, as facts (describe_graduation_scope()).
+      filter_scope_stripe(uiOutput(ns("scope")))
     ),
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332",
                           loading_label = "Reading who left…",
@@ -210,8 +213,16 @@ graduationServer <- function(id, student_terms, programs, degrees, terms, dims, 
       }))
     })
 
+    cedar_copy_url_observer(input, session, "copy_url", spec_title = "Graduation",
+                            values_fn = function() list(campus = input$campus, level = input$level, line = input$line))
+
     n <- fmt_count
     has_rows <- function(p) !is.null(p) && p$meta$n_left > 0L
+
+    output$scope <- renderUI({
+      p <- payload(); req(p)
+      headcount_scope_bar(describe_graduation_scope(p))
+    })
 
     output$headline <- renderUI({
       p <- payload()

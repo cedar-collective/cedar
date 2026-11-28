@@ -313,6 +313,24 @@ format_graduation_pace <- function(pace) {
     plans)
 }
 
+#' What Graduation counted, as facts for its scope bar
+#'
+#' Facts only: the students who left without a degree and the last terms they
+#' span, those whose last term is too recent to judge, and the two edges that
+#' decide it (get_exit_credits()).
+#' @param payload A `build_graduation_dashboard()` result.
+#' @return A named character vector, in display order.
+describe_graduation_scope <- function(payload) {
+  m <- payload$meta
+  terms <- if (m$n_left > 0L) paste0(fmt_term(m$first_exit_term),
+                                     if (m$last_exit_term != m$first_exit_term) paste0(" to ", fmt_term(m$last_exit_term)))
+  c(`Left without a degree` = fmt_count(m$n_left),
+    `Last terms` = terms %||% "none",
+    `Too recent to judge` = paste0(fmt_count(m$n_not_judged), " student", if (m$n_not_judged != 1L) "s"),
+    `Enrollment settled through` = fmt_term(m$edge),
+    `Degrees through` = fmt_term(m$degree_edge))
+}
+
 #' The page's lead sentence: who left, and how many were far along
 #' @param payload A `build_graduation_dashboard()` result.
 graduation_headline <- function(payload) {

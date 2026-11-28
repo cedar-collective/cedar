@@ -271,6 +271,11 @@ test_that("the dashboard names colleges and carries the course board's window", 
   expect_equal(unique(p$courses$courses$college_name[p$courses$courses$college == "UC"]),
                unname(college_code_names(test_dims)["UC"]))
   expect_equal(p$meta$level, "lower")
+  testthat::local_edition(3)
+  expect_snapshot({
+    describe_dfw_rates_scope(p)
+    describe_dfw_rates_scope(build_dfw_dashboard(df_attempts, test_dims, modifyList(df01_fall_opt, list(campus = "EA"))))
+  })
 })
 
 test_that("the DFW Rates page's scope has one form, and the page opens on a scope it can ask for", {

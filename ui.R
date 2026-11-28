@@ -1425,7 +1425,7 @@ nav_panel(
     fluidRow(
       cedar_section_scope_inputs(
         identity, "enrl", cedar_sections, .dept_choices, cedar_default_term,
-        fields = c("campus", "college", "term", "pt", "dept"), widths = c(dept = 3)),
+        fields = c("campus", "college", "dept", "term", "pt"), widths = c(dept = 3)),
       column(1,
              selectizeInput(
                inputId = "enrl_subj",
@@ -1509,14 +1509,10 @@ nav_panel(
                        label = "Gather Enrollments",
                        class = "btn-primary",
                        icon = icon("sync-alt")),
-            c("enrl_campus", "enrl_college", "enrl_term", "enrl_pt", "enrl_dept", "enrl_subj",
-              "enrl_course", "enrl_inst", "enrl_im", "enrl_gen_ed"),
+            c("enrl_campus", "enrl_college", "enrl_dept", "enrl_term", "enrl_pt", "enrl_subj",
+              "enrl_course", "enrl_inst"),
             "Choose a filter other than Level first", any = TRUE),
           cedar_link_menu("enrl_copy_url")
-        ),
-        tags$small(
-          class = "text-muted",
-          "Choose any filter other than Level to enable this analysis."
         )
       )
     ), # end fluidRow
