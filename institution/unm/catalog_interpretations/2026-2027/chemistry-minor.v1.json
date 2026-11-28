@@ -1,0 +1,509 @@
+{
+ "schema_version": "1.0.0",
+ "version": 1,
+ "catalog_id": "68a34618094c97cf857f1ec1",
+ "program_id": "B1xHMxQ5j5",
+ "unit_key": "d43c1963968941b157c76d1baf54bf82555be18ec55f5156054e975da8a48615",
+ "producer": "Claude (Opus 5.5); source interpretation in the CEDAR development session, 2026-11-28; no API call.",
+ "scope": "The minor only. Linked course prerequisite units are not yet interpreted. Draft; no human academic approval.",
+ "proposal": {
+  "schema_version": "1.1.0",
+  "nodes": [
+   {
+    "id": "minor",
+    "parent_id": "",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "all",
+    "label": "Complete the Chemistry minor",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-e7d0edc9f8891c88e5768f36",
+      "quote": "Complete all of the following"
+     }
+    ]
+   },
+   {
+    "id": "core",
+    "parent_id": "minor",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "all",
+    "label": "Complete the nine Chemistry courses",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-e3f27250e8a5d70eb4855b76",
+      "quote": "Complete the following:"
+     }
+    ]
+   },
+   {
+    "id": "chem-1215",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM1215 - General Chemistry I for STEM Majors (3)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:SyFq5N9i9"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-4b1761d9cb5bf3d8ce976f9e",
+      "quote": "CHEM1215 - General Chemistry I for STEM Majors (3)"
+     }
+    ]
+   },
+   {
+    "id": "chem-1215l",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:HJxj7cVqo9"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-b993aa6ab688593b383b8aa5",
+      "quote": "CHEM1215L - General Chemistry I for STEM Majors Laboratory (1)"
+     }
+    ]
+   },
+   {
+    "id": "chem-1225",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM1225 - General Chemistry II for STEM Majors (3)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:BJLYX5N9j5"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-99cf28df04e04c0c68fef4e8",
+      "quote": "CHEM1225 - General Chemistry II for STEM Majors (3)"
+     }
+    ]
+   },
+   {
+    "id": "chem-1225l",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:r1yh54qs9"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-cd227476690c3c17ddb1f45c",
+      "quote": "CHEM1225L - General Chemistry II for STEM Majors Laboratory (1)"
+     }
+    ]
+   },
+   {
+    "id": "chem-2310c",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM2310C - Quantitative Analysis Lecture and Laboratory (4)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:ryWGfcEcs5"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-e2be6cad98d9f284eb33d715",
+      "quote": "CHEM2310C - Quantitative Analysis Lecture and Laboratory (4)"
+     }
+    ]
+   },
+   {
+    "id": "chem-301",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM301 - Organic Chemistry (3)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:B12N9E9jq"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-631f730655ebff5069686100",
+      "quote": "CHEM301 - Organic Chemistry (3)"
+     }
+    ]
+   },
+   {
+    "id": "chem-302",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM302 - Organic Chemistry (3)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:r1U-6949o5"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-74d18a190f6cff3f8fb865f4",
+      "quote": "CHEM302 - Organic Chemistry (3)"
+     }
+    ]
+   },
+   {
+    "id": "chem-303l",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM303L - Organic Chemistry Laboratory (1)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:BkrNmqNcs9"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-166d8efcf72c3a78f70fbd0c",
+      "quote": "CHEM303L - Organic Chemistry Laboratory (1)"
+     }
+    ]
+   },
+   {
+    "id": "chem-304l",
+    "parent_id": "core",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "course",
+    "label": "CHEM304L - Organic Chemistry Laboratory (1)",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [
+     "courses:H1Tl9V9iq"
+    ],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-d2a8b09bef17e43a88a97801",
+      "quote": "CHEM304L - Organic Chemistry Laboratory (1)"
+     }
+    ]
+   },
+   {
+    "id": "deviation",
+    "parent_id": "",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "permission",
+    "label": "A deviation from the minor's requirements must be approved in writing",
+    "minimum": null,
+    "maximum": null,
+    "unit": "none",
+    "comparison": "none",
+    "value": "Any deviation from the requirements prescribed above must be approved in writing.",
+    "minimum_grade": "",
+    "course_refs": [],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-0535998f17c0b39ba2943bdd",
+      "quote": "Any deviation from the requirements prescribed above must be approved in writing."
+     }
+    ]
+   },
+   {
+    "id": "minor-total",
+    "parent_id": "",
+    "entity_id": "programs:B1xHMxQ5j5",
+    "phase": "degree",
+    "kind": "credits",
+    "label": "At least 20 credits in the minor",
+    "minimum": 20,
+    "maximum": null,
+    "unit": "credits",
+    "comparison": "at_least",
+    "value": "",
+    "minimum_grade": "",
+    "course_refs": [],
+    "program_ref": "",
+    "timing": "not_applicable",
+    "citations": [
+     {
+      "block_id": "b-08f86f272c0e56079694aa44",
+      "quote": "Grand Total Credits: 20"
+     }
+    ]
+   }
+  ],
+  "coverage": [
+   {
+    "block_id": "b-7a5fa5571f8fdec761e32947",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "The description refers the reader to the department; it states no requirement."
+   },
+   {
+    "block_id": "b-e7d0edc9f8891c88e5768f36",
+    "disposition": "requirements",
+    "node_ids": [
+     "minor"
+    ],
+    "explanation": "The minor's requirement tree."
+   },
+   {
+    "block_id": "b-e3f27250e8a5d70eb4855b76",
+    "disposition": "requirements",
+    "node_ids": [
+     "core"
+    ],
+    "explanation": "Every listed course is required."
+   },
+   {
+    "block_id": "b-4b1761d9cb5bf3d8ce976f9e",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-1215"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-b993aa6ab688593b383b8aa5",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-1215l"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-99cf28df04e04c0c68fef4e8",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-1225"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-cd227476690c3c17ddb1f45c",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-1225l"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-e2be6cad98d9f284eb33d715",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-2310c"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-631f730655ebff5069686100",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-301"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-74d18a190f6cff3f8fb865f4",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-302"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-166d8efcf72c3a78f70fbd0c",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-303l"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-d2a8b09bef17e43a88a97801",
+    "disposition": "requirements",
+    "node_ids": [
+     "chem-304l"
+    ],
+    "explanation": "A required course."
+   },
+   {
+    "block_id": "b-0535998f17c0b39ba2943bdd",
+    "disposition": "requirements",
+    "node_ids": [
+     "deviation"
+    ],
+    "explanation": "A deviation needs written approval; the record does not say whose."
+   },
+   {
+    "block_id": "b-08f86f272c0e56079694aa44",
+    "disposition": "requirements",
+    "node_ids": [
+     "minor-total"
+    ],
+    "explanation": "The minor's total; its nine courses add to 20 credits."
+   },
+   {
+    "block_id": "b-5ba90b8fee4e679174ce39af",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-6979f3d35cce9187e245a7dc",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-bda9c884172417c177c7af41",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-45030c8bf668a291a178284b",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-54ef6b62a4747b6980f6dacb",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-8db195880fbc918e7da153cd",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-ba1cc3395b930702b436b2b0",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-a8337cfc566c7cfbc18a0275",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   },
+   {
+    "block_id": "b-63f4b99081eda0deb10aa2cf",
+    "disposition": "information",
+    "node_ids": [],
+    "explanation": "Record metadata."
+   }
+  ],
+  "questions": [
+   {
+    "block_id": "b-0535998f17c0b39ba2943bdd",
+    "question": "Who approves a deviation from the Chemistry minor's requirements in writing: the Chemistry department, the student's advisor, or the College of Arts & Sciences? The record says only that it must be approved in writing, and its description says to contact the department."
+   }
+  ]
+ },
+ "triage": [
+  {
+   "item": "question:1",
+   "settled_by": "catalog"
+  }
+ ]
+}

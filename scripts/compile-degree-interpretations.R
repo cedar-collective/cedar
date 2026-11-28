@@ -99,7 +99,7 @@ for (path in readings) {
   if (nrow(open)) {
     questions[[path]] <- data.frame(reading = sub(paste0("^", normalizePath(cedar_institution_dir()), "/"), "", normalizePath(path)),
       reading_file_sha256 = degree_reading_file_sha256(path), program_id = reading$program_id, program_title = trimws(packet$title),
-      catalog_url = degree_packet_program_facts(packet)$catalog_url, catalog_id = c(board, listed, "")[1], open)
+      catalog_url = degree_packet_program_record(packet)$catalog_url, catalog_id = c(board, listed, "")[1], open)
   }
   if (write && length(board) + length(listed) == 0L) {
     cat("Not written:", packet$title, "has no hand-built board and no row in degree_reading_catalogs.csv.\n\n")

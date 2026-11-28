@@ -38,6 +38,7 @@ fix each needs, and which of them are one piece of work, are under
 
 | ID | Kind | Summary |
 |---|---|---|
+| [I104](#i104--a-catalog-scan-on-the-mac-stops-at-its-first-request-r-cannot-verify-catalogunmedus-certificate) | Defect | A catalog scan run on the Mac stops at its first request: R's curl cannot verify catalog.unm.edu's certificate, though the system's curl and the app image's R can |
 | [I102](#i102--every-refresh-of-draft-interpretations-restages-every-reading-and-the-admin-browser-suite-times-out-waiting) | Defect | Every Refresh of Draft interpretations restages all 17 readings (about 15 s); the admin browser suite times out waiting, on `main` too |
 | [I96](#i96--the-demo-browser-suites-dept-trends-step-can-read-the-course-list-before-the-server-has-filtered-it) | Defect | The demo browser suite's Dept Trends step failed twice in three runs: it read the course list after "Other departments" was set and still found the department's own course; the page filters correctly by hand |
 | [I95](#i95--retention-looks-dead-for-most-of-a-minute-on-its-first-visit-after-a-start) | Defect | Retention's first visit after a start takes about 45 s on production with nothing saying it is working past the first 8 s: its view is not built ahead, and the overlay covers one of its seven builds |
@@ -214,6 +215,48 @@ an option (a `credits` node with no courses), and staging accepts it.
 **Fix:** draw the choice as elective space of its smallest option's credits,
 naming the options in its detail. Failing that, list it for the reviewer. In
 neither case may one reading stop the others.
+
+## I104 — A catalog scan on the Mac stops at its first request: R cannot verify catalog.unm.edu's certificate
+
+**Status:** open; worked around 2026-11-28 by running the scan in the app
+image.
+**Found:** 2026-11-28, capturing the 2026–2027 catalog with minors.
+**Severity:** low. The scan stops loudly before saving anything, and
+`--resume` continues it.
+
+`scripts/scan-degree-catalog.R scan`, run on the Mac as
+`catalog-scanning.md` shows, stopped at the landing page ("SSL certificate
+problem: unable to get local issuer certificate [catalog.unm.edu]"). It left
+an incomplete capture holding no request. On the same Mac:
+
+- the system's `curl` verifies `https://catalog.unm.edu/` (200, verify
+  result 0);
+- R's curl (OpenSSL 3.3.2) reaches the Kuali API (`unm.kuali.co`) but not
+  `catalog.unm.edu`. `CURL_CA_BUNDLE=/etc/ssl/cert.pem` and
+  `CURL_SSL_BACKEND=SecureTransport` change nothing;
+- R in the app image (`cedar-cedar-shiny`, Debian's CA store) fetches it
+  (200).
+
+The site sends its certificate and the "SSL.com TLS Issuing RSA CA R1"
+intermediate. R's OpenSSL evidently does not trust the root above it. The
+October capture ran before this certificate, or elsewhere. The capture always
+fetches the landing page, even with `--catalog-id`, so pinning the edition
+does not avoid it.
+
+**Workaround:** run the scan in the `cedar-projections` tool service, with the
+source mounted and the output under `data/` (its `CEDAR_DATA_DIR` mount):
+
+```bash
+docker compose run --rm --no-deps -T -v "$PWD:/srv/shiny-server/cedar:ro" \
+  cedar-projections scripts/scan-degree-catalog.R scan --institution unm \
+  --output data/catalog-scans/unm/<new folder> </dev/null
+```
+
+**Reproduction:** `Rscript --vanilla -e
+'curl::curl_fetch_memory("https://catalog.unm.edu/")'` on the Mac.
+
+**Done when:** `catalog-scanning.md` names where a scan runs, and the command
+it shows works there. Never by turning off certificate verification.
 
 ## I103 — Preparing a program again after its archive moved makes a second packet for the same unit
 
