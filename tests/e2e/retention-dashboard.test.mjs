@@ -419,6 +419,18 @@ try {
   await waitFor(page, plotTraces, { timeout: 300000, args: [`${CL}milestones_plot`] });
   ok(true, 'the old First Year link opens Retention, with the entering classes on it');
 
+  // A link restores the controls, and restoring them is the run.
+  await connect(page, { tab: 'retention', search: 'tab=retention&campus=ABQ&level=UG&term_type=spring', expect: 'Retention' });
+  const restored = await waitFor(page, (ns) =>
+    document.querySelector(`input[name="${ns}term_type"]:checked`)?.value === 'spring' &&
+    document.getElementById(`${ns}level`)?.value === 'UG', { timeout: 60000, args: [NS] });
+  ok(restored, 'a link restores spring terms');
+  if (restored) {
+    await waitBuilt();
+    const springLead = await page.$eval(`#${NS}overall_finding`, (el) => el.innerText.trim());
+    ok(/spring terms read/.test(springLead), `the restored page reads spring terms (${springLead.slice(0, 100)}…)`);
+  }
+
   ok(jsErrors.length === 0, `no page errors (${jsErrors.join('; ')})`);
 } catch (e) {
   fail.push(String(e));

@@ -437,6 +437,16 @@ the scope. It is not where a page explains itself.
 - **No page-level paragraph** restating the time scope above the tabs: the
   charts mark in-progress terms (`mark_plotly_terms()`) and the bar names them.
 
+### One order for a filter bar
+
+Every Bird's Eye page asks its questions in one order: campus, then college
+and department, then student level, then the terms (From, To, then term
+type), then the page's own controls, then the actions (a run button, the
+copy-link menu). A page that rebuilds when a control changes (DFW Rates,
+Retention, Graduation) has no run button: its link restores the controls, and
+that is the run. Each shows what it counted as facts under its controls
+(`filter_scope_stripe()`).
+
 ### A section page's filter bar
 
 Regstats, Open Seats, Waitlists, Low Enrollment, Cancellations and Enrollment
@@ -454,6 +464,8 @@ term, department, method, level.
   `cedar_threshold_state()`: "standard values", or each value changed. They
   are read at Run, carried by the page's link, and stated in the scope bar.
   Regstats and Low Enrollment are the two users.
+- Gen Ed asks three of the seven (campus, college, department) of the same
+  table, through the same function.
 - Low Enrollment (`R/modules/low-enrollment.R`) is the shortest whole example:
   bar, run button that waits for a term, overlay, scope bar of facts, one
   section with its method, link copy and restore.
@@ -528,8 +540,8 @@ CEDAR has no sign-in, so the choice belongs to the browser, not the person.
 | `seatfinder.R` | `seatfinderUI/Server` | Courses > Open Seats |
 | `cancellations.R` | `cancellationsUI/Server` | Courses > Cancellations |
 | `low-enrollment.R` | `lowEnrollmentUI(id, sections, default_term, dept_choices)`, `lowEnrollmentServer(id, sections, current_term, min_days_after_start, error_handler)` | Courses > Low Enrollment: the seven shared scope inputs, thresholds folded under "Adjust thresholds" (`cedar_threshold_fold()`) and read at Run, then `build_low_enrollment_page()`'s payload drawn as notes, cards and one table a level. Deep-linkable (`?tab=low-enrollment`) |
-| `dfw-rates.R` | `dfwRatesUI(id, campuses)`, `dfwRatesServer(id, attempts, dims, edges, active)` | Bird's Eye > DFW Rates: lower-division DFW one term type at a time (Term type and Campus, deep-linkable, no run button); builds only while the tab is open, once per term type and campus a session asks for; every number from `build_dfw_dashboard()` through `features/dfw-dashboard-view.R` |
-| `retention-dashboard.R` | `retentionDashboardUI(id, campuses)`, `retentionDashboardServer(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active, course_dim, course_codes)` | Bird's Eye > Retention: Term type, Student level and Home campus, no run button; each section's result is built once per scope a process is asked for (`cedar_shared_result()`), only while the tab is open. It places and feeds the module below |
+| `dfw-rates.R` | `dfwRatesUI(id, campuses)`, `dfwRatesServer(id, attempts, dims, edges, active)` | Bird's Eye > DFW Rates: lower-division DFW one term type at a time (Campus, From, To and Term type, deep-linkable, no run button; its facts bar from `describe_dfw_rates_scope()`); builds only while the tab is open, once per term type and campus a session asks for; every number from `build_dfw_dashboard()` through `features/dfw-dashboard-view.R` |
+| `retention-dashboard.R` | `retentionDashboardUI(id, campuses)`, `retentionDashboardServer(id, student_terms, attempts, degrees, programs, applicants, dims, edges, active, course_dim, course_codes)` | Bird's Eye > Retention: Home campus, Student level and Term type, deep-linkable, no run button; each section's result is built once per scope a process is asked for (`cedar_shared_result()`), only while the tab is open. It places and feeds the module below |
 | `retention-entering-classes.R` | `retentionEnteringClassesUI(id)` (a list of two sections, `classes` and `summer`, for the page to place), `retentionEnteringClassesServer(id, student_terms, degrees, programs, attempts, courses, course_codes, edges, scope)` | Two sections of Retention, a module inside it: each entering class semester by semester, and the summer after its first spring. It owns one control (Entering students) and reads the page's term type, level and campus through `scope`, a reactive that waits while the page is closed. It was the First Year page until 2026-11; `?tab=first-year` opens Retention |
 | `waitlist.R` | `waitlistUI/Server` | Courses > Waitlists |
 | `gen-ed.R` | `genEdExploreUI/Server`, `deptProfileGenEdUI/Server` | Bird's Eye > Gen Ed; Dept Trends Gen Ed panel (`deptProfileGenEd*` is the legacy internal function name) |

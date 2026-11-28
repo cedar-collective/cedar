@@ -40,16 +40,17 @@ retentionDashboardUI <- function(id, campuses) {
       "Retention",
       "From the first semester on: are students coming back, are they keeping pace, and who is not?",
       fluidRow(
+        column(3, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
+                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
+                                 options = list(placeholder = "Every home campus"))),
+        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
         column(3, radioButtons(ns("term_type"), "Term type", choices = RETENTION_TERM_TYPES,
                                selected = "fall", inline = TRUE)),
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
-        column(4, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
-                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
-                                 options = list(placeholder = "Every home campus")))
-      )
+        column(3, filter_actions(cedar_link_menu(ns("copy_url"))))
+      ),
+      # Who the page counts, as facts (describe_retention_scope()).
+      filter_scope_stripe(uiOutput(ns("scope")))
     ),
-    # Who the page counts, as facts (describe_retention_scope()).
-    uiOutput(ns("scope")),
     # Opened by the server while it reads (cedar_with_loading()).
     cedar_loading_overlay(ns("load"), run_button = NULL, emoji = "\U0001f332", loading_label = "Reading who came back…",
     dashboard_section(
@@ -190,21 +191,26 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
                                      course_dim, course_codes) {
   moduleServer(id, function(input, output, session) {
     college_names <- college_code_names(dims)
+    cedar_copy_url_observer(input, session, "copy_url", spec_title = "Retention",
+                            values_fn = function() list(campus = input$campus, level = input$level,
+                                                        term_type = input$term_type))
+    # One scope, one shared result, whatever order its campuses were picked in.
+    campus_key <- reactive(if (length(input$campus) > 0) sort(input$campus) else NULL)
     # The entering-class sections read this page's controls.
     retentionEnteringClassesServer(
       "classes", student_terms, degrees, programs, attempts, course_dim, course_codes, edges,
       scope = reactive({
         req(isTRUE(active()), input$term_type, input$level)
         list(term_type = input$term_type, level = input$level,
-             campus = if (length(input$campus) > 0) input$campus else NULL)
+             campus = campus_key())
       }))
     payload <- reactive({
       req(isTRUE(active()), input$term_type, input$level)
-      cedar_shared_result(list("retention_dashboard", input$term_type, input$level, input$campus), function() cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
+      cedar_shared_result(list("retention_dashboard", input$term_type, input$level, campus_key()), function() cedar_with_loading(session, session$ns("load"), report_type = "retention_dashboard", {
         tryCatch(
           build_retention_dashboard(student_terms, attempts, degrees, list(
             term_type = input$term_type, student_level = input$level,
-            campus = if (length(input$campus) > 0) input$campus else NULL, data_edges = edges,
+            campus = campus_key(), data_edges = edges,
             milestones = FALSE, courses = FALSE), programs = programs),
           error = function(e) {
             showNotification(paste("Retention:", conditionMessage(e)), type = "error", duration = 10)
@@ -226,9 +232,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     # The course list is the slowest part: read after the charts above it.
     courses <- reactive({
       p <- payload(); req(p, nrow(p$series) > 0L)
-      cedar_shared_result(list("retention_courses", input$term_type, input$level, input$campus), function() tryCatch(
+      cedar_shared_result(list("retention_courses", input$term_type, input$level, campus_key()), function() tryCatch(
         retention_dashboard_course_list(student_terms, attempts, degrees, p$series, list(
-          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          student_level = input$level, campus = campus_key(),
           data_edges = edges)),
         error = function(e) {
           showNotification(paste("Courses:", conditionMessage(e)), type = "error", duration = 10)
@@ -239,10 +245,10 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     bands <- reactive({
       req(isTRUE(active()), input$term_type, input$level, input$band_by)
       if (identical(input$band_by, "hs") && is.null(applicants)) return(NULL)
-      cedar_shared_result(list("retention_bands", input$term_type, input$level, input$campus, input$band_by), function() tryCatch(
+      cedar_shared_result(list("retention_bands", input$term_type, input$level, campus_key(), input$band_by), function() tryCatch(
         retention_dashboard_band_courses(attempts, student_terms, applicants, list(
           term_type = input$term_type, student_level = input$level,
-          campus = if (length(input$campus) > 0) input$campus else NULL,
+          campus = campus_key(),
           data_edges = edges, band_by = input$band_by)),
         error = function(e) {
           showNotification(paste("Courses by GPA:", conditionMessage(e)), type = "error", duration = 10)
@@ -352,9 +358,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     # slowest part of the page.
     class_pace <- reactive({
       req(isTRUE(active()), input$level)
-      cedar_shared_result(list("class_pace", input$level, input$campus), function() tryCatch(
+      cedar_shared_result(list("class_pace", input$level, campus_key()), function() tryCatch(
         build_class_pace(student_terms, degrees, programs, list(
-          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          student_level = input$level, campus = campus_key(),
           data_edges = edges)),
         error = function(e) {
           showNotification(paste("Pace:", conditionMessage(e)), type = "error", duration = 10)
@@ -425,9 +431,9 @@ retentionDashboardServer <- function(id, student_terms, attempts, degrees, progr
     # Students behind on credits each spring, and what the summer did.
     pace_summer <- reactive({
       req(isTRUE(active()), input$level)
-      cedar_shared_result(list("pace_summer", input$level, input$campus), function() tryCatch(
+      cedar_shared_result(list("pace_summer", input$level, campus_key()), function() tryCatch(
         build_pace_summer(student_terms, attempts, degrees, programs, list(
-          student_level = input$level, campus = if (length(input$campus) > 0) input$campus else NULL,
+          student_level = input$level, campus = campus_key(),
           data_edges = edges)),
         error = function(e) {
           showNotification(paste("Summer and pace:", conditionMessage(e)), type = "error", duration = 10)

@@ -72,6 +72,31 @@ DFW_SPREAD_DIRECTION_CODES <- c("rising", "falling", "steady")
 
 #' The latest term's rate and the series' verdict
 #'
+#' What DFW Rates read, as facts for its scope bar
+#'
+#' Facts only: the course level the page reads, the campuses, the terms read
+#' (those of the term type with graded attempts, which can be fewer than the
+#' From and To terms span), the attempts and the last graded term.
+#'
+#' @param payload build_dfw_dashboard() output.
+#' @return A named character vector, in display order.
+describe_dfw_rates_scope <- function(payload) {
+  .dfw_view_check(payload)
+  m <- payload$meta
+  terms <- payload$overall$terms
+  levels <- c(lower = "lower division", upper = "upper division", grad = "graduate")
+  read_terms <- sort(terms$term)
+  n <- length(read_terms)
+  read <- if (n == 0L) "none" else
+    paste0(fmt_term(read_terms[1]), if (n > 1L) paste0(" to ", fmt_term(read_terms[n])),
+           " (", n, " ", m$term_type, " term", if (n != 1L) "s", ")")
+  c(Courses = paste(unname(levels[m$level]), collapse = ", "),
+    Campus = if (length(m$campus)) paste(m$campus, collapse = ", ") else "every campus",
+    `Terms read` = read,
+    Attempts = fmt_count(sum(terms$n_attempts)),
+    `Grades through` = fmt_term(m$graded_edge))
+}
+
 #' @param payload build_dfw_dashboard() output.
 #' @return A list: `term`, `dfw_pct`, `n_dfw`, `n_attempts` (the latest term),
 #'   `direction`, `slope`, `sentence` (dfw_trend_sentence()), and `nr_terms`

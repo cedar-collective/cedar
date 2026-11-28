@@ -112,6 +112,8 @@ test_that("XC01: the page's words", {
   expect_snapshot({
     cat(format_graduation_dashboard(p), sep = "\n")
     cat("\n", graduation_headline(none), "\n")
+    describe_graduation_scope(p)
+    describe_graduation_scope(none)
   })
   expect_equal(graduation_band_table(p)$n, c(1L, 0L, 1L, 1L, 1L, 2L, 1L))
 })

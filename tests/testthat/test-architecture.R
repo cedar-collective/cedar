@@ -592,7 +592,7 @@ test_that("inline styles given a fixed string do not grow, and the backlog shrin
     "R/modules/regstats.R" = 7L,
     "R/modules/retention.R" = 3L,
     "R/modules/ui-helpers.R" = 3L,
-    "server.R" = 54L
+    "server.R" = 51L
   )
   architecture_expect_ratchet(measured, allowance, "inline style(s) given a fixed string")
 })
@@ -615,7 +615,7 @@ test_that("bare headings do not grow, and the backlog shrinks on record (M18)", 
     "R/modules/instructor-gate.R" = 2L,
     "R/modules/pathways.R" = 3L,
     "R/modules/retention.R" = 1L,
-    "server.R" = 8L,
+    "server.R" = 5L,
     "ui.R" = 4L
   )
   architecture_expect_ratchet(measured, allowance, "bare heading(s)")

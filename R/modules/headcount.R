@@ -17,24 +17,25 @@ headcountUI <- function(id) {
       cedar_definition_summary("program-headcount"),
       fluidRow(
         column(4,
-          selectizeInput(ns("campus"), "Select Campus", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("campus"), "Home campus", multiple = TRUE, choices = NULL,
+                         options = list(placeholder = "Every home campus"))
         ),
         column(4,
-          selectizeInput(ns("college"), "Select College", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("college"), "College", multiple = TRUE, choices = NULL)
         ),
         column(4,
-          selectizeInput(ns("dept"), "Select Department", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("dept"), "Department", multiple = TRUE, choices = NULL)
         )
       ),
       fluidRow(
         column(3,
-          selectizeInput(ns("major"), "Select Major", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("major"), "Major", multiple = TRUE, choices = NULL)
         ),
         column(3,
-          selectizeInput(ns("minor"), "Select Minor", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("minor"), "Minor", multiple = TRUE, choices = NULL)
         ),
         column(3,
-          selectizeInput(ns("concentration"), "Select Concentration", multiple = TRUE, choices = NULL)
+          selectizeInput(ns("concentration"), "Concentration", multiple = TRUE, choices = NULL)
         ),
         column(3,
           filter_actions(

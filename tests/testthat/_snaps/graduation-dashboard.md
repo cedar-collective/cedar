@@ -178,6 +178,24 @@
     Output
       
        No student in this scope has a last term that can be judged yet. 
+    Code
+      describe_graduation_scope(p)
+    Output
+           Left without a degree                 Last terms 
+                             "7" "Fall 2020 to Spring 2021" 
+             Too recent to judge Enrollment settled through 
+                    "2 students"                "Fall 2022" 
+                 Degrees through 
+                     "Fall 2022" 
+    Code
+      describe_graduation_scope(none)
+    Output
+           Left without a degree                 Last terms 
+                             "0"                     "none" 
+             Too recent to judge Enrollment settled through 
+                    "0 students"                "Fall 2022" 
+                 Degrees through 
+                     "Fall 2022" 
 
 # EC01: the entering classes' pace, as the page shows it
 

@@ -39,6 +39,28 @@
           Not listed: 1 course read in fewer than 4 terms.
           Left out: 1 course-term in which no student, or every student, got a DFW grade.
 
+# the dashboard names colleges and carries the course board's window
+
+    Code
+      describe_dfw_rates_scope(p)
+    Output
+                                      Courses                                  Campus 
+                             "lower division"                          "every campus" 
+                                   Terms read                                Attempts 
+      "Fall 2019 to Fall 2022 (4 fall terms)"                                   "560" 
+                               Grades through 
+                                  "Fall 2022" 
+    Code
+      describe_dfw_rates_scope(build_dfw_dashboard(df_attempts, test_dims, modifyList(
+        df01_fall_opt, list(campus = "EA"))))
+    Output
+                                      Courses                                  Campus 
+                             "lower division"                                    "EA" 
+                                   Terms read                                Attempts 
+      "Fall 2019 to Fall 2022 (4 fall terms)"                                   "120" 
+                               Grades through 
+                                  "Fall 2022" 
+
 # the DFW dashboard's text preview
 
     Code

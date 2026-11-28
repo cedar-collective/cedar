@@ -146,12 +146,30 @@ try {
   const lead120 = await page.$eval(`#${NS}headline`, (el) => el.innerText);
   ok(/had 120 credits or more\.$/.test(lead120.trim()), `the lead follows the line (${lead120.slice(-50)})`);
 
+  // What the page counted, as facts under the controls.
+  await waitForSelector(page, `#${NS}scope .scope-chip`, { timeout: 120000 });
+  const scopeKeys = await page.$$eval(`#${NS}scope .scope-chip-key`, (els) => els.map((el) => el.textContent.trim()));
+  ok(['Left without a degree', 'Too recent to judge', 'Enrollment settled through', 'Degrees through'].every((k) => scopeKeys.includes(k)),
+     `the scope bar names who left, who is too recent to judge and both edges (${scopeKeys})`);
+
   const inError = await outputsInError(page, NS);
   ok(inError.length === 0, `no output in error (${inError.join('; ')})`);
 
   await connect(page, { tab: 'home' });
   const card = await page.evaluate(() => [...document.querySelectorAll('a[href]')].some((a) => a.getAttribute('href') === '?tab=graduation'));
   ok(card, 'the home page links to Graduation');
+
+  // A link restores the controls, and restoring them is the run.
+  await connect(page, { tab: 'graduation', search: 'tab=graduation&campus=ABQ&level=UG&line=105', expect: 'Graduation' });
+  const restored = await waitFor(page, (ns) =>
+    document.querySelector(`input[name="${ns}line"]:checked`)?.value === '105' &&
+    document.getElementById(`${ns}level`)?.value === 'UG', { timeout: 60000, args: [NS] });
+  ok(restored, 'a link restores far along at 105 credits');
+  if (restored) {
+    await waitBuilt();
+    const lead105 = await page.$eval(`#${NS}headline`, (el) => el.innerText);
+    ok(/had 105 credits or more/.test(lead105), `the restored page reads at 105 credits (${lead105.slice(0, 70)})`);
+  }
 
   ok(jsErrors.length === 0, `no page errors (${jsErrors.join('; ')})`);
 } catch (e) {
