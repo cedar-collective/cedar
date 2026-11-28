@@ -30,6 +30,7 @@ and two are misleading:
 |---|---|---|
 | `degreeRequirements` | the program's requirement tree, one line per passage ([below](#the-requirement-tree)) | requirements; a heading or note that requires nothing is information |
 | `concentrationRequirements` | each concentration's tree, on its own entity (`specializations:<id>`) | requirements, on the concentration's entity |
+| `minorRequirements` | a minor's requirement tree, in the same fixed phrases as a degree's ([Minors](#minors)) | requirements |
 | `graduateGraduationRequirements` | **the undergraduate program's graduation requirements**, despite the name: residency, GPA, the college's rules | sentence by sentence: requirements, or information when a sentence requires nothing |
 | `graduateAdmissionsRequirements` | **admission to the program**, despite the name | `phase: admission` ([below](#admission)) |
 | `description` | prose, which sometimes restates the tree and sometimes contradicts it | information, unless it states a requirement the tree lacks; a contradiction is an `unresolved` rule and a question |
@@ -144,6 +145,21 @@ Kuali renders the tree as fixed phrases. The readings read them this way:
   their own records (Chemical Engineering's "6 credit hours of technical
   electives" against a 9-credit Semiconductor concentration), keep both and
   ask the catalog.
+
+## Minors
+
+A minor is its own record, with no `degreeType` and no `degreeHours`; the
+capture keeps it from 2026-11-28 on. The first reading is the Chemistry minor
+(`chemistry-minor.v1.json`).
+
+- Its tree is `minorRequirements`, read as a degree's tree is. Its closing
+  "Grand Total Credits: 20" is `minor-total`, a top-level `credits` rule.
+- "Any deviation from the requirements prescribed above must be approved in
+  writing." is a top-level `permission` with the sentence in `value`. The
+  record names no approver, so it is a question for the catalog.
+- `scope` says "The minor only."
+- A minor has no board: its reading stops at the check and triage, and the
+  compile lists it and puts its open items on Catalog questions.
 
 ## Who settles each open item
 

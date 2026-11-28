@@ -549,6 +549,11 @@ test_that("a minor is captured with its course links, read by the analysis and p
   expect_setequal(targets, c("programs:minor", "courses:course-ecol"))
   minor_unit <- packet$units[[match("programs:minor", targets)]]
   expect_true(any(vapply(minor_unit$request$source_blocks, function(b) b$field == "minorRequirements", logical(1))))
+  # The Catalog questions list reads a minor's record; only a board needs the
+  # degree total a minor does not have.
+  record <- degree_packet_program_record(packet)
+  expect_identical(record[c("entity_id", "title")], list(entity_id = "programs:minor", title = "Biology Minor"))
+  expect_error(degree_packet_program_facts(packet), "no Degree Hours field")
 
   # A record with a minor's requirements that says it is graduate-level is excluded.
   graduate <- scan_fixture

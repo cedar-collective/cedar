@@ -39,6 +39,23 @@ degree_board_split_credits <- function(total, n) {
   each
 }
 
+#' The program record a packet reads: its entity, title, catalog page and passages
+#'
+#' A degree's or a minor's alike. The Catalog questions list reads this for every
+#' reading; a board reads `degree_packet_program_facts()`, which adds the
+#' degree total a minor's record does not have.
+#'
+#' @param packet A prepared packet.
+#' @return List: `entity_id`, `title`, `catalog_url`, `blocks` (every program
+#'   and concentration source block).
+degree_packet_program_record <- function(packet) {
+  unit <- Filter(function(u) any(startsWith(vapply(u$request$documents, function(d) d$id, ""), "programs:")), packet$units)
+  if (length(unit) != 1L) stop("[degree-compiler-board.R] The packet has no single program unit")
+  request <- unit[[1]]$request
+  doc <- Filter(function(d) startsWith(d$id, "programs:"), request$documents)[[1]]
+  list(entity_id = doc$id, title = doc$title, catalog_url = doc$catalog_url, blocks = request$source_blocks)
+}
+
 #' The program page's own facts a board cites
 #'
 #' @param packet A prepared packet.
@@ -47,14 +64,11 @@ degree_board_split_credits <- function(total, n) {
 #'   minimum of 128 hours"; `degree_reading_degree_hours()` reads the number),
 #'   `blocks` (every program and concentration source block, for citation sections).
 degree_packet_program_facts <- function(packet) {
-  unit <- Filter(function(u) any(startsWith(vapply(u$request$documents, function(d) d$id, ""), "programs:")), packet$units)
-  if (length(unit) != 1L) stop("[degree-compiler-board.R] The packet has no single program unit")
-  request <- unit[[1]]$request
-  doc <- Filter(function(d) startsWith(d$id, "programs:"), request$documents)[[1]]
-  hours <- Filter(function(b) identical(b$field, "degreeHours") && identical(b$entity_id, doc$id), request$source_blocks)
+  record <- degree_packet_program_record(packet)
+  hours <- Filter(function(b) identical(b$field, "degreeHours") && identical(b$entity_id, record$entity_id), record$blocks)
   if (length(hours) != 1L) stop("[degree-compiler-board.R] The program record has no Degree Hours field")
-  list(entity_id = doc$id, title = doc$title, catalog_url = doc$catalog_url,
-       hours_block = hours[[1]]$id, hours_quote = hours[[1]]$text, blocks = request$source_blocks)
+  list(entity_id = record$entity_id, title = record$title, catalog_url = record$catalog_url,
+       hours_block = hours[[1]]$id, hours_quote = hours[[1]]$text, blocks = record$blocks)
 }
 
 #' The degree's credit total: the reading's credit rule on the Degree Hours field
