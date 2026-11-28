@@ -32,7 +32,7 @@ catalog_program_scope <- function(index, credentials) {
   validate_catalog_index(index)
   if (!all(c("degree_type", "scope") %in% names(credentials)) || !nrow(credentials) ||
       anyNA(credentials) || any(!nzchar(credentials$degree_type)) || anyDuplicated(credentials$degree_type) ||
-      any(!credentials$scope %in% c("undergraduate_degree", "excluded"))) {
+      any(!credentials$scope %in% c("undergraduate_degree", "undergraduate_minor", "excluded"))) {
     stop("[catalog-extraction.R] Invalid credential classification file")
   }
   types <- vapply(index, catalog_named_value, character(1), field = "degreeType")

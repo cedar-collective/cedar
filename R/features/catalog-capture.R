@@ -23,11 +23,17 @@ catalog_record_classification <- function(record, initial, source, credentials) 
     if (is.na(i)) stop("[catalog-capture.R] Unclassified full-record degree type: ", type)
     return(credentials$scope[i])
   }
-  exclusion_fields <- strsplit(source$untyped_exclusion_fields, "|", fixed = TRUE)[[1]]
-  if (any(vapply(exclusion_fields, function(k) !is.null(record[[k]]) &&
-    is.character(record[[k]]) && nzchar(record[[k]]), logical(1)))) return("excluded")
-  if (identical(catalog_scalar(record, source$level_field), source$graduate_level)) return("excluded")
-  if (identical(catalog_scalar(record, source$level_field), source$undergraduate_level)) {
+  filled <- function(fields) {
+    any(vapply(strsplit(fields, "|", fixed = TRUE)[[1]], function(k) !is.null(record[[k]]) &&
+      is.character(record[[k]]) && nzchar(record[[k]]), logical(1)))
+  }
+  level <- catalog_scalar(record, source$level_field)
+  # An untyped record whose requirements are a minor's is an undergraduate
+  # minor, unless it says it is a graduate program.
+  if (filled(source$untyped_minor_fields) && !identical(level, source$graduate_level)) return("undergraduate_minor")
+  if (filled(source$untyped_exclusion_fields)) return("excluded")
+  if (identical(level, source$graduate_level)) return("excluded")
+  if (identical(level, source$undergraduate_level)) {
     return("undergraduate_candidate") # Retain and flag an undergraduate whose credential is unspecified.
   }
   initial
@@ -53,7 +59,8 @@ capture_degree_catalog <- function(source, credentials, fields, directory,
       any(!fields$phase %in% c("admission", "degree", "prerequisite", "corequisite", "info"))) {
     stop("[catalog-capture.R] Invalid source field/phase mapping")
   }
-  required <- c("landing_url", "api_base", "level_field", "undergraduate_level", "graduate_level", "untyped_exclusion_fields")
+  required <- c("landing_url", "api_base", "level_field", "undergraduate_level", "graduate_level",
+    "untyped_minor_fields", "untyped_exclusion_fields")
   if (any(!required %in% names(source)) || any(!nzchar(unlist(source[required])))) {
     stop("[catalog-capture.R] Incomplete catalog source configuration")
   }
@@ -104,9 +111,10 @@ capture_degree_catalog <- function(source, credentials, fields, directory,
   index <- get_source("index", "programs", index_url)
   inventory <- catalog_program_scope(index, credentials)
   programs <- list()
-  candidates <- which(inventory$scope %in% c("undergraduate_degree", "unclassified"))
+  candidates <- which(inventory$scope %in% c("undergraduate_degree", "undergraduate_minor", "unclassified"))
   message("[catalog-capture.R] ", edition$title, ": ", nrow(inventory), " index entries; ",
     sum(inventory$scope == "undergraduate_degree"), " declared undergraduate degrees; ",
+    sum(inventory$scope == "undergraduate_minor"), " declared undergraduate minors; ",
     sum(inventory$scope == "unclassified"), " unlabeled records to classify.")
   for (i in candidates) {
     id <- inventory$program_id[i]
@@ -115,10 +123,12 @@ capture_degree_catalog <- function(source, credentials, fields, directory,
       stop("[catalog-capture.R] Program identity/revision disagrees with index: ", id)
     }
     inventory$scope[i] <- catalog_record_classification(record, inventory$scope[i], source, credentials)
-    if (inventory$scope[i] %in% c("undergraduate_degree", "undergraduate_candidate")) programs[[id]] <- record
+    # Degrees and minors are kept, and their course links followed.
+    if (inventory$scope[i] %in% c("undergraduate_degree", "undergraduate_candidate", "undergraduate_minor")) programs[[id]] <- record
     if (match(i, candidates) %% 20L == 0L) message("[catalog-capture.R] Classified ", match(i, candidates), "/", length(candidates), " program records.")
   }
-  if (!length(programs)) stop("[catalog-capture.R] No undergraduate degrees found; capture remains incomplete")
+  degrees <- inventory$program_id[inventory$scope %in% c("undergraduate_degree", "undergraduate_candidate")]
+  if (!any(names(programs) %in% degrees)) stop("[catalog-capture.R] No undergraduate degrees found; capture remains incomplete")
   if (include_courses) {
     references <- catalog_record_references(programs)
     pending <- unique(vapply(references, function(x) x$key, character(1)))
@@ -141,12 +151,18 @@ capture_degree_catalog <- function(source, credentials, fields, directory,
   identity <- function(x) sort(vapply(x, function(r) paste(r$pid, r$id, sep = ":"), character(1)))
   if (!identical(identity(index), identity(final_index))) stop("[catalog-capture.R] Program index changed during capture; start a new capture")
   utils::write.csv(inventory, file.path(directory, "program-inventory.csv"), row.names = FALSE, na = "")
-  manifest$program_ids <- names(programs)
+  # program_ids are the degrees (and undergraduate candidates), as before
+  # minors were kept; minor_ids are the minors. A capture made before has no
+  # minor_ids, and held no minor.
+  is_minor <- names(programs) %in% inventory$program_id[inventory$scope == "undergraduate_minor"]
+  manifest$program_ids <- names(programs)[!is_minor]
+  manifest$minor_ids <- names(programs)[is_minor]
   manifest$inventory <- lapply(seq_len(nrow(inventory)), function(i) as.list(inventory[i, , drop = FALSE]))
   manifest$status <- "complete"
   manifest$finished_at <- format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
   write_source_json(manifest, manifest_path)
-  message("[catalog-capture.R] Complete: ", length(programs), " undergraduate degree/candidate records, ",
+  message("[catalog-capture.R] Complete: ", sum(!is_minor), " undergraduate degree/candidate records, ",
+    sum(is_minor), " minor records, ",
     sum(vapply(manifest$requests, function(x) x$kind == "course", logical(1))), " linked course records.")
   invisible(directory)
 }

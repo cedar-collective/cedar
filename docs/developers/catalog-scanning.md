@@ -22,12 +22,19 @@ index and program/course/specialization schemas. UNM's default is its Main Campu
 catalog and the units that edition's own query publishes, not every campus edition.
 
 `catalog_scan_credentials.csv` explicitly marks credential labels as
-`undergraduate_degree` or `excluded`. New unmapped labels stop the capture.
-Unlabeled records are fetched and examined: explicit minor/certificate requirements
-and graduate-level records are excluded; other undergraduates remain candidates
-for review. Every index entry appears in `program-inventory.csv`. Standalone dual/
-shared-credit records, certificates and minors are excluded from this scope.
-Embedded concentrations retain their parent program relationships.
+`undergraduate_degree`, `undergraduate_minor` or `excluded`. New unmapped labels
+stop the capture. Unlabeled records are fetched and examined: one whose
+`untyped_minor_fields` (UNM: `minorRequirements`) hold requirements is an
+undergraduate minor unless it is graduate-level; one whose
+`untyped_exclusion_fields` (certificate requirements) do, and graduate-level
+records, are excluded; other undergraduates remain candidates for review. Every
+index entry appears in `program-inventory.csv`. Degrees and minors are kept and
+their course links followed: the manifest lists degrees (with candidates) in
+`program_ids` and minors in `minor_ids`, and the analysis reads both. A capture
+made before 2026-11-28 has no `minor_ids` and held no minor; its analysis says
+`scope = "undergraduate_degrees"`, a later one `undergraduate_programs`.
+Standalone dual/shared-credit records and certificates are excluded. Embedded
+concentrations retain their parent program relationships.
 
 `catalog_scan_fields.csv` assigns source fields to admission, degree, prerequisite,
 corequisite or informational phases. Labels/types come from the captured schema:
@@ -40,7 +47,7 @@ remain unclassified sections requiring review.
 Run from the repository root with the existing pinned dependencies:
 
 ```bash
-# Degrees, embedded specializations, and the closure of linked course records.
+# Degrees, minors, embedded specializations, and the closure of linked course records.
 Rscript --vanilla scripts/scan-degree-catalog.R scan --institution unm \
   --output "$CEDAR_DATA_DIR"/catalog-scans/unm/current-full
 

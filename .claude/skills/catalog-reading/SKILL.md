@@ -36,6 +36,10 @@ Set `CEDAR_DATA_DIR` (the shared data directory). The packets are in
 ### 1. Prepare the packet (once per program and edition)
 
 The program id is the end of its catalog URL (`#/programs/SypQxQ9j5`).
+A minor is prepared and read the same way, from a capture that kept minors
+(one made after 2026-11-28; its analysis says `scope = "undergraduate_programs"`).
+Steps 1 to 5 apply to it. Steps 6 and 7 are for degrees: the compiler builds a
+degree's board, and a minor's reading stops at its check and triage.
 
 ```bash
 A="$CEDAR_DATA_DIR"/catalog-scans/unm/2026-2027-undergraduate-complete-20261018

@@ -141,7 +141,7 @@ CEDAR_COURSE_LEVELS <- c("lower", "upper", "grad")
 # colleges from.
 CEDAR_CONFIG_FILE_SPECS <- list(
   catalog_scan_sources = c("source_id", "provider", "landing_url", "api_base", "level_field",
-    "undergraduate_level", "graduate_level", "untyped_exclusion_fields"),
+    "undergraduate_level", "graduate_level", "untyped_minor_fields", "untyped_exclusion_fields"),
   catalog_scan_credentials = c("degree_type", "scope"),
   catalog_scan_fields = c("field", "phase"),
   # Versioned, explicitly partial catalog snapshots; never student degree audits.
