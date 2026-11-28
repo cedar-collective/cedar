@@ -47,6 +47,14 @@
   --filter-bar-border:   #c4d4c9;
   --surface-soft:        #F3F8F4;   /* scope bars, light result surfaces      */
   --surface-soft-border: #d4e6d9;
+  /* Pathways > Course paths grid: one green, lighter to darker by a cell's
+     share of the term's students (COURSE_PATH_SHADE_BREAKS). Body text keeps
+     8:1 or better on every step. */
+  --course-grid-shade-0: #f7faf8;
+  --course-grid-shade-1: #e6f0e9;
+  --course-grid-shade-2: #d3e6d9;
+  --course-grid-shade-3: #bcd8c5;
+  --course-grid-shade-4: #a3c9af;
   --surface-card:        #f6f4f0;   /* stat/summary cards — warm off-white    */
   --surface-card-border: #c8bfb0;   /* card top accent stripe                 */
   --movement-native-accent:   var(--danger-red);
@@ -3162,6 +3170,65 @@ details.cedar-method-panel .scope-bar {
 }
 
 
+/* ── Pathways > Course paths grid ─────────────────────────────────────────────
+   R/modules/observed-course-paths.R: a row per kind of course, a column per
+   enrolled term; each cell's share, its most-taken courses and "+N more".
+   The share is printed in every cell, so the shade is never the only sign. */
+.cedar-course-grid-wrap { overflow-x: auto; margin-bottom: 0.5rem; }
+.cedar-course-grid {
+  width: 100%;
+  min-width: 56rem;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 2px;
+  color: var(--charcoal-soil);
+}
+.cedar-course-grid th {
+  padding: 0.25rem 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  vertical-align: top;
+  color: var(--text-secondary);
+}
+.cedar-course-grid th.cedar-course-grid-kind { width: 10rem; color: var(--charcoal-soil); }
+.cedar-course-grid td {
+  padding: 0.4rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  vertical-align: top;
+}
+.cedar-course-grid-shade-0 { background: var(--course-grid-shade-0); }
+.cedar-course-grid-shade-1 { background: var(--course-grid-shade-1); }
+.cedar-course-grid-shade-2 { background: var(--course-grid-shade-2); }
+.cedar-course-grid-shade-3 { background: var(--course-grid-shade-3); }
+.cedar-course-grid-shade-4 { background: var(--course-grid-shade-4); }
+.cedar-course-grid-withheld { border: 1px dashed var(--table-border); color: var(--text-muted); }
+.cedar-course-grid-share { font-size: 0.95rem; font-weight: 700; }
+.cedar-course-grid-of { margin-left: 0.25rem; }
+.cedar-course-grid-items { margin: 0.25rem 0 0; padding: 0; list-style: none; }
+.cedar-course-grid-items li { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cedar-course-grid-more,
+.cedar-course-grid-note { display: block; font-style: italic; }
+.cedar-course-grid-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.cedar-course-grid-key-step { display: inline-flex; align-items: center; gap: 0.3rem; }
+.cedar-course-grid-swatch {
+  display: inline-block;
+  width: 1.1rem;
+  height: 0.8rem;
+  border: 1px solid var(--table-border);
+  border-radius: 2px;
+}
+
 /* ── Dark mode ────────────────────────────────────────────────────────────────
    html[data-bs-theme="dark"], set by www/cedar-theme.js from the reader's
    choice (remembered per browser); light until they choose.
@@ -3205,6 +3272,12 @@ details.cedar-method-panel .scope-bar {
   --filter-bar-border:   #34463a;
   --surface-soft:        #1b231e;
   --surface-soft-border: #2f4035;
+  /* Course paths grid, darker page to deeper green; body text 6:1 or better. */
+  --course-grid-shade-0: #1b201d;
+  --course-grid-shade-1: #1f2b24;
+  --course-grid-shade-2: #24372b;
+  --course-grid-shade-3: #2a4433;
+  --course-grid-shade-4: #31523c;
   --surface-card:        #222624;
   --surface-card-border: #4f483d;
   --movement-native-bg:   #3a2622;

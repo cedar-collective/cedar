@@ -126,3 +126,19 @@ concepts:
     again unless something has changed. A course never offered in that season
     is listed too, because there is nothing to judge it by. This cannot see why
     a course ran small, or a change in when, where or by whom it is taught.
+  pathways.course-grid: >-
+    What do these students take, term by term? Each row is a kind of course,
+    named by what it is to them: their own department's courses, the courses
+    their degree plan names, Gen Ed, and everything else. Each cell says what
+    share of the students in that term took a course of that kind, and which
+    courses they took most, so reading down a column shows where a term's work
+    goes and reading along a row shows when. First-time and transfer students
+    are read apart, because a transfer student's first term here is not their
+    first in college. It shows what students took, not what they passed or
+    needed.
+  pathways.course-table: >-
+    Every course behind the grid, with the share of these students taking it
+    in each term. Use it to find a course the grid only counts, or to see when
+    a course is taken: one taken mostly in the first terms is part of how
+    students start, one taken late is part of how they finish. It shows
+    taking, not passing.

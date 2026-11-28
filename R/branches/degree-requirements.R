@@ -46,10 +46,13 @@ degree_named_requirements <- function(roadmaps, catalog_ids) {
 #' @param major_codes The majors read.
 #' @param declarations `cedar_programs`: `major_code`, `program_code`.
 #' @param course_codes `cedar_course_codes`, to resolve the plans' codes to courses.
+#' @param include_options TRUE to mark, too, a course a plan lists as one
+#'   option of a choice on its main track; its plan then reads "<label> (one
+#'   of a choice)", unless the plan also requires it outright.
 #' @return list(`courses`: `subject_course` (the course id), `in_plan` (the
 #'   plans naming it, by label, joined with "; "); `plans`: the labels of the
 #'   plans read, sorted).
-degree_plan_course_marks <- function(boards, major_codes, declarations, course_codes) {
+degree_plan_course_marks <- function(boards, major_codes, declarations, course_codes, include_options = FALSE) {
   missing <- setdiff(c("major_code", "program_code"), names(declarations))
   if (length(missing) > 0) stop("[degree-requirements.R] the declarations lack ", paste(missing, collapse = ", "), call. = FALSE)
   degree_programs <- unique(declarations$program_code[declarations$major_code %in% major_codes &
@@ -57,11 +60,24 @@ degree_plan_course_marks <- function(boards, major_codes, declarations, course_c
   keyed <- boards$catalog$program_codes
   plan_ids <- unique(keyed$catalog_id[keyed$program_code %in% degree_programs])
   labels <- boards$catalog$catalogs$degree_label[match(plan_ids, boards$catalog$catalogs$catalog_id)]
-  courses <- degree_named_requirements(boards$roadmaps, plan_ids)$courses %>%
+  named <- degree_named_requirements(boards$roadmaps, plan_ids)$courses %>%
+    transmute(catalog_id, subject_course, option = FALSE)
+  if (isTRUE(include_options)) {
+    roadmaps <- boards$roadmaps
+    main <- roadmaps$nodes[roadmaps$nodes$catalog_id %in% plan_ids & roadmaps$nodes$track == "main" &
+                             roadmaps$nodes$kind != "preparation", c("catalog_id", "node_id")]
+    options <- roadmaps$options %>%
+      semi_join(main, by = c("catalog_id", "node_id")) %>%
+      transmute(catalog_id, subject_course, option = TRUE)
+    named <- bind_rows(named, options)
+  }
+  courses <- named %>%
     transmute(subject_course = course_code_ids(subject_course, course_codes),
-              plan = labels[match(catalog_id, plan_ids)]) %>%
-    distinct() %>%
+              plan = labels[match(catalog_id, plan_ids)], option) %>%
     # CAMPUS_ROLLUP: a degree plan names a course, not a campus's offering of it.
+    group_by(subject_course, plan) %>%
+    summarize(option = all(option), .groups = "drop") %>%
+    mutate(plan = if_else(option, paste(plan, "(one of a choice)"), plan)) %>%
     group_by(subject_course) %>%
     summarize(in_plan = paste(sort(plan), collapse = "; "), .groups = "drop")
   list(courses = courses, plans = sort(labels))
@@ -188,13 +204,145 @@ degree_rule_outline <- function(catalog, catalog_ids) {
 }
 
 #' Classify a course once for descriptive pathways, never as degree fulfillment
+#'
+#' @param groups Keyed by course: `subject_course`, `group_id`, `group_label`
+#'   (course_path_roles()). A course it does not name is unmapped.
 attach_pathway_groups <- function(rows, groups) {
-  groups <- validate_pathway_subject_groups(groups)
+  missing <- setdiff(c("subject_course", "group_id", "group_label"), names(groups))
+  if (length(missing)) stop("[degree-requirements.R] Course path grouping missing: ", paste(missing, collapse = ", "))
+  groups <- groups[c("subject_course", "group_id", "group_label")]
+  if (anyNA(groups) || any(!nzchar(as.matrix(groups)))) stop("[degree-requirements.R] Blank course path grouping field")
+  if (anyDuplicated(groups$subject_course)) stop("[degree-requirements.R] A course has two course path groups")
   rows %>%
-    mutate(subject_code = sub(" .*", "", subject_course)) %>%
-    left_join(groups, by = "subject_code", relationship = "many-to-one") %>%
+    left_join(groups, by = "subject_course", relationship = "many-to-one") %>%
     mutate(group_id = coalesce(group_id, "unmapped"),
            group_label = coalesce(group_label, "Unmapped coursework"))
+}
+
+#' What each course is to a population, the groups of the course grid
+#'
+#' Course paths group a population's courses by what each is to these
+#' students, not by subject family. A course is the first of these it is:
+#' one of their department's subjects; one their degree plan names, as a
+#' requirement or one option of a choice; a Gen Ed course; anything else.
+#' PSYC 1110 for Psychology majors is their department's, not Gen Ed.
+COURSE_PATH_ROLES <- c(
+  department = "Their department's courses",
+  plan = "Named in their degree plan",
+  gen_ed = "Gen Ed",
+  other = "Everything else"
+)
+
+#' @param course_ids Every course id a path can hold (`cedar_courses$course_id`).
+#' @param department_subjects The subject codes of the population's departments
+#'   (resolve_pathways_focal_subjects()).
+#' @param plan_courses Course ids their degree plans name as required
+#'   (degree_plan_course_marks()).
+#' @param gen_ed_courses Course ids in the Gen Ed curriculum.
+#' @return One row per course id: `subject_course`, `group_id` (a name of
+#'   COURSE_PATH_ROLES), `group_label`.
+course_path_roles <- function(course_ids, department_subjects, plan_courses, gen_ed_courses) {
+  ids <- unique(as.character(course_ids[!is.na(course_ids)]))
+  role <- dplyr::case_when(
+    sub(" .*", "", ids) %in% department_subjects ~ "department",
+    ids %in% plan_courses ~ "plan",
+    ids %in% gen_ed_courses ~ "gen_ed",
+    TRUE ~ "other")
+  tibble::tibble(subject_course = ids, group_id = role, group_label = unname(COURSE_PATH_ROLES[role]))
+}
+
+# The order course path groups run in: those `group_order` names, in its
+# order, then any other by label.
+path_group_levels <- function(rows, group_order) {
+  groups <- distinct(rows, group_id, group_label)
+  rest <- groups[!groups$group_id %in% group_order, ]
+  c(intersect(group_order, groups$group_id), rest$group_id[order(rest$group_label)])
+}
+
+#' One kind of arrival's course paths
+#'
+#' get_grouped_student_paths() given arrivals keys every table by
+#' `entry_type`; the grid, the course table and the page read one at a time.
+#'
+#' @param paths get_grouped_student_paths() output, split by arrival.
+#' @param entry_type "first_time" or "transfer".
+#' @return `paths` with only that arrival's rows, `entry_type` dropped,
+#'   `meta$n_observed` that arrival's students and `meta$entry_type` set. An
+#'   arrival with no students has no rows.
+path_entry_slice <- function(paths, entry_type) {
+  if (!isTRUE(paths$meta$split_entry)) stop("[degree-requirements.R] These course paths were not split by arrival")
+  if (length(entry_type) != 1L || !entry_type %in% c("first_time", "transfer")) {
+    stop("[degree-requirements.R] entry_type must be first_time or transfer")
+  }
+  keep <- function(df) df[df$entry_type %in% entry_type, setdiff(names(df), "entry_type")]
+  for (part in c("cells", "courses", "subjects")) paths[[part]] <- keep(paths[[part]])
+  paths$meta$n_observed <- unname(paths$meta$n_observed_by_entry[[entry_type]])
+  paths$meta$entry_type <- entry_type
+  paths
+}
+
+#' The course grid: a group's share of a term's students, with what they took in it
+#'
+#' Reads get_grouped_student_paths(): its cells (a group's share of a
+#' campus's students in one enrolled term, and how many courses and subjects
+#' they took in it) and its courses and subjects (already past the small-cell
+#' guards). A cell lists its `n_top` most-taken courses, or for a group in
+#' `by_subject` its most-taken subjects, and counts the rest, those too small
+#' to list included; a suppressed cell lists and counts nothing.
+#'
+#' @param paths get_grouped_student_paths() output, one arrival at a time
+#'   (path_entry_slice()) when it was split.
+#' @param n_top The most courses or subjects a cell lists.
+#' @param by_subject Group ids whose cells list subjects, not courses.
+#' @param group_order Group ids in the order the rows run; a group not named
+#'   follows, by label.
+#' @return list(`cells`: `campus`, `group_id`, `group_label`, `relative_term`,
+#'   `n_eligible`, `n_students`, `pct_students`, `band_suppressed`,
+#'   `suppressed`, `detail` ("course" or "subject"), `n_items`, `n_shown`,
+#'   `n_more`; `items`: `campus`, `group_id`, `relative_term`, `rank`,
+#'   `detail`, `item` (a course or a subject code), `n_students`,
+#'   `pct_students`; `meta`: `paths$meta` with `n_top` and `by_subject`).
+degree_path_course_grid <- function(paths, n_top = 3L, by_subject = "other", group_order = names(COURSE_PATH_ROLES)) {
+  if (length(n_top) != 1L || !is.finite(n_top) || n_top < 1 || n_top != floor(n_top)) {
+    stop("[degree-requirements.R] n_top must be a whole number of at least 1")
+  }
+  if (!is.character(by_subject)) stop("[degree-requirements.R] by_subject must name group ids")
+  if ("entry_type" %in% names(paths$cells)) {
+    stop("[degree-requirements.R] Course grid reads one arrival at a time: path_entry_slice() first")
+  }
+  term_cols <- c("campus", "relative_term", "group_id", "n_students", "pct_students")
+  for (need in list(list(paths$cells, c("campus", "relative_term", "group_id", "group_label", "n_eligible",
+                                        "n_students", "pct_students", "band_suppressed", "suppressed",
+                                        "n_courses", "n_subjects"), "cells"),
+                    list(paths$courses, c(term_cols, "subject_course"), "courses"),
+                    list(paths$subjects, c(term_cols, "subject_code"), "subjects"))) {
+    missing <- setdiff(need[[2]], names(need[[1]]))
+    if (length(missing)) stop("[degree-requirements.R] Course grid ", need[[3]], " missing: ", paste(missing, collapse = ", "))
+  }
+  items <- bind_rows(
+    paths$courses %>% filter(!group_id %in% by_subject) %>%
+      transmute(campus, group_id, relative_term, detail = "course", item = subject_course, n_students, pct_students),
+    paths$subjects %>% filter(group_id %in% by_subject) %>%
+      transmute(campus, group_id, relative_term, detail = "subject", item = subject_code, n_students, pct_students)) %>%
+    arrange(campus, relative_term, group_id, desc(n_students), item) %>%
+    group_by(campus, relative_term, group_id) %>%
+    mutate(rank = row_number()) %>%
+    ungroup() %>%
+    filter(rank <= n_top) %>%
+    select(campus, group_id, relative_term, rank, detail, item, n_students, pct_students)
+  shown <- items %>% count(campus, relative_term, group_id, name = "n_shown")
+  levels <- path_group_levels(paths$cells, group_order)
+  cells <- paths$cells %>%
+    left_join(shown, by = c("campus", "relative_term", "group_id")) %>%
+    mutate(detail = if_else(group_id %in% by_subject, "subject", "course"),
+           n_items = if_else(detail == "subject", n_subjects, n_courses),
+           n_shown = coalesce(n_shown, 0L),
+           n_more = if_else(suppressed, NA_integer_, n_items - n_shown)) %>%
+    select(campus, group_id, group_label, relative_term, n_eligible, n_students, pct_students,
+           band_suppressed, suppressed, detail, n_items, n_shown, n_more) %>%
+    arrange(campus, match(group_id, levels), relative_term)
+  list(cells = cells, items = items,
+       meta = c(paths$meta, list(n_top = as.integer(n_top), by_subject = by_subject)))
 }
 
 #' The courses inside the groups, one row per campus and course, a column per term
@@ -213,10 +361,14 @@ attach_pathway_groups <- function(rows, groups) {
 #'   k in 1..`paths$meta$max_terms`, `term_k` (percent of that campus's
 #'   students that term, NA where the course had too few) and `n_k` (its
 #'   students). Rows run by group, campus, then largest share first.
-degree_path_course_table <- function(paths, group_id = "all", descriptions = NULL) {
+degree_path_course_table <- function(paths, group_id = "all", descriptions = NULL,
+                                     group_order = names(COURSE_PATH_ROLES)) {
   needed <- c("campus", "relative_term", "group_id", "group_label", "subject_course", "n_students", "pct_students")
   missing <- setdiff(needed, names(paths$courses))
   if (length(missing)) stop("[degree-requirements.R] Course detail missing: ", paste(missing, collapse = ", "))
+  if ("entry_type" %in% names(paths$courses)) {
+    stop("[degree-requirements.R] Course table reads one arrival at a time: path_entry_slice() first")
+  }
   terms <- seq_len(paths$meta$max_terms)
   courses <- if (identical(group_id, "all")) paths$courses else paths$courses[paths$courses$group_id == group_id, ]
   if (any(!courses$relative_term %in% terms)) stop("[degree-requirements.R] Course detail past max_terms")
@@ -232,7 +384,7 @@ degree_path_course_table <- function(paths, group_id = "all", descriptions = NUL
   wide$peak_pct <- if (nrow(wide)) apply(as.matrix(wide[pct_cols]), 1, max, na.rm = TRUE) else numeric(0)
   table <- wide %>%
     select(all_of(key), peak_pct, all_of(as.vector(rbind(pct_cols, paste0("n_", terms))))) %>%
-    arrange(group_label, campus, desc(peak_pct), subject_course)
+    arrange(match(group_id, path_group_levels(courses, group_order)), campus, desc(peak_pct), subject_course)
   if (is.null(descriptions)) return(table)
   if (!"subject_course" %in% names(descriptions) || anyDuplicated(descriptions$subject_course) > 0L) {
     stop("[degree-requirements.R] descriptions must hold one row per subject_course")

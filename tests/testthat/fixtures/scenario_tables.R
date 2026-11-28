@@ -1633,6 +1633,47 @@ mc_population <- tibble(student_id = unique(test_students_mc$student_id),
 grouped_path_population <- test_students_mc %>% distinct(student_id) %>%
   mutate(population_label = "All", relevant_until = NA_integer_)
 
+# MC02's arrivals, as student_term_entry_type() returns them. MC_A1 started
+# first-time and has a later transfer record: the first on record starts the
+# path. MC_A2's first term is recorded both ways and reads first-time. MC_A3
+# transferred in the term after a course here, which is left out. MC_G2 has
+# none and is left out. First-time: MC_A1, MC_A2, MC_A4, MC_G1; transfer: MC_A3.
+grouped_path_arrivals <- tibble::tribble(
+  ~student_id, ~term,   ~entry_type,
+  "MC_A1",     202010L, "first_time",
+  "MC_A1",     202110L, "transfer",
+  "MC_A2",     202010L, "transfer",
+  "MC_A2",     202010L, "first_time",
+  "MC_A3",     202080L, "transfer",
+  "MC_A4",     202010L, "first_time",
+  "MC_G1",     202010L, "first_time")
+
+# MC02's courses grouped by course, the key course_path_roles() gives a
+# grouping: Spanish one group, philosophy another.
+grouped_path_course_groups <- tibble::tribble(
+  ~subject_course, ~group_id,    ~group_label,
+  "PHIL 105",      "humanities", "Humanities",
+  "SPAN 101",      "languages",  "Languages",
+  "SPAN 101L",     "languages",  "Languages",
+  "SPAN 201",      "languages",  "Languages")
+
+# Declarations recording arrivals at two levels, for course_path_arrivals().
+# MC_A1 arrived as a non-degree graduate transfer before starting first-time as
+# an undergraduate; MC_A2 transferred in as an undergraduate; MC_A3's only
+# arrival is as a non-degree undergraduate. A continuing term records no
+# arrival, and MC_X9 is not in the population.
+grouped_path_programs <- tibble::tribble(
+  ~student_id, ~term,   ~student_level,             ~student_population,
+  "MC_A1",     201980L, "Non Degree Graduate",      "New Transfer",
+  "MC_A1",     202010L, "Undergraduate",            "First Time Freshman",
+  "MC_A1",     202080L, "Undergraduate",            "Continuing",
+  "MC_A2",     202010L, "Undergraduate",            "New Transfer",
+  "MC_A3",     202080L, "Non Degree Undergraduate", "New Transfer",
+  "MC_X9",     202010L, "Undergraduate",            "First Time Freshman")
+
+# The course dimension over MC02's class list, to describe its courses.
+grouped_path_courses <- suppressMessages(build_cedar_courses(test_sections[0, ], test_students_mc, test_dims))
+
 cov_pop <- tibble::tibble(
   student_id = paste0("S", 1:6),
   # S1 starts at the data edge -> truncated. S2 ends at the edge -> censored.
@@ -2508,6 +2549,26 @@ st01_plan <- list(
         "hist-ba",   "math",   "MATH 1215",
         "anth-ba",   "intro",  "ENGL 1110"),
       options = tibble::tibble(catalog_id = character(), node_id = character()))))
+
+# ST01's plan with its choices' options listed (test-pathways-helpers.R, the
+# course grid's plan row). The upper-level choice lists HIST 300, POLS 300
+# and MATH 1215, which the plan also requires outright; a math-track route,
+# not the plan's own track, lists MATH 1220. Read with options: HIST 1110
+# and MATH 1215 required, HIST 300 and POLS 300 one of a choice, MATH 1220 not
+# named.
+st01_plan_options <- local({
+  boards <- st01_plan$boards
+  boards$roadmaps$nodes <- dplyr::bind_rows(boards$roadmaps$nodes, tibble::tibble(
+    catalog_id = "hist-ba", node_id = "route", track = "math", kind = "choice", code = "MATH",
+    title = "Math route", semester = 1L))
+  boards$roadmaps$options <- tibble::tribble(
+    ~catalog_id, ~node_id, ~subject_course,
+    "hist-ba",   "upper",  "HIST 300",
+    "hist-ba",   "upper",  "POLS 300",
+    "hist-ba",   "upper",  "MATH 1215",
+    "hist-ba",   "route",  "MATH 1220")
+  list(programs = st01_plan$programs, boards = boards)
+})
 
 # CC01: undergraduates passing 160 attempted credits (test-credit-ceiling.R).
 # Settled, graded and degrees posted through Fall 2022. ABQ undergraduates

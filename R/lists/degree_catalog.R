@@ -192,18 +192,6 @@ degree_catalog_program_codes <- function(catalogs, programs) {
   }
 }
 
-validate_pathway_subject_groups <- function(groups) {
-  if (!all(CEDAR_CONFIG_FILE_SPECS$pathway_subject_groups %in% names(groups))) {
-    stop("[degree_catalog.R] Invalid pathway grouping columns")
-  }
-  if (anyNA(groups) || any(!nzchar(as.matrix(groups)))) stop("[degree_catalog.R] Blank pathway grouping field")
-  if (anyDuplicated(groups$subject_code)) stop("[degree_catalog.R] Subject has multiple pathway groups")
-  labels_per_group <- vapply(split(groups$group_label, groups$group_id),
-                             function(labels) length(unique(labels)), integer(1))
-  if (any(labels_per_group != 1L)) stop("[degree_catalog.R] Inconsistent pathway group label")
-  groups
-}
-
 #' Read and validate an institution's degree catalog files
 read_degree_catalog <- function(dir = cedar_institution_dir()) {
   catalog <- validate_degree_catalog(list(
@@ -217,7 +205,6 @@ read_degree_catalog <- function(dir = cedar_institution_dir()) {
 }
 
 CEDAR_DEGREE_CATALOG <- read_degree_catalog()
-CEDAR_PATHWAY_SUBJECT_GROUPS <- validate_pathway_subject_groups(read_institution_file("pathway_subject_groups"))
 
 #' Node ids a program's roadmap can show
 #'

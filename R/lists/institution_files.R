@@ -196,8 +196,6 @@ CEDAR_CONFIG_FILE_SPECS <- list(
   degree_roadmap_math_routes = c("catalog_id", "start_id", "label", "node_ids"),
   degree_roadmap_conditions = c("condition_id", "catalog_id", "node_id", "kind", "minimum",
                                  "eligible_node_ids", "label", "evidence_id"),
-  # Descriptive categories, independent of degree eligibility and Gen Ed credit.
-  pathway_subject_groups = c("subject_code", "group_id", "group_label"),
   # kind: main (exactly one), online (at most one) or branch. default_scope:
   # TRUE for the campuses a filter bar selects by default (CEDAR_CAMPUS_DEFAULT).
   # campus_name may be blank for a code whose expansion is not documented; it

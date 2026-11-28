@@ -69,8 +69,7 @@ unresolved choices have none. It does not map renamed courses to older numbers.
 
 The formal AND/OR requirement excerpts remain in `degree_rules.csv` and
 `degree_rule_courses.csv`. The roadmap graph selects example routes; it does not
-evaluate all alternatives or certify graduation. `pathway_subject_groups.csv`
-serves descriptive observed student coursework, separately from degree rules.
+evaluate all alternatives or certify graduation.
 
 Known limits remain explicit: Biology's Degree Hours field says 120 while its
 grand total says 122–127, and its breadth wording conflicts. Its English route

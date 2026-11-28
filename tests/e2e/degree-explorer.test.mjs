@@ -779,16 +779,31 @@ try {
   await runAndWait(page, 'pathways-population-build_btn', { timeout: 180000 });
   await openSubTab(page, 'Course paths');
   await runAndWait(page, 'pathways-course_paths-button', { timeout: 180000 });
-  await waitForSelector(page, '#pathways-course_paths-path_plot .heatmaplayer', { nonEmpty: false });
+  await waitForSelector(page, '#pathways-course_paths-path_grid .cedar-course-grid', { nonEmpty: false });
   const overlayClosed = () => waitFor(page, () => {
     const overlay = document.getElementById('pathways-course_paths-loading-overlay');
     return overlay && getComputedStyle(overlay).display === 'none';
   }, { timeout: 10000 });
   if (!await overlayClosed()) throw new Error('Course paths finished rendering but its loading dialog never closed');
-  check(true, 'Course paths closes its nested loading dialog and reveals the completed plot');
-  const scope = await page.$eval('#pathways-course_paths-path_scope', el => el.innerText);
-  check(scope.includes('observed students') && scope.includes('Through') && scope.includes('suppressed'),
-    'Course paths uses the shared population and reports the data edge and suppression');
+  check(true, 'Course paths closes its nested loading dialog and reveals the completed grid');
+  // The bar's labels are uppercased by CSS, and innerText carries that.
+  const scope = (await page.$eval('#pathways-course_paths-path_scope', el => el.innerText)).toLowerCase();
+  check(['started first-time', 'transferred in', 'no undergraduate start on record', 'through'].every((fact) => scope.includes(fact)),
+    'Course paths names who it counts, first-time, transfer and left out at the undergraduate level, and the data edge');
+  const gridKinds = () => page.$$eval('#pathways-course_paths-path_grid tbody th', els => els.map(el => el.innerText.trim()));
+  const firstTimeKinds = await gridKinds();
+  check(firstTimeKinds.length > 0 && firstTimeKinds[0] === "Their department's courses",
+    `the grid's rows are kinds of course, the department's first (${firstTimeKinds.join(' | ')})`);
+  check(await page.$$eval('#pathways-course_paths-path_grid td', cells => cells.some(td =>
+    /^\d+\.\d%/.test(td.innerText.trim()) && td.querySelector('.cedar-course-grid-items li'))),
+    'a grid cell shows its share and lists the courses taken most');
+  await setInput(page, 'pathways-course_paths-entry', 'transfer');
+  await waitForIdle(page, { timeout: 30000 });
+  const transferGrid = await page.$eval('#pathways-course_paths-path_grid', el => el.innerText);
+  check(transferGrid.includes('Term 1') || transferGrid.includes('no transfer students'),
+    'the grid reads transfer students on their own, or says there are none');
+  await setInput(page, 'pathways-course_paths-entry', 'first_time');
+  await waitForIdle(page, { timeout: 30000 });
   const table = await readReactable(page, 'pathways-course_paths-path_courses');
   check(!table.error && table.rows.length > 0 && colIndex(table.headers, 'Campus') >= 0,
     'moved course detail retains observed data and delivery campus');
