@@ -51,6 +51,10 @@ changelog:
         tab: "data-usage"
       - title: "The changelog labels each change: new, deeper, clearer or easier"
         tab: "changelog"
+      - title: "Course paths as a grid, term by term"
+        tab: "pathways"
+      - title: "Bird's Eye filters in one order, with links to share"
+        tab: "retention"
     items:
       - kind: new
         text: "Low Enrollment became its own page, and the pages looked up by course or section became one Courses menu: Course Dynamics, Regstats, Open Seats, Waitlists, Projections, Cancellations and Low Enrollment."
@@ -58,6 +62,8 @@ changelog:
         text: "Degree Explorer gives a map to a program with no hand-built one, compiled from CEDAR's reading of its catalog record and labelled a draft until reviewed. The online Business Administration and Psychology programs share their main programs' maps, so their students are on a map too."
       - kind: new
         text: "Catalog Review gained a Catalog questions list: every question the readings of the catalog leave open, the passage it is about, and who can settle it. It replaces the scanner's Extraction diagnostics."
+      - kind: new
+        text: "Pathways' Course paths shows what a population's students take each term after they arrive, as a grid: their department's courses, the courses their degree plan names, Gen Ed and everything else, with the most-taken courses named in each cell. First-time and transfer students are shown apart, and a path starts at an arrival at the population's level."
       - kind: deeper
         text: "Retention's headline is a line for each semester here, the return rate after the first, second, third semester and on, with first-time and transfer students apart. First Year's sections moved onto Retention, so one page answers whether students are coming back."
       - kind: deeper
@@ -67,13 +73,17 @@ changelog:
       - kind: clearer
         text: "Retention says who it counts (transfer students in, other levels out), which students are new in the term, and which term its latest numbers wait on."
       - kind: clearer
+        text: "DFW Rates and Graduation say what they counted under their controls: the terms read, the grades or degrees they reach, and who is too recent to judge. Enrollment names the codes a department counts, as the other pages do."
+      - kind: clearer
         text: "The Changelog shows the latest release once, then the earlier ones, with each change labelled by what it does for a reader and each release's version shown beside its title. Its record now runs through this week."
       - kind: easier
         text: "A session starts in about 2 seconds instead of 8, and a wait is shown where you are reading. Downstream's comparison with similar students takes about 12 seconds where it took 50, is built once per course for every later reader, and is ready at start for the ten courses analysed most. DFW Rates and Headcount's choices are built once for everyone."
       - kind: easier
         text: "Admin's two usage tabs are one Usage tab with one date range, and the Degree Map opens on College Algebra."
+      - kind: easier
+        text: "Every Bird's Eye page asks its questions in one order: campus, college and department, student level, the terms, then the page's own. Retention and Graduation can be shared by link, and Enrollment's link keeps the part of term."
       - kind: hood
-        text: "A refresh stops when an export was not converted or read whole, and when student IDs do not match across the tables, in place of the Join Integrity page; one fetch runs at a time. A catalog reading cannot ship without the catalog pages it cites, and is checked before it is committed. Tests no longer wait a fixed time, and each fix is checked by putting its bug back."
+        text: "A refresh stops when an export was not converted or read whole, and when student IDs do not match across the tables, in place of the Join Integrity page; one fetch runs at a time. A catalog reading cannot ship without the catalog pages it cites, and is checked before it is committed. Tests no longer wait a fixed time, and each fix is checked by putting its bug back. The catalog scanner keeps minors, so CEDAR can read a minor's requirements as it reads a degree's."
 
   - version: "v2.3.0"
     date: "2026-11-17"
