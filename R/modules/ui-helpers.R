@@ -721,6 +721,83 @@ cedar_section_scope_inputs <- function(ns, prefix, sections, dept_choices,
   lapply(fields, function(field) column(col_width(field), input_for(field)))
 }
 
+# ── The scope inputs of a Bird's Eye page that reads students over terms ─────
+# Campus, Student level, From term, To term and Term type are the questions
+# DFW Rates, Retention, Graduation and Gen Ed ask of their students and terms.
+# They are written once, here, and always come in the one order every Bird's
+# Eye filter bar uses (shiny-modules.md, "One order for a filter bar"),
+# whatever order a page names them in. A page adds its own controls and its
+# actions after them, and its section inputs (cedar_section_scope_inputs())
+# before them.
+#
+#   ns        the module's NS(id).
+#   prefix    the ids' prefix, `<prefix>_<field>` under `ns`, or NULL for a
+#             bare `<field>`: what CEDAR_SHARE_SPECS restores a link into.
+#   fields    which inputs (any of CEDAR_RATE_SCOPE_FIELDS).
+#   choices   named list by field: what each shown field offers. Term codes
+#             given unnamed are named with fmt_term(); Student level offers
+#             student_levels.csv's levels unless a page gives its own.
+#   selected  named list by field: what each opens on; a field left out
+#             opens on its first choice (campus: on none).
+#   campus    "teaching", the campus that taught the course ("Campus"), or
+#             "home", the student's home campus ("Home campus"). Either way
+#             none picked reads every campus, which the placeholder says.
+#   widths    named by field, to depart from the standard column width.
+# Term type is one at a time (radio): a term type changes who is counted.
+# Returns a list of column() tags, one per field.
+CEDAR_RATE_SCOPE_FIELDS <- c("campus", "level", "from_term", "to_term", "term_type")
+CEDAR_RATE_SCOPE_WIDTHS <- c(campus = 3, level = 3, from_term = 2, to_term = 2, term_type = 3)
+
+cedar_rate_scope_inputs <- function(ns, prefix, fields, choices, selected = list(),
+                                    campus = c("teaching", "home"), widths = NULL) {
+  campus <- match.arg(campus)
+  unknown <- setdiff(fields, CEDAR_RATE_SCOPE_FIELDS)
+  if (length(fields) == 0 || length(unknown) > 0 || anyDuplicated(fields) > 0) {
+    stop("cedar_rate_scope_inputs(): fields are distinct names from ",
+         paste(CEDAR_RATE_SCOPE_FIELDS, collapse = ", "), "; got ",
+         paste(fields, collapse = ", "), ".")
+  }
+  if ("level" %in% fields && !"level" %in% names(choices)) {
+    choices$level <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
+  }
+  for (field in intersect(c("from_term", "to_term"), names(choices))) {
+    if (is.null(names(choices[[field]]))) {
+      terms <- choices[[field]]
+      choices[[field]] <- stats::setNames(terms, vapply(terms, fmt_term, character(1)))
+    }
+  }
+  no_choices <- fields[!fields %in% names(choices) | lengths(choices[fields]) == 0]
+  if (length(no_choices) > 0) {
+    stop("cedar_rate_scope_inputs(): no choices for ", paste(no_choices, collapse = ", "), ".")
+  }
+  for (given in list(selected, widths)) {
+    if (length(given) > 0 && (is.null(names(given)) || length(setdiff(names(given), fields)) > 0)) {
+      stop("cedar_rate_scope_inputs(): selected and widths are named by a field being shown (",
+           paste(fields, collapse = ", "), ").")
+    }
+  }
+  id_of <- function(field) ns(if (is.null(prefix)) field else paste0(prefix, "_", field))
+  width_of <- function(field) if (field %in% names(widths)) widths[[field]] else CEDAR_RATE_SCOPE_WIDTHS[[field]]
+  opens_on <- function(field) {
+    if (field %in% names(selected)) return(selected[[field]])
+    if (field == "campus") NULL else unname(choices[[field]])[1]
+  }
+  input_for <- function(field) {
+    id <- id_of(field)
+    switch(field,
+      campus = selectizeInput(id, if (campus == "home") "Home campus" else "Campus", multiple = TRUE,
+                              choices = choices$campus, selected = opens_on("campus"),
+                              options = list(placeholder = if (campus == "home") "Every home campus" else "Every campus")),
+      level = selectInput(id, "Student level", choices = choices$level, selected = opens_on("level")),
+      from_term = selectizeInput(id, "From term", choices = choices$from_term, selected = opens_on("from_term")),
+      to_term = selectizeInput(id, "To term", choices = choices$to_term, selected = opens_on("to_term")),
+      term_type = radioButtons(id, "Term type", choices = choices$term_type, selected = opens_on("term_type"),
+                               inline = TRUE))
+  }
+  lapply(CEDAR_RATE_SCOPE_FIELDS[CEDAR_RATE_SCOPE_FIELDS %in% fields],
+         function(field) column(width_of(field), input_for(field)))
+}
+
 # ── Folded thresholds ────────────────────────────────────────────────────────
 # A page's thresholds are a reader's adjustment, not a filter: they stay folded
 # under one line that says whether the standard values are in force, so a

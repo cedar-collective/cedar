@@ -140,15 +140,10 @@ genEdExploreUI <- function(id, sections, dept_choices, current_term = NULL, defa
         # Campus, college and department are the section pages' own inputs.
         cedar_section_scope_inputs(ns, "ge", sections, dept_choices, fields = c("campus", "college", "dept")),
         # Opens on every term to the default term: a Gen Ed pattern is read
-        # over its history, one term type at a time, never off one term.
-        column(2,
-          selectizeInput(ns("ge_from_term"), "From term",
-            choices = term_choices, selected = unname(term_choices[1]))
-        ),
-        column(2,
-          selectizeInput(ns("ge_to_term"), "To term",
-            choices = term_choices, selected = last_term)
-        ),
+        # over its history, never off one term.
+        cedar_rate_scope_inputs(ns, "ge", c("from_term", "to_term"),
+          choices = list(from_term = term_choices, to_term = term_choices),
+          selected = list(from_term = unname(term_choices[1]), to_term = last_term)),
         column(1,
           selectInput(ns("ge_gen_ed_area"), "Gen Ed Area", multiple = TRUE,
             choices = area_choices)
