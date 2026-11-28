@@ -90,6 +90,160 @@ test_that("the courses inside the groups read as one row per campus and course, 
   expect_error(describe_courses("HIST 1110", dimension$courses["course_id"], dimension$codes), "courses lacks")
 })
 
+test_that("a course path group is what the course is to the population, the first it is", {
+  roles <- course_path_roles(c("SPAN 101", "SPAN 201", "PHIL 105", "ENGL 1110", "MATH 1220", NA),
+    department_subjects = "SPAN", plan_courses = c("SPAN 201", "PHIL 105"),
+    gen_ed_courses = c("SPAN 101", "PHIL 105", "ENGL 1110"))
+  expect_equal(roles$subject_course, c("SPAN 101", "SPAN 201", "PHIL 105", "ENGL 1110", "MATH 1220"))
+  expect_equal(roles$group_id, c("department", "department", "plan", "gen_ed", "other"))
+  expect_equal(roles$group_label, unname(COURSE_PATH_ROLES[roles$group_id]))
+})
+
+test_that("grouped paths read a grouping by course and count every course of a cell, small ones included", {
+  roles <- course_path_roles(test_students_mc$subject_course, "SPAN", "PHIL 105", character(0))
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(min_n = 3L))
+  expect_equal(p$meta$n_unmapped_rows, 0L)
+  # SPAN 101 and its lab: the lab's two students are too few to list it, and it still counts.
+  first <- p$cells %>% filter(campus == "ABQ", relative_term == 1, group_id == "department")
+  expect_equal(c(first$n_students, first$n_courses), c(4L, 2L))
+  expect_false(any(p$courses$subject_course == "SPAN 101L"))
+  # One student took the plan's course: the cell says nothing, its course count included.
+  plan <- p$cells %>% filter(campus == "ABQ", relative_term == 2, group_id == "plan")
+  expect_true(plan$suppressed)
+  expect_true(is.na(plan$n_courses))
+  expect_error(get_grouped_student_paths(test_students_mc, grouped_path_population, dplyr::bind_rows(roles, roles[1, ]),
+    grouped_path_opt()), "two course path groups")
+})
+
+test_that("the course grid lists a cell's most-taken courses and counts the rest", {
+  # Change: SPAN and PHIL both the department's, so one cell holds SPAN 201
+  # (four students) and PHIL 105 (one): the most-taken is listed, not the first.
+  wide <- course_path_roles(test_students_mc$subject_course, c("SPAN", "PHIL"), character(0), character(0))
+  top <- degree_path_course_grid(get_grouped_student_paths(test_students_mc, grouped_path_population, wide,
+    grouped_path_opt()), n_top = 1L)
+  second <- top$cells %>% filter(campus == "ABQ", relative_term == 2)
+  expect_equal(c(second$n_items, second$n_shown, second$n_more), c(2L, 1L, 1L))
+  expect_equal(top$items$item[top$items$campus == "ABQ" & top$items$relative_term == 2], "SPAN 201")
+
+  roles <- course_path_roles(test_students_mc$subject_course, "SPAN", "PHIL 105", character(0))
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(min_n = 3L))
+  grid <- degree_path_course_grid(p)
+  expect_equal(unique(grid$cells$group_id), c("department", "plan"))
+  first <- grid$cells %>% filter(campus == "ABQ", relative_term == 1, group_id == "department")
+  expect_equal(c(first$n_shown, first$n_more), c(1L, 1L))
+  expect_true(all(is.na(grid$cells$n_more[grid$cells$suppressed])))
+  expect_false(any(grid$items$campus == "ABQ" & grid$items$relative_term == 2 & grid$items$group_id == "plan"))
+  expect_error(degree_path_course_grid(p, n_top = 0), "whole number")
+  expect_error(degree_path_course_grid(list(cells = p$cells["campus"], courses = p$courses, subjects = p$subjects)),
+               "cells missing")
+})
+
+test_that("a cell of a spread-out kind of course lists its subjects, each student once", {
+  roles <- course_path_roles(test_students_mc$subject_course, "SPAN", character(0), character(0))
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt())
+  # ABQ, term 1: SPAN 101 (4 students) and SPAN 101L (2 of them), two courses
+  # and one subject of 4 students.
+  first <- p$cells %>% filter(campus == "ABQ", relative_term == 1, group_id == "department")
+  expect_equal(c(first$n_courses, first$n_subjects), c(2L, 1L))
+  expect_equal(p$subjects$n_students[p$subjects$campus == "ABQ" & p$subjects$relative_term == 1 &
+                                       p$subjects$subject_code == "SPAN"], 4L)
+  by_subject <- degree_path_course_grid(p, by_subject = "department")
+  listed <- by_subject$items %>% filter(campus == "ABQ", relative_term == 1)
+  expect_equal(listed$item, "SPAN")
+  expect_equal(listed$detail, "subject")
+  cell <- by_subject$cells %>% filter(campus == "ABQ", relative_term == 1, group_id == "department")
+  expect_equal(c(cell$n_items, cell$n_more), c(1L, 0L))
+  # By default only everything else lists subjects: PHIL 105 is listed as PHIL.
+  other <- degree_path_course_grid(p)$items %>% filter(group_id == "other")
+  expect_equal(other$item, "PHIL")
+  expect_equal(other$detail, "subject")
+  expect_error(degree_path_course_grid(p, by_subject = 1), "name group ids")
+  # The course table runs in the grid's order: the department's courses first.
+  expect_equal(unique(degree_path_course_table(p)$group_id), c("department", "other"))
+})
+
+test_that("course paths start at each student's arrival, first-time and transfer apart", {
+  roles <- course_path_roles(test_students_mc$subject_course, "SPAN", character(0), character(0))
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(),
+                                 arrivals = grouped_path_arrivals)
+  # MC_A1's later transfer record and MC_A2's term recorded both ways read
+  # first-time; MC_G2 has no arrival and is left out.
+  expect_equal(p$meta$n_observed_by_entry, c(first_time = 4L, transfer = 1L))
+  expect_equal(p$meta$n_no_arrival, 1L)
+  # MC_G2 takes courses only at GA: an ABQ view does not count them.
+  expect_equal(get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(campus = "ABQ"),
+                                         arrivals = grouped_path_arrivals)$meta$n_no_arrival, 0L)
+  # MC_A3 transferred in Fall 2020: their term 1 is PHIL 105 then, and the
+  # SPAN 101 they took before it is left out.
+  transfer <- path_entry_slice(p, "transfer")
+  expect_equal(transfer$meta$n_observed, 1L)
+  expect_false("entry_type" %in% names(transfer$cells))
+  expect_equal(transfer$courses$subject_course, "PHIL 105")
+  expect_equal(unique(transfer$cells$relative_term), 1L)
+  # First-time, ABQ, term 1: MC_A1, MC_A2 and MC_A4; MC_G1 starts at GA.
+  first <- path_entry_slice(p, "first_time")
+  expect_equal(unique(first$cells$n_eligible[first$cells$campus == "ABQ" & first$cells$relative_term == 1]), 3L)
+  expect_false("PHIL 105" %in% first$courses$subject_course)
+  unsplit <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt())
+  expect_error(path_entry_slice(unsplit, "transfer"), "not split")
+  expect_error(path_entry_slice(p, "readmitted"), "first_time or transfer")
+  expect_error(degree_path_course_grid(p), "one arrival at a time")
+  expect_error(degree_path_course_table(p), "one arrival at a time")
+  expect_error(get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(),
+                                         arrivals = grouped_path_arrivals["student_id"]), "Arrivals missing")
+  # Change: no arrival on record for anyone. No path starts; the count left
+  # out says why, and a campus with no courses at all still stops.
+  none <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(),
+                                    arrivals = grouped_path_arrivals[0, ])
+  expect_equal(none$meta$n_observed_by_entry, c(first_time = 0L, transfer = 0L))
+  expect_equal(none$meta$n_no_arrival, 6L)
+  expect_equal(nrow(degree_path_course_grid(path_entry_slice(none, "first_time"))$cells), 0L)
+  expect_error(get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(campus = "EA"),
+                                         arrivals = grouped_path_arrivals), "selected delivery campuses")
+})
+
+test_that("a degree plan names its required courses and, when asked, its choices' options", {
+  codes <- grouped_path_courses$codes
+  required <- degree_plan_course_marks(st01_plan_options$boards, "HIST", st01_plan_options$programs, codes)
+  expect_setequal(required$courses$subject_course, c("HIST 1110", "MATH 1215"))
+  marks <- degree_plan_course_marks(st01_plan_options$boards, "HIST", st01_plan_options$programs, codes,
+                                    include_options = TRUE)
+  # MATH 1215 is required outright as well as one option; MATH 1220's route is off the main track.
+  expect_equal(marks$courses$in_plan[match(c("HIST 1110", "MATH 1215", "HIST 300", "POLS 300"), marks$courses$subject_course)],
+               c("History B.A.", "History B.A.", "History B.A. (one of a choice)", "History B.A. (one of a choice)"))
+  expect_false("MATH 1220" %in% marks$courses$subject_course)
+})
+
+test_that("the course grid's cells read as text, one arrival at a time", {
+  roles <- course_path_roles(test_students_mc$subject_course, "SPAN", "PHIL 105", character(0))
+  p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles,
+                                 grouped_path_opt(min_n = 3L, min_band_n = 2L), arrivals = grouped_path_arrivals)
+  first <- degree_path_course_grid(path_entry_slice(p, "first_time"))
+  view <- course_path_grid_view(first)
+  expect_equal(nrow(view), nrow(first$cells))
+  expect_true(all(is.na(view$shade[first$cells$suppressed])))
+  expect_true(all(lengths(view$items[!is.na(view$note)]) == 0L))
+  # The department's courses reach every first-time student in terms 1 and 2;
+  # no first-time student takes the plan's PHIL 105.
+  abq <- view %>% filter(campus == "ABQ", relative_term %in% 1:2)
+  expect_equal(abq$shade, c(4L, 4L, 0L, 0L))
+  # Change: SPAN and PHIL both the department's and courses listed from 5
+  # students: term 2 holds five students, none of its two courses five.
+  wide <- course_path_roles(test_students_mc$subject_course, c("SPAN", "PHIL"), character(0), character(0))
+  spread <- degree_path_course_grid(get_grouped_student_paths(test_students_mc, grouped_path_population, wide,
+                                                              grouped_path_opt(min_n = 5L)))
+  testthat::local_edition(3)
+  expect_snapshot({
+    cat(format_degree_path_course_grid(first, "MC test population"), sep = "\n")
+    cat(format_degree_path_course_grid(degree_path_course_grid(path_entry_slice(p, "transfer")), "MC test population"),
+        sep = "\n")
+    cat(format_degree_path_course_grid(spread, "MC test population", plans = "Spanish B.A."), sep = "\n")
+    cat(course_paths_empty_note(p$meta, "transfer"), sep = "\n")
+    cat(course_paths_empty_note(modifyList(p$meta, list(n_observed_by_entry = c(first_time = 0L, transfer = 0L))),
+                                "transfer"), sep = "\n")
+  })
+})
+
 test_that("pathways_level_filter translates UI values to CEDAR level values", {
   expect_null(pathways_level_filter("all"))
   expect_null(pathways_level_filter(""))

@@ -5159,7 +5159,7 @@ for (.download_key in names(.enrl_desr_view_ids)) {
                  dims = data_objects[["cedar_dims"]],
                  program_choices = cedar_pathways_choices$program_choices,
                  dept_choices = cedar_pathways_choices$dept_choices,
-                 edges = data_objects[["cedar_edges"]], pathway_groups = CEDAR_PATHWAY_SUBJECT_GROUPS,
+                 edges = data_objects[["cedar_edges"]],
                  instructor_access = dfw_authenticated, instructor_password = dfw_password,
                  courses = data_objects[["cedar_courses"]], course_codes = data_objects[["cedar_course_codes"]],
                  boards = CEDAR_DEGREE_BOARDS)

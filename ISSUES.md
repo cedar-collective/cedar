@@ -58,7 +58,7 @@ fix each needs, and which of them are one piece of work, are under
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M82 | Improvement | See [Improvements](#improvements) |
+| M1–M83 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -6121,6 +6121,15 @@ attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
 of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
+
+**M83 — `pathway_subject_groups.csv` is validated at startup and read by no
+page.** Open; found 2026-11-27 regrouping Pathways > Course paths by what each
+course is to its students, the only page that read the subject families. The
+file, `CEDAR_PATHWAY_SUBJECT_GROUPS`, its validator and its
+`CEDAR_CONFIG_FILE_SPECS` entry stay, and `attach_pathway_groups()` still
+reads a grouping by subject, which its tests use. *Done when:* the file is
+retired (its spec, list, docs row and the synthetic institution's copy, with
+the tests moved to a grouping by course), or a page reads it again.
 
 **M82 — The compiled Liberal Arts and Integrative Studies board has no
 shared-rules profile, so it shows no Gen Ed cards.** Open; found 2026-11-27

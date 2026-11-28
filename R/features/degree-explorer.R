@@ -1,32 +1,197 @@
 # Semester roadmap payloads and descriptive observed course mix.
 
-plot_grouped_student_paths <- function(paths) {
-  cells <- paths$cells %>% mutate(
-    display_group = paste(group_label, campus, sep = " · "),
-    hover = if_else(suppressed, "Suppressed: insufficient students",
-      paste0(n_students, " of ", n_eligible, " students (", sprintf("%.1f", pct_students), "%)")),
-    hover = paste0(display_group, "<br>Observed enrolled term ", relative_term, "<br>", hover))
-  plotly::plot_ly(cells, x = ~relative_term, y = ~display_group, z = ~pct_students,
-    type = "heatmap", text = ~hover, hoverinfo = "text", zmin = 0, zmax = 100,
-    colors = c(CEDAR_SURFACE_TINTS[["success"]], CEDAR_PALETTE[[1]]),
-    colorbar = list(title = "% students")) %>%
-    plotly::layout(xaxis = list(title = "Observed enrolled term (summer included)", dtick = 1),
-      yaxis = list(title = "", automargin = TRUE), margin = list(l = 230, r = 50, b = 65, t = 10)) %>%
-    plotly::config(displayModeBar = FALSE)
+#' What each course is to a Pathways population: the course grid's groups
+#'
+#' @param population build_population() output; its focal programs name the
+#'   majors whose degree plans are read.
+#' @param population_opt The options it was built from, which name its departments.
+#' @param programs cedar_programs.
+#' @param dims build_cedar_dims() output.
+#' @param courses,course_codes `cedar_courses`, `cedar_course_codes`.
+#' @param boards publish_degree_drafts() output, or NULL to read no plan.
+#' @return list(`groups`: course_path_roles() over every course; `marks`:
+#'   degree_plan_course_marks()'s courses, a choice's options included;
+#'   `plans`: the degree plans read; `department_subjects`).
+population_course_roles <- function(population, population_opt, programs, dims, courses, course_codes,
+                                    boards = NULL) {
+  subjects <- resolve_pathways_focal_subjects(population_opt, programs, dims)
+  majors <- attr(population, "focal_programs")$codes$program_code
+  marks <- if (is.null(boards) || length(majors) == 0L) {
+    list(courses = tibble::tibble(subject_course = character(), in_plan = character()), plans = character(0))
+  } else degree_plan_course_marks(boards, majors, programs, course_codes, include_options = TRUE)
+  described <- describe_courses(courses$course_id, courses, course_codes)
+  list(groups = course_path_roles(courses$course_id, subjects, marks$courses$subject_course,
+                                  described$subject_course[!is.na(described$gen_ed_area)]),
+       marks = marks$courses, plans = marks$plans, department_subjects = sort(subjects))
 }
 
-#' Use the Pathways population rather than creating a second, hidden major filter
-build_population_course_paths <- function(students, population, groups, opt, description) {
-  paths <- get_grouped_student_paths(students, population, groups, opt)
-  meta <- paths$meta
-  paths$note <- paste0(description, ": ", format(meta$n_observed, big.mark = ","),
-    " observed students from ", format(meta$n_population, big.mark = ","), " population members. Through ",
-    fmt_term(meta$analysis_through), ". First observed enrolled term = 1. ",
-    meta$n_left_boundary, " students begin at the data boundary. ", meta$n_unmapped_rows,
-    " of ", meta$n_course_rows, " course records are unmapped. ", meta$n_suppressed,
-    " cells suppressed (minimum ", meta$min_band_n, " students per campus/term and ", meta$min_n,
-    " per positive cell).")
-  paths
+#' The arrivals a population's course paths start from
+#'
+#' student_term_entry_type() over the population's own declarations: each
+#' term the registrar recorded a student as new, first-time or transfer.
+#'
+#' @param programs cedar_programs.
+#' @param population build_population() output.
+#' @return student_term_entry_type()'s rows for the population's students.
+course_path_arrivals <- function(programs, population) {
+  student_term_entry_type(programs[programs$student_id %in% population$student_id, ])
+}
+
+#' Course paths for a Pathways population, by what each course is to it
+#'
+#' The Pathways population, never a second, hidden major filter. Each
+#' student's path starts at their arrival and the paths are split first-time
+#' and transfer (get_grouped_student_paths()'s `arrivals`).
+#'
+#' @param students cedar_registrations.
+#' @param population,population_opt The Pathways population and its options.
+#' @param programs,dims,courses,course_codes,boards As population_course_roles().
+#' @param opt get_grouped_student_paths()'s options.
+#' @param description The population, as the page describes it.
+#' @return list(`paths`, split by arrival; `descriptions`: describe_courses()
+#'   for every listed course with its `in_plan` mark; `plans`;
+#'   `department_subjects`; `description`).
+build_population_course_paths <- function(students, population, population_opt, programs, dims, courses,
+                                          course_codes, boards, opt, description) {
+  roles <- population_course_roles(population, population_opt, programs, dims, courses, course_codes, boards)
+  paths <- get_grouped_student_paths(students, population, roles$groups, opt,
+                                     arrivals = course_path_arrivals(programs, population))
+  descriptions <- describe_courses(unique(paths$courses$subject_course), courses, course_codes) %>%
+    left_join(roles$marks, by = "subject_course")
+  list(paths = paths, descriptions = descriptions, plans = roles$plans,
+       department_subjects = roles$department_subjects, description = description)
+}
+
+COURSE_PATH_ARRIVALS <- c(first_time = "first-time students", transfer = "transfer students")
+
+#' What a Pathways population's course paths cover, as scope-bar facts
+#'
+#' @param payload build_population_course_paths() output.
+#' @return A named list of strings, one scope chip each.
+course_paths_scope_facts <- function(payload) {
+  meta <- payload$paths$meta
+  list(Population = payload$description,
+       `Started first-time` = fmt_count(meta$n_observed_by_entry[["first_time"]]),
+       `Transferred in` = fmt_count(meta$n_observed_by_entry[["transfer"]]),
+       `No start on record` = fmt_count(meta$n_no_arrival),
+       Through = fmt_term(meta$analysis_through),
+       `Degree plans` = if (length(payload$plans)) paste(payload$plans, collapse = "; ") else "None compiled")
+}
+
+#' Why one arrival's course grid is empty, in the page's words
+#'
+#' @param meta The paths' meta (get_grouped_student_paths(), split by arrival).
+#' @param entry_type "first_time" or "transfer".
+#' @return One sentence.
+course_paths_empty_note <- function(meta, entry_type) {
+  if (sum(meta$n_observed_by_entry) == 0L) {
+    n <- meta$n_no_arrival
+    paste0("No student here has a start on record as a first-time or transfer student, so no path can begin. ",
+           if (identical(as.integer(n), 1L)) "The one student with courses was" else paste0("All ", fmt_count(n), " with courses were"),
+           " already here when the records begin, readmitted, or started at another level.")
+  } else paste0("This population has no ", COURSE_PATH_ARRIVALS[[entry_type]], ".")
+}
+
+#' The course grid's run-specific method notes
+#'
+#' @param payload build_population_course_paths() output.
+#' @param grid degree_path_course_grid() over one arrival's slice.
+#' @return Character: one sentence each.
+course_paths_method_notes <- function(payload, grid) {
+  meta <- grid$meta
+  subjects <- payload$department_subjects
+  c(if (length(subjects)) paste0("Their department's courses are those in ", paste(subjects, collapse = ", "), ".")
+    else "This population names no department, so no course is counted as theirs.",
+    if (length(payload$plans)) paste0(sub("([^.])$", "\\1.", paste0("The degree plans read are ", paste(payload$plans, collapse = "; "))),
+      " A plan compiled from the catalog is a draft until a reviewer signs it off.")
+    else "No degree plan has been compiled for these majors, so no course is counted as named by one.",
+    paste0(fmt_count(meta$n_no_arrival), " of the population's students with courses have no start on record: ",
+           "they were here before the records begin, were readmitted, or started at another level. They are left out."),
+    paste0("A term needs ", meta$min_band_n, " students on a campus to be shown, and a cell, a course or a subject ",
+           meta$min_n, " students; ", fmt_count(sum(grid$cells$suppressed)), " cells are withheld."),
+    paste0("Through ", fmt_term(meta$analysis_through), ", the last term whose enrollment is settled."))
+}
+
+# The course grid's shading steps, by a cell's share of the term's students,
+# and the key's words for them.
+COURSE_PATH_SHADE_BREAKS <- c(10, 25, 50, 75)
+COURSE_PATH_SHADE_LABELS <- c(
+  paste0("Under ", COURSE_PATH_SHADE_BREAKS[1], "%"),
+  paste0(utils::head(COURSE_PATH_SHADE_BREAKS, -1), "\u2013", COURSE_PATH_SHADE_BREAKS[-1], "%"),
+  paste0(utils::tail(COURSE_PATH_SHADE_BREAKS, 1), "% or more"))
+
+#' The course grid's cells as the page and the text preview show them
+#'
+#' The one place the grid's numbers are rounded and its cells worded.
+#'
+#' @param grid degree_path_course_grid() output.
+#' @return The grid's cells with `shade` (0 to 4, the step of
+#'   COURSE_PATH_SHADE_BREAKS its share is in; NA where withheld), `share`, `of`, `items` (a list of
+#'   "CODE x.x%" strings), `more` and `note` (a withheld, empty or
+#'   unlistable cell's words, in place of the others).
+course_path_grid_view <- function(grid) {
+  meta <- grid$meta
+  pct <- function(x) sprintf("%.1f%%", x)
+  noun <- function(detail, n) paste0(if_else(detail == "subject", "subject", "course"), if_else(n == 1L, "", "s"))
+  listed <- grid$items %>%
+    group_by(campus, group_id, relative_term) %>%
+    summarize(items = list(paste(item, pct(pct_students))), .groups = "drop")
+  grid$cells %>%
+    left_join(listed, by = c("campus", "group_id", "relative_term")) %>%
+    mutate(
+      empty = !suppressed & n_students == 0L,
+      unlisted = !suppressed & !empty & n_shown == 0L,
+      shade = if_else(suppressed, NA_integer_, findInterval(pct_students, COURSE_PATH_SHADE_BREAKS)),
+      share = if_else(suppressed | empty, NA_character_, pct(pct_students)),
+      of = if_else(band_suppressed, NA_character_, paste("of", fmt_count(n_eligible))),
+      note = case_when(
+        band_suppressed ~ paste("Fewer than", meta$min_band_n, "students this term"),
+        suppressed ~ paste("Fewer than", meta$min_n, "students took one"),
+        empty ~ "None took one",
+        unlisted ~ paste0(fmt_count(n_more), " ", noun(detail, n_more), ", ",
+                          if_else(n_more == 1L, "taken", "each taken"), " by fewer than ", meta$min_n, " students"),
+        TRUE ~ NA_character_),
+      more = if_else(is.na(note) & n_more > 0L, paste0("+", fmt_count(n_more), " more ", noun(detail, n_more)), NA_character_),
+      items = lapply(items, function(x) if (is.null(x)) character(0) else x)) %>%
+    select(-empty, -unlisted)
+}
+
+#' The course grid as text, before its page
+#'
+#' @param grid degree_path_course_grid() output, one arrival's.
+#' @param description The population, as the page describes it.
+#' @param plans The degree plans read.
+#' @return One string.
+format_degree_path_course_grid <- function(grid, description, plans = character(0)) {
+  meta <- grid$meta
+  who <- if (is.null(meta$entry_type)) "observed students" else COURSE_PATH_ARRIVALS[[meta$entry_type]]
+  if (identical(as.integer(meta$n_observed), 1L)) who <- sub("students$", "student", who)
+  view <- course_path_grid_view(grid)
+  lines <- c(
+    paste0(description, ": ", fmt_count(meta$n_observed), " ", who, " of ", fmt_count(meta$n_population),
+           " in the population, through ", fmt_term(meta$analysis_through), ". ",
+           if (isTRUE(meta$split_entry)) "Term 1 is the term they started." else "Term 1 is each student's first observed enrolled term."),
+    paste0("A cell is the share of the campus's students that term who took a course of that kind, then its ", meta$n_top,
+           " most-taken ", paste0("courses (subjects for ", paste(COURSE_PATH_ROLES[meta$by_subject], collapse = ", "), ")"),
+           ", each with its own share; \"+N more\" counts the rest."),
+    if (length(plans)) sub("([^.])$", "\\1.", paste0("Degree plans read: ", paste(plans, collapse = "; ")))
+    else "No degree plan has been compiled for these majors.")
+  for (campus in unique(view$campus)) {
+    lines <- c(lines, "", campus)
+    on_campus <- view[view$campus == campus, ]
+    for (group in unique(on_campus$group_id)) {
+      rows <- on_campus[on_campus$group_id == group, ]
+      lines <- c(lines, paste0("  ", rows$group_label[1]))
+      for (i in seq_len(nrow(rows))) {
+        r <- rows[i, ]
+        cell <- if (!is.na(r$note) && is.na(r$share)) r$note else
+          paste0(r$share, " ", r$of, ": ", if (!is.na(r$note)) r$note else
+            paste(c(r$items[[1]], stats::na.omit(r$more)), collapse = ", "))
+        lines <- c(lines, sprintf("    Term %-2d %s", r$relative_term, cell))
+      }
+    }
+  }
+  paste(lines, collapse = "\n")
 }
 
 # "3" or "3–4": a credit range as the catalog states it.

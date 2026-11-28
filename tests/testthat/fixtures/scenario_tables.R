@@ -1633,6 +1633,24 @@ mc_population <- tibble(student_id = unique(test_students_mc$student_id),
 grouped_path_population <- test_students_mc %>% distinct(student_id) %>%
   mutate(population_label = "All", relevant_until = NA_integer_)
 
+# MC02's arrivals, as student_term_entry_type() returns them. MC_A1 started
+# first-time and has a later transfer record: the first on record starts the
+# path. MC_A2's first term is recorded both ways and reads first-time. MC_A3
+# transferred in the term after a course here, which is left out. MC_G2 has
+# none and is left out. First-time: MC_A1, MC_A2, MC_A4, MC_G1; transfer: MC_A3.
+grouped_path_arrivals <- tibble::tribble(
+  ~student_id, ~term,   ~entry_type,
+  "MC_A1",     202010L, "first_time",
+  "MC_A1",     202110L, "transfer",
+  "MC_A2",     202010L, "transfer",
+  "MC_A2",     202010L, "first_time",
+  "MC_A3",     202080L, "transfer",
+  "MC_A4",     202010L, "first_time",
+  "MC_G1",     202010L, "first_time")
+
+# The course dimension over MC02's class list, to describe its courses.
+grouped_path_courses <- suppressMessages(build_cedar_courses(test_sections[0, ], test_students_mc, test_dims))
+
 cov_pop <- tibble::tibble(
   student_id = paste0("S", 1:6),
   # S1 starts at the data edge -> truncated. S2 ends at the edge -> censored.
@@ -2508,6 +2526,26 @@ st01_plan <- list(
         "hist-ba",   "math",   "MATH 1215",
         "anth-ba",   "intro",  "ENGL 1110"),
       options = tibble::tibble(catalog_id = character(), node_id = character()))))
+
+# ST01's plan with its choices' options listed (test-pathways-helpers.R, the
+# course grid's plan row). The upper-level choice lists HIST 300, POLS 300
+# and MATH 1215, which the plan also requires outright; a math-track route,
+# not the plan's own track, lists MATH 1220. Read with options: HIST 1110
+# and MATH 1215 required, HIST 300 and POLS 300 one of a choice, MATH 1220 not
+# named.
+st01_plan_options <- local({
+  boards <- st01_plan$boards
+  boards$roadmaps$nodes <- dplyr::bind_rows(boards$roadmaps$nodes, tibble::tibble(
+    catalog_id = "hist-ba", node_id = "route", track = "math", kind = "choice", code = "MATH",
+    title = "Math route", semester = 1L))
+  boards$roadmaps$options <- tibble::tribble(
+    ~catalog_id, ~node_id, ~subject_course,
+    "hist-ba",   "upper",  "HIST 300",
+    "hist-ba",   "upper",  "POLS 300",
+    "hist-ba",   "upper",  "MATH 1215",
+    "hist-ba",   "route",  "MATH 1220")
+  list(programs = st01_plan$programs, boards = boards)
+})
 
 # CC01: undergraduates passing 160 attempted credits (test-credit-ceiling.R).
 # Settled, graded and degrees posted through Fall 2022. ABQ undergraduates

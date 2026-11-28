@@ -15,11 +15,12 @@ standard `cedar_info_modal()`, rendered by the server from
 `degree_roadmap_tile_detail()`; the script handles hover previews and connectors
 only, reading every chain from the board's JSON payload.
 `observedCoursePathsUI(id, campuses)` and
-`observedCoursePathsServer(id, students, population, description, edges, groups)`
-are mounted under Pathways > Course paths. `population` and `description` are
-reactives from the shared population selector. `pathwaysUI()` also receives
-`course_campus_choices`; `pathwaysServer()` receives `edges` and `pathway_groups`.
-Course counts retain delivery campus and enrolled term.
+`observedCoursePathsServer(id, students, population, population_opt, description, edges, programs, dims, courses, course_codes, boards)`
+are mounted under Pathways > Course paths. `population`, `population_opt` and
+`description` are reactives from the shared population selector. `pathwaysUI()`
+also receives `course_campus_choices`; `pathwaysServer()` receives `edges`.
+Course counts retain delivery campus and enrolled term; every section reads one
+arrival (first-time or transfer) at a time.
 
 The long-form companion to the Shiny Module Pattern section of `AGENTS.md`: table and plot gotchas, selectize/CSS traps, the shareable-URL registry, and the page-structure heading contract.
 

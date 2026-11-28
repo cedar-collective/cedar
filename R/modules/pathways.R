@@ -24,7 +24,7 @@
 #
 # Exported functions:
 #   pathwaysUI(id, campus_choices, program_choices, dept_choices, course_campus_choices)
-#   pathwaysServer(id, students, programs, degrees, attempts, cedar_student_terms, dims, program_choices, dept_choices, edges, pathway_groups)
+#   pathwaysServer(id, students, programs, degrees, attempts, cedar_student_terms, dims, program_choices, dept_choices, edges)
 #
 # Internal sub-module:
 #   populationSelectorUI(id, campus_choices, program_choices, dept_choices)
@@ -1013,7 +1013,7 @@ pathways_start_panel <- function() {
 pathwaysServer <- function(id, students, programs, degrees = NULL,
                            attempts, cedar_student_terms = NULL,
                            dims, program_choices = character(),
-                           dept_choices = character(), edges, pathway_groups,
+                           dept_choices = character(), edges,
                            instructor_access = reactiveVal(FALSE), instructor_password = "",
                            courses, course_codes, boards = NULL) {
   moduleServer(id, function(input, output, session) {
@@ -1143,8 +1143,8 @@ pathwaysServer <- function(id, students, programs, degrees = NULL,
     })
 
     observedCoursePathsServer("course_paths", students, get_analysis_population,
-      reactive(get_description()), edges, pathway_groups,
-      courses = courses, course_codes = course_codes, boards = boards, declarations = programs)
+      reactive(population_rv()$opt), reactive(get_description()), edges, programs, dims,
+      courses = courses, course_codes = course_codes, boards = boards)
 
     # TRUE once population has been successfully built
     population_built <- reactive({
