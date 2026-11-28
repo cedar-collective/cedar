@@ -4,9 +4,8 @@
 #' When does a population take each kind of coursework?
 #' @param students cedar_registrations; all history is needed to anchor the clock.
 #' @param population build_population() output, including relevant_until.
-#' @param groups A grouping by subject (`subject_code`, the institution's
-#'   pathway_subject_groups.csv) or by course (`subject_course`,
-#'   course_path_roles()); attach_pathway_groups() reads either.
+#' @param groups A grouping by course (`subject_course`, `group_id`,
+#'   `group_label`: course_path_roles()), read by attach_pathway_groups().
 #' @param opt data_edges (required), campus, max_terms, min_n, min_band_n.
 #' @param arrivals Optional: `student_id`, `term`, `entry_type` ("first_time"
 #'   or "transfer"), as student_term_entry_type() returns them. Given, each

@@ -60,5 +60,25 @@
       cat(course_paths_empty_note(modifyList(p$meta, list(n_observed_by_entry = c(
         first_time = 0L, transfer = 0L))), "transfer"), sep = "\n")
     Output
-      No student here has a start on record as a first-time or transfer student, so no path can begin. The one student with courses was already here when the records begin, readmitted, or started at another level.
+      No student here has a start on record as a first-time or transfer student at this level, so no path can begin. The one student with courses was already here when the records begin, readmitted, or started at another level.
+    Code
+      payload <- list(paths = p, plans = "Spanish B.A.", department_subjects = "SPAN",
+        description = "MC test population", level = "Undergraduate")
+      str(course_paths_scope_facts(payload))
+    Output
+      List of 6
+       $ Population                      : chr "MC test population"
+       $ Started first-time              : chr "4"
+       $ Transferred in                  : chr "1"
+       $ No undergraduate start on record: chr "1"
+       $ Through                         : chr "Spring 2021"
+       $ Degree plans                    : chr "Spanish B.A."
+    Code
+      cat(course_paths_method_notes(payload, first), sep = "\n")
+    Output
+      Their department's courses are those in SPAN.
+      The degree plans read are Spanish B.A. A plan compiled from the catalog is a draft until a reviewer signs it off.
+      1 of the population's students with courses has no undergraduate start on record: they were here before the records begin, were readmitted, or started at another level, as a non-degree student for one. They are left out.
+      A term needs 2 students on a campus to be shown, and a cell, a course or a subject 3 students; 4 cells are withheld.
+      Through Spring 2021, the last term whose enrollment is settled.
 

@@ -28,14 +28,12 @@ by `R/lists/degree_catalog.R` at startup:
 | `degree_roadmap_starts.csv` | Common math/English placement identifiers, English course routes, explicitly completed degree credits, and the one start of each track the page's pickers open on (`opens`) |
 | `degree_roadmap_math_routes.csv` | One route per program/math placement identifier, with program-specific labels and ordered shared course IDs; no calculus fallback |
 | `degree_roadmap_conditions.csv` | Course-count pools and permission conditions, target, minimum, eligible single-course slots, visible label and course-page evidence; separate from named-course edges |
-| `pathway_subject_groups.csv` | One descriptive group per subject prefix, with consistent labels |
 
 Degree tables are exposed as `CEDAR_DEGREE_CATALOG` (`catalogs`, `rules`,
 `courses`, `evidence`); templates as `CEDAR_DEGREE_ROADMAPS`
-(`nodes`, `links`, `starts`, `basis`, `plans`, `courses`);
-categories as `CEDAR_PATHWAY_SUBJECT_GROUPS`. The synthetic institution
-has empty catalog files rather than importing real university rules as synthetic
-facts; its fixture courses still have descriptive groups.
+(`nodes`, `links`, `starts`, `basis`, `plans`, `courses`). The synthetic
+institution has empty catalog files rather than importing real university rules
+as synthetic facts.
 
 ## Banner program codes
 

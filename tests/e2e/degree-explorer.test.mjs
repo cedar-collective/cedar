@@ -788,8 +788,8 @@ try {
   check(true, 'Course paths closes its nested loading dialog and reveals the completed grid');
   // The bar's labels are uppercased by CSS, and innerText carries that.
   const scope = (await page.$eval('#pathways-course_paths-path_scope', el => el.innerText)).toLowerCase();
-  check(['started first-time', 'transferred in', 'no start on record', 'through'].every((fact) => scope.includes(fact)),
-    'Course paths names who it counts, first-time, transfer and left out, and the data edge');
+  check(['started first-time', 'transferred in', 'no undergraduate start on record', 'through'].every((fact) => scope.includes(fact)),
+    'Course paths names who it counts, first-time, transfer and left out at the undergraduate level, and the data edge');
   const gridKinds = () => page.$$eval('#pathways-course_paths-path_grid tbody th', els => els.map(el => el.innerText.trim()));
   const firstTimeKinds = await gridKinds();
   check(firstTimeKinds.length > 0 && firstTimeKinds[0] === "Their department's courses",

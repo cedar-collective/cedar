@@ -2,7 +2,7 @@ context("Pathways branch helpers")
 
 test_that("grouped paths count concurrent same-category courses once per student and campus", {
   p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
-    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
+    grouped_path_course_groups, grouped_path_opt())
   first <- p$cells %>% filter(relative_term == 1, group_id == "languages")
   expect_equal(first$n_students[first$campus == "ABQ"], 4L)
   expect_equal(first$n_students[first$campus == "GA"], 2L)
@@ -11,14 +11,14 @@ test_that("grouped paths count concurrent same-category courses once per student
   expect_equal(second$n_eligible, 5L)
   # Campus filtering must not re-anchor MC_G1 at term 1 after moving to ABQ.
   scoped <- get_grouped_student_paths(test_students_mc, grouped_path_population,
-    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(campus = "ABQ"))
+    grouped_path_course_groups, grouped_path_opt(campus = "ABQ"))
   expect_equal(scoped$cells, filter(p$cells, campus == "ABQ"))
   expect_equal(nrow(filter(p$courses, subject_course == "SPAN 201", campus == "ABQ")), 2L)
 })
 
 test_that("grouped paths suppress thin bands and cells without leaking their counts", {
   p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
-    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt(min_n = 3L, min_band_n = 4L))
+    grouped_path_course_groups, grouped_path_opt(min_n = 3L, min_band_n = 4L))
   thin_band <- p$cells %>% filter(campus == "GA" | relative_term == 3)
   expect_true(all(is.na(thin_band$n_students)))
   expect_true(all(is.na(thin_band$n_eligible)))
@@ -34,14 +34,14 @@ test_that("grouped paths suppress thin bands and cells without leaking their cou
 test_that("grouped paths honor population ceilings and the settled observation edge", {
   pop <- grouped_path_population
   pop$relevant_until[pop$student_id == "MC_A1"] <- 202010L
-  p <- get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
+  p <- get_grouped_student_paths(test_students_mc, pop, grouped_path_course_groups,
     grouped_path_opt(data_edges = list(first_enrolled = 202010L, last_enrolled_complete = 202080L)))
   second <- p$cells %>% filter(campus == "ABQ", relative_term == 2, group_id == "languages")
   expect_equal(second$n_students, 3L)
   expect_false(any(p$cells$relative_term > 2))
-  expect_error(get_grouped_student_paths(test_students_mc, pop, CEDAR_PATHWAY_SUBJECT_GROUPS,
+  expect_error(get_grouped_student_paths(test_students_mc, pop, grouped_path_course_groups,
     list(data_edges = list())), "settled enrollment edge")
-  partial <- CEDAR_PATHWAY_SUBJECT_GROUPS %>% filter(subject_code != "PHIL")
+  partial <- grouped_path_course_groups %>% filter(subject_course != "PHIL 105")
   unmapped <- get_grouped_student_paths(test_students_mc, grouped_path_population, partial, grouped_path_opt())
   expect_equal(unmapped$meta$n_unmapped_rows, 1L)
   expect_true("Unmapped coursework" %in% unmapped$cells$group_label)
@@ -50,7 +50,7 @@ test_that("grouped paths honor population ceilings and the settled observation e
 
 test_that("the courses inside the groups read as one row per campus and course, a column per term", {
   p <- get_grouped_student_paths(test_students_mc, grouped_path_population,
-    CEDAR_PATHWAY_SUBJECT_GROUPS, grouped_path_opt())
+    grouped_path_course_groups, grouped_path_opt())
   t <- degree_path_course_table(p)
   expect_equal(paste0("term_", seq_len(p$meta$max_terms)), grep("^term_", names(t), value = TRUE))
   expect_false(anyDuplicated(t[c("campus", "subject_course")]) > 0L)
@@ -162,6 +162,21 @@ test_that("a cell of a spread-out kind of course lists its subjects, each studen
   expect_equal(unique(degree_path_course_table(p)$group_id), c("department", "other"))
 })
 
+test_that("course paths start only at an arrival at the population's level", {
+  ug <- course_path_arrivals(grouped_path_programs, grouped_path_population, "Undergraduate")
+  expect_equal(ug, tibble::tibble(student_id = c("MC_A1", "MC_A2"), term = 202010L,
+                                  entry_type = c("first_time", "transfer")))
+  # The non-degree graduate transfer is MC_A1's arrival at that level only.
+  ng <- course_path_arrivals(grouped_path_programs, grouped_path_population, "Non Degree Graduate")
+  expect_equal(ng$student_id, "MC_A1")
+  expect_equal(ng$term, 201980L)
+  expect_error(course_path_arrivals(grouped_path_programs, grouped_path_population, NULL), "one level")
+  expect_error(course_path_arrivals(grouped_path_programs, grouped_path_population, ""), "one level")
+  expect_error(course_path_arrivals(grouped_path_programs, grouped_path_population, "Postdoc"), "not in student_levels")
+  expect_error(course_path_arrivals(grouped_path_programs["student_id"], grouped_path_population, "Undergraduate"),
+               "lacks student_level")
+})
+
 test_that("course paths start at each student's arrival, first-time and transfer apart", {
   roles <- course_path_roles(test_students_mc$subject_course, "SPAN", character(0), character(0))
   p <- get_grouped_student_paths(test_students_mc, grouped_path_population, roles, grouped_path_opt(),
@@ -241,6 +256,11 @@ test_that("the course grid's cells read as text, one arrival at a time", {
     cat(course_paths_empty_note(p$meta, "transfer"), sep = "\n")
     cat(course_paths_empty_note(modifyList(p$meta, list(n_observed_by_entry = c(first_time = 0L, transfer = 0L))),
                                 "transfer"), sep = "\n")
+    # The scope bar and the method notes name the arrivals' level.
+    payload <- list(paths = p, plans = "Spanish B.A.", department_subjects = "SPAN",
+                    description = "MC test population", level = "Undergraduate")
+    str(course_paths_scope_facts(payload))
+    cat(course_paths_method_notes(payload, first), sep = "\n")
   })
 })
 

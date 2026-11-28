@@ -1648,6 +1648,29 @@ grouped_path_arrivals <- tibble::tribble(
   "MC_A4",     202010L, "first_time",
   "MC_G1",     202010L, "first_time")
 
+# MC02's courses grouped by course, the key course_path_roles() gives a
+# grouping: Spanish one group, philosophy another.
+grouped_path_course_groups <- tibble::tribble(
+  ~subject_course, ~group_id,    ~group_label,
+  "PHIL 105",      "humanities", "Humanities",
+  "SPAN 101",      "languages",  "Languages",
+  "SPAN 101L",     "languages",  "Languages",
+  "SPAN 201",      "languages",  "Languages")
+
+# Declarations recording arrivals at two levels, for course_path_arrivals().
+# MC_A1 arrived as a non-degree graduate transfer before starting first-time as
+# an undergraduate; MC_A2 transferred in as an undergraduate; MC_A3's only
+# arrival is as a non-degree undergraduate. A continuing term records no
+# arrival, and MC_X9 is not in the population.
+grouped_path_programs <- tibble::tribble(
+  ~student_id, ~term,   ~student_level,             ~student_population,
+  "MC_A1",     201980L, "Non Degree Graduate",      "New Transfer",
+  "MC_A1",     202010L, "Undergraduate",            "First Time Freshman",
+  "MC_A1",     202080L, "Undergraduate",            "Continuing",
+  "MC_A2",     202010L, "Undergraduate",            "New Transfer",
+  "MC_A3",     202080L, "Non Degree Undergraduate", "New Transfer",
+  "MC_X9",     202010L, "Undergraduate",            "First Time Freshman")
+
 # The course dimension over MC02's class list, to describe its courses.
 grouped_path_courses <- suppressMessages(build_cedar_courses(test_sections[0, ], test_students_mc, test_dims))
 

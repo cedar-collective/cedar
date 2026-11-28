@@ -58,7 +58,7 @@ observedCoursePathsUI <- function(id, campuses) {
         method = tagList(tags$ul(
           tags$li("A row is a kind of course, by what it is to these students: one of their department's subjects; a course their degree plan names, as a requirement or as one option of a choice; a Gen Ed course; or anything else. A course counts in the first row it fits."),
           tags$li("A cell is the share of the campus's students that term who took at least one course of that kind, then its three most-taken courses with each one's share, or for everything else its three most-taken subjects. \"+N more\" counts the rest, those too few to show included."),
-          tags$li("Term 1 is the term a student started here, first-time or as a transfer, as the registrar recorded it, and each later term is the next they enrolled in, summers included. Courses taken before they started are left out."),
+          tags$li("Term 1 is the term a student started here at the population's level, first-time or as a transfer, as the registrar recorded it, and each later term is the next they enrolled in, summers included. Courses taken before they started are left out, and so is an earlier start at another level."),
           tags$li("Registered students and late drops count; waitlists and early drops do not. A student takes several kinds of course in a term, so a column's shares add past 100%."),
           tags$li("It shows what students took, not what they passed or needed: a course a plan leaves to a choice it does not list counts as everything else.")),
           uiOutput(ns("grid_method"))),

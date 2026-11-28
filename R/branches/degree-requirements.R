@@ -205,22 +205,16 @@ degree_rule_outline <- function(catalog, catalog_ids) {
 
 #' Classify a course once for descriptive pathways, never as degree fulfillment
 #'
-#' @param groups Keyed by subject (`subject_code`, `group_id`, `group_label`:
-#'   pathway_subject_groups.csv) or by course (`subject_course`, `group_id`,
-#'   `group_label`: course_path_roles()). A course neither names is unmapped.
+#' @param groups Keyed by course: `subject_course`, `group_id`, `group_label`
+#'   (course_path_roles()). A course it does not name is unmapped.
 attach_pathway_groups <- function(rows, groups) {
-  joined <- if ("subject_course" %in% names(groups)) {
-    groups <- groups[c("subject_course", "group_id", "group_label")]
-    if (anyNA(groups) || any(!nzchar(as.matrix(groups)))) stop("[degree-requirements.R] Blank course path grouping field")
-    if (anyDuplicated(groups$subject_course)) stop("[degree-requirements.R] A course has two course path groups")
-    rows %>% left_join(groups, by = "subject_course", relationship = "many-to-one")
-  } else {
-    groups <- validate_pathway_subject_groups(groups)
-    rows %>%
-      mutate(subject_code = sub(" .*", "", subject_course)) %>%
-      left_join(groups, by = "subject_code", relationship = "many-to-one")
-  }
-  joined %>%
+  missing <- setdiff(c("subject_course", "group_id", "group_label"), names(groups))
+  if (length(missing)) stop("[degree-requirements.R] Course path grouping missing: ", paste(missing, collapse = ", "))
+  groups <- groups[c("subject_course", "group_id", "group_label")]
+  if (anyNA(groups) || any(!nzchar(as.matrix(groups)))) stop("[degree-requirements.R] Blank course path grouping field")
+  if (anyDuplicated(groups$subject_course)) stop("[degree-requirements.R] A course has two course path groups")
+  rows %>%
+    left_join(groups, by = "subject_course", relationship = "many-to-one") %>%
     mutate(group_id = coalesce(group_id, "unmapped"),
            group_label = coalesce(group_label, "Unmapped coursework"))
 }

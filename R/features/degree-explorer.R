@@ -27,21 +27,35 @@ population_course_roles <- function(population, population_opt, programs, dims, 
 
 #' The arrivals a population's course paths start from
 #'
-#' student_term_entry_type() over the population's own declarations: each
-#' term the registrar recorded a student as new, first-time or transfer.
+#' student_term_entry_type() over the population's own declarations at its
+#' level: each term the registrar recorded a student as new, first-time or
+#' transfer, at that level. An arrival counts only at its own level, as
+#' student_term_semesters() reads it: an undergraduate population's paths
+#' start at an undergraduate arrival, never at a non-degree or graduate one.
 #'
 #' @param programs cedar_programs.
 #' @param population build_population() output.
+#' @param level The population's student level (its `student_level` option,
+#'   a value student_levels.csv names). Exactly one.
 #' @return student_term_entry_type()'s rows for the population's students.
-course_path_arrivals <- function(programs, population) {
-  student_term_entry_type(programs[programs$student_id %in% population$student_id, ])
+course_path_arrivals <- function(programs, population, level) {
+  if (length(level) != 1L || is.na(level) || !nzchar(level)) {
+    stop("Course paths follow students from their arrival at one level: set the population's Level, ",
+         "define the population, then show course paths.", call. = FALSE)
+  }
+  if (!"student_level" %in% names(programs)) stop("[degree-explorer.R] course_path_arrivals: programs lacks student_level")
+  code <- cedar_level_code_from_source(level)
+  if (is.na(code)) stop("[degree-explorer.R] course_path_arrivals: level not in student_levels.csv: ", level)
+  rows <- programs[programs$student_id %in% population$student_id, ]
+  student_term_entry_type(rows[cedar_level_code_from_source(rows$student_level) %in% code, ])
 }
 
 #' Course paths for a Pathways population, by what each course is to it
 #'
 #' The Pathways population, never a second, hidden major filter. Each
-#' student's path starts at their arrival and the paths are split first-time
-#' and transfer (get_grouped_student_paths()'s `arrivals`).
+#' student's path starts at their arrival at the population's level, and the
+#' paths are split first-time and transfer (get_grouped_student_paths()'s
+#' `arrivals`).
 #'
 #' @param students cedar_registrations.
 #' @param population,population_opt The Pathways population and its options.
@@ -50,16 +64,17 @@ course_path_arrivals <- function(programs, population) {
 #' @param description The population, as the page describes it.
 #' @return list(`paths`, split by arrival; `descriptions`: describe_courses()
 #'   for every listed course with its `in_plan` mark; `plans`;
-#'   `department_subjects`; `description`).
+#'   `department_subjects`; `description`; `level`, the arrivals' level name).
 build_population_course_paths <- function(students, population, population_opt, programs, dims, courses,
                                           course_codes, boards, opt, description) {
+  arrivals <- course_path_arrivals(programs, population, population_opt$student_level)
+  level <- unname(CEDAR_STUDENT_LEVEL_LABELS[cedar_level_code_from_source(population_opt$student_level)])
   roles <- population_course_roles(population, population_opt, programs, dims, courses, course_codes, boards)
-  paths <- get_grouped_student_paths(students, population, roles$groups, opt,
-                                     arrivals = course_path_arrivals(programs, population))
+  paths <- get_grouped_student_paths(students, population, roles$groups, opt, arrivals = arrivals)
   descriptions <- describe_courses(unique(paths$courses$subject_course), courses, course_codes) %>%
     left_join(roles$marks, by = "subject_course")
   list(paths = paths, descriptions = descriptions, plans = roles$plans,
-       department_subjects = roles$department_subjects, description = description)
+       department_subjects = roles$department_subjects, description = description, level = level)
 }
 
 COURSE_PATH_ARRIVALS <- c(first_time = "first-time students", transfer = "transfer students")
@@ -70,12 +85,14 @@ COURSE_PATH_ARRIVALS <- c(first_time = "first-time students", transfer = "transf
 #' @return A named list of strings, one scope chip each.
 course_paths_scope_facts <- function(payload) {
   meta <- payload$paths$meta
-  list(Population = payload$description,
-       `Started first-time` = fmt_count(meta$n_observed_by_entry[["first_time"]]),
-       `Transferred in` = fmt_count(meta$n_observed_by_entry[["transfer"]]),
-       `No start on record` = fmt_count(meta$n_no_arrival),
-       Through = fmt_term(meta$analysis_through),
-       `Degree plans` = if (length(payload$plans)) paste(payload$plans, collapse = "; ") else "None compiled")
+  facts <- list(Population = payload$description,
+                `Started first-time` = fmt_count(meta$n_observed_by_entry[["first_time"]]),
+                `Transferred in` = fmt_count(meta$n_observed_by_entry[["transfer"]]),
+                no_start = fmt_count(meta$n_no_arrival),
+                Through = fmt_term(meta$analysis_through),
+                `Degree plans` = if (length(payload$plans)) paste(payload$plans, collapse = "; ") else "None compiled")
+  names(facts)[names(facts) == "no_start"] <- paste("No", tolower(payload$level), "start on record")
+  facts
 }
 
 #' Why one arrival's course grid is empty, in the page's words
@@ -86,7 +103,7 @@ course_paths_scope_facts <- function(payload) {
 course_paths_empty_note <- function(meta, entry_type) {
   if (sum(meta$n_observed_by_entry) == 0L) {
     n <- meta$n_no_arrival
-    paste0("No student here has a start on record as a first-time or transfer student, so no path can begin. ",
+    paste0("No student here has a start on record as a first-time or transfer student at this level, so no path can begin. ",
            if (identical(as.integer(n), 1L)) "The one student with courses was" else paste0("All ", fmt_count(n), " with courses were"),
            " already here when the records begin, readmitted, or started at another level.")
   } else paste0("This population has no ", COURSE_PATH_ARRIVALS[[entry_type]], ".")
@@ -105,8 +122,10 @@ course_paths_method_notes <- function(payload, grid) {
     if (length(payload$plans)) paste0(sub("([^.])$", "\\1.", paste0("The degree plans read are ", paste(payload$plans, collapse = "; "))),
       " A plan compiled from the catalog is a draft until a reviewer signs it off.")
     else "No degree plan has been compiled for these majors, so no course is counted as named by one.",
-    paste0(fmt_count(meta$n_no_arrival), " of the population's students with courses have no start on record: ",
-           "they were here before the records begin, were readmitted, or started at another level. They are left out."),
+    paste0(fmt_count(meta$n_no_arrival), " of the population's students with courses ",
+           if (identical(as.integer(meta$n_no_arrival), 1L)) "has" else "have", " no ", tolower(payload$level),
+           " start on record: they were here before the records begin, were readmitted, or started at another level, ",
+           "as a non-degree student for one. They are left out."),
     paste0("A term needs ", meta$min_band_n, " students on a campus to be shown, and a cell, a course or a subject ",
            meta$min_n, " students; ", fmt_count(sum(grid$cells$suppressed)), " cells are withheld."),
     paste0("Through ", fmt_term(meta$analysis_through), ", the last term whose enrollment is settled."))
