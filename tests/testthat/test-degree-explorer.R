@@ -481,8 +481,10 @@ test_that("catalog capture inventories every entry and follows course links with
   manifest <- catalog_capture_manifest(out)
   inventory <- read.csv(file.path(out, "program-inventory.csv"))
   expect_equal(nrow(inventory), 3)
-  expect_equal(inventory$scope, c("undergraduate_degree", "excluded", "excluded"))
+  # The unlabeled Biology Minor is a minor: kept, apart from the degrees.
+  expect_equal(inventory$scope, c("undergraduate_degree", "excluded", "undergraduate_minor"))
   expect_equal(unlist(manifest$program_ids), "biology")
+  expect_equal(unlist(manifest$minor_ids), "minor")
   expect_equal(sum(vapply(manifest$requests, function(x) x$kind == "course", logical(1))), 3)
   expect_false("program:graduate" %in% names(manifest$requests))
   unavailable <- function(url) { value <- scan_fetcher()(url); value$status_code <- 404L; value }
@@ -492,7 +494,12 @@ test_that("catalog capture inventories every entry and follows course links with
     fetch = scan_fetcher(), pause = 0), "already exists")
   analysis <- analyze_degree_catalog(out)
   summary <- read_source_json(file.path(analysis, "analysis-manifest.json"))
+  expect_equal(summary$scope, "undergraduate_programs")
   expect_equal(summary$counts$degrees, 1)
+  expect_equal(summary$counts$minors, 1)
+  coverage <- read.csv(file.path(analysis, "program-coverage.csv"))
+  expect_equal(coverage$scope[coverage$program_id == "minor"], "undergraduate_minor")
+  expect_equal(coverage$degree_sections[coverage$program_id == "minor"], 1L)
   expect_equal(summary$counts$specializations, 1)
   expect_equal(summary$counts$course_requests, 3)
   expect_equal(summary$counts$source_issues, 1)
@@ -515,6 +522,42 @@ test_that("catalog capture inventories every entry and follows course links with
   expect_true(all(nzchar(rules$source_pointer)))
   expect_match(readLines(file.path(analysis, "REPORT.md"))[1], "Designed Catalog")
   expect_error(analyze_degree_catalog(out), "already exists")
+})
+
+test_that("a minor is captured with its course links, read by the analysis and prepared like a degree", {
+  config <- scan_config; root <- withr::local_tempdir(); out <- file.path(root, "linked")
+  # The fixture's Biology Minor, given a course only it names.
+  linked <- scan_fixture
+  linked$programs$minor$minorRequirements <- paste0('<ul><li>Complete the following:<ul><li>',
+    '<a href="#/courses/view/ecol">BIOL300</a> - Ecology (3)</li></ul></li></ul>')
+  linked$courses$ecol <- list(pid = "course-ecol", id = "ecol", title = "Ecology", `__catalogCourseId` = "BIOL300",
+    subjectCode = list(name = "BIOL", description = "Biology", id = "subject-biol"),
+    credits = list(credits = list(min = 3, max = 3), value = 3, chosen = "fixed"))
+  capture_degree_catalog(config$source, config$credentials, config$fields, out, fetch = scan_fetcher(linked), pause = 0)
+  expect_true("course:view/ecol" %in% names(catalog_capture_manifest(out)$requests))
+
+  analyze_degree_catalog(out)
+  payload <- load_catalog_review(root, "linked/analysis")
+  expect_setequal(catalog_review_program_entities(payload$records, "minor"), c("programs:minor", "courses:course-ecol"))
+  # Step 1 of a reading works on a minor as on a degree: one unit for the
+  # minor, one for its course.
+  path <- prepare_catalog_normalization(payload, "minor", file.path(root, "reviews"),
+    paste(readLines(file.path(cedar_base_dir, "config/catalog-normalization-prompt.txt")), collapse = "\n"),
+    read_source_json(file.path(cedar_base_dir, "config/catalog-normalization.schema.json")))
+  packet <- load_catalog_normalization_program(file.path(root, "reviews"), basename(path))$packet
+  targets <- vapply(packet$units, function(u) paste(unlist(u$request$target_entities), collapse = " "), character(1))
+  expect_setequal(targets, c("programs:minor", "courses:course-ecol"))
+  minor_unit <- packet$units[[match("programs:minor", targets)]]
+  expect_true(any(vapply(minor_unit$request$source_blocks, function(b) b$field == "minorRequirements", logical(1))))
+
+  # A record with a minor's requirements that says it is graduate-level is excluded.
+  graduate <- scan_fixture
+  graduate$programs$minor$ugGrDegree <- "graduateProgram"
+  excluded <- file.path(root, "graduate")
+  capture_degree_catalog(config$source, config$credentials, config$fields, excluded, fetch = scan_fetcher(graduate), pause = 0)
+  inventory <- read.csv(file.path(excluded, "program-inventory.csv"))
+  expect_equal(inventory$scope[inventory$program_id == "minor"], "excluded")
+  expect_length(unlist(catalog_capture_manifest(excluded)$minor_ids), 0L)
 })
 
 test_that("conflicting total-credit mentions are flagged without claiming which number is right", {

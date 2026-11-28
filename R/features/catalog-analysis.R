@@ -46,7 +46,9 @@ analyze_degree_catalog <- function(directory, output = file.path(directory, "ana
     function(x) load("schema", x)), c("programs", "courses", "specializations"))
   fields <- catalog_config_rows(manifest$settings$fields)
   records <- list()
-  for (id in unlist(manifest$program_ids, use.names = FALSE)) {
+  # Degrees, then minors. A capture made before minors were kept has no
+  # minor_ids and read none.
+  for (id in unlist(c(manifest$program_ids, manifest$minor_ids), use.names = FALSE)) {
     program <- load("program", id)
     receipt <- requests[[paste0("program:", id)]]
     record <- extract_catalog_record(program, "programs", receipt, edition, schemas, fields)
@@ -93,7 +95,7 @@ analyze_degree_catalog <- function(directory, output = file.path(directory, "ana
   source_issues <- rbind(catalog_source_issue_rows(records, inventory, requests, sections),
     catalog_credit_conflict_rows(records))
   utils::write.csv(source_issues, file.path(output, "source-issues.csv"), row.names = FALSE, na = "")
-  status <- inventory[inventory$scope %in% c("undergraduate_degree", "undergraduate_candidate", "unclassified"), ]
+  status <- inventory[inventory$scope %in% c("undergraduate_degree", "undergraduate_minor", "undergraduate_candidate", "unclassified"), ]
   status$sections <- vapply(status$program_id, function(id) sum(sections$entity == paste0("programs:", id) & !sections$phase %in% c("metadata", "info")), integer(1))
   status$degree_sections <- vapply(status$program_id, function(id) sum(sections$entity == paste0("programs:", id) & sections$phase == "degree"), integer(1))
   status$review_items <- vapply(status$program_id, function(id) {
@@ -105,13 +107,14 @@ analyze_degree_catalog <- function(directory, output = file.path(directory, "ana
   write_source_json(provenance, file.path(output, "extractor-source.json"))
   summary <- list(schema_version = "1.0.0", extractor_version = provenance$version, catalog_id = manifest$catalog_id,
     extractor_sha256 = source_sha256(source_json_bytes(provenance)),
-    catalog_title = manifest$catalog_title, scope = "undergraduate_degrees",
+    catalog_title = manifest$catalog_title, scope = "undergraduate_programs",
     source_directory = normalizePath(directory), include_courses = manifest$settings$include_courses,
     settings_sha256 = manifest$settings_sha256,
     configuration_sha256 = source_sha256(source_json_bytes(manifest$settings[setdiff(names(manifest$settings), "requested_catalog_id")])),
     source_manifest_sha256 = source_sha256(readBin(file.path(directory, "source-manifest.json"), "raw", n = file.info(file.path(directory, "source-manifest.json"))$size)),
     sections_sha256 = source_sha256(readBin(file.path(output, "sections.csv"), "raw", n = file.info(file.path(output, "sections.csv"))$size)),
     counts = list(degrees = sum(inventory$scope == "undergraduate_degree"),
+      minors = length(unlist(manifest$minor_ids)),
       undergraduate_candidates = sum(inventory$scope == "undergraduate_candidate"),
       unclassified = sum(inventory$scope == "unclassified"),
       specializations = sum(vapply(records, function(x) x$kind == "specializations", logical(1))),
@@ -121,7 +124,7 @@ analyze_degree_catalog <- function(directory, output = file.path(directory, "ana
     review_status = "unreviewed")
   escape <- function(x) gsub("[|\r\n]", " ", x)
   lines <- c(paste0("# Catalog scan: ", manifest$catalog_title), "",
-    sprintf("%d declared undergraduate degrees; %d undergraduate candidates; %d still unclassified.", summary$counts$degrees, summary$counts$undergraduate_candidates, summary$counts$unclassified),
+    sprintf("%d declared undergraduate degrees; %d undergraduate minors; %d undergraduate candidates; %d still unclassified.", summary$counts$degrees, summary$counts$minors, summary$counts$undergraduate_candidates, summary$counts$unclassified),
     sprintf("%d embedded specializations; %d linked course requests; %d narrative review items.", summary$counts$specializations, summary$counts$course_requests, summary$counts$review_items), "",
     sprintf("%d shared status milestones; %d cited uses. See milestones.csv and the milestone_id links in rule-nodes.csv. These preserve required standing/admission status, not inferred credits, semester placement, or admission awards.", nrow(milestones), summary$counts$milestone_uses), "",
     sprintf("%d source-query/coverage flags need review; see source-issues.csv. Source flags are preserved without inferring cancellation, scheduling, or a replacement course.", nrow(source_issues)), "",

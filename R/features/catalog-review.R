@@ -8,7 +8,8 @@ list_catalog_review_scans <- function(root) {
   if (!length(paths)) return(empty)
   rows <- lapply(paths, function(path) {
     meta <- read_source_json(path)
-    if (!identical(meta$schema_version, "1.0.0") || !identical(meta$scope, "undergraduate_degrees")) {
+    # undergraduate_degrees: an analysis made before minors were kept.
+    if (!identical(meta$schema_version, "1.0.0") || !isTRUE(meta$scope %in% c("undergraduate_degrees", "undergraduate_programs"))) {
       stop("[catalog-review.R] Unsupported catalog analysis: ", path)
     }
     id <- substring(normalizePath(dirname(path)), nchar(root) + 2L)
