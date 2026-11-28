@@ -272,6 +272,21 @@ details.enrollment-projection-method-guide {
   color: #7a5010;
 }
 
+/* A release's version beside its title, on Admin > Changelog and in the
+   notice of a new version. */
+.changelog-version {
+  background: var(--surface-soft);
+  border: 1px solid var(--surface-soft-border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: 0.4rem;
+  padding: 1px 8px;
+  vertical-align: middle;
+}
+
 /* The three evidence axes as compact badges. */
 .projection-axis {
   display: inline-block;

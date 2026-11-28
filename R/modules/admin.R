@@ -57,7 +57,7 @@ changelogUI <- function(id) {
     fluidRow(
       column(12,
         card(
-          card_header("Recent Updates"),
+          card_header("Latest release"),
           card_body(htmlOutput(ns("changelog_recent")))
         )
       )
@@ -65,8 +65,8 @@ changelogUI <- function(id) {
     fluidRow(
       column(12,
         card(
-          card_header("All Changes"),
-          card_body(htmlOutput(ns("changelog_full")))
+          card_header("Earlier releases"),
+          card_body(htmlOutput(ns("changelog_earlier")))
         )
       )
     )
@@ -93,19 +93,19 @@ changelogServer <- function(id) {
       })
     })
 
-    output$changelog_full <- renderUI({
+    # The releases before the latest, which the card above shows.
+    output$changelog_earlier <- renderUI({
       tryCatch({
-        all_entries <- load_changelog()
-        if (length(all_entries) == 0) {
-          empty_state("No changelog entries yet. The full history appears here once releases are recorded.")
+        earlier <- get_earlier_changelog(after = 1)
+        if (length(earlier) == 0) {
+          empty_state("No earlier releases yet.")
         } else {
-          changelog_html <- format_changelog_html(all_entries, max_entries = length(all_entries))
-          HTML(changelog_html)
+          HTML(format_changelog_html(earlier))
         }
       }, error = function(e) {
-        handle_error(e, "changelog_full")
+        handle_error(e, "changelog_earlier")
         div(class = "alert-box alert-box--critical",
-            tags$strong("Could not load the full changelog."),
+            tags$strong("Could not load the earlier releases."),
             tags$div(e$message))
       })
     })
