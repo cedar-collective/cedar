@@ -61,7 +61,45 @@ get_feature_spotlight <- function() {
 # Get recent changelog entries
 get_recent_changelog <- function(max_entries = 3) {
   changelog <- load_changelog()
-  changelog[1:min(max_entries, length(changelog))]
+  changelog[seq_along(changelog) <= max_entries]
+}
+
+# The entries after the newest `after`: the Changelog page's earlier releases,
+# shown below the latest so no release appears twice.
+get_earlier_changelog <- function(after = 1) {
+  changelog <- load_changelog()
+  changelog[seq_along(changelog) > after]
+}
+
+# What a release's change does for a reader, in the order a release lists them
+# (docs/developers/release-runbook.md#the-changelog). Internal work is one
+# "Under the hood" item; its detail is in the PRs.
+CHANGELOG_ITEM_KINDS <- c(
+  new = "New",
+  deeper = "Deeper",
+  clearer = "Clearer",
+  easier = "Easier",
+  hood = "Under the hood"
+)
+
+# A release's items as HTML list text, escaped. An item written before v2.2.0
+# is a plain string and keeps its place; one with a `kind` is labelled and
+# listed in CHANGELOG_ITEM_KINDS order.
+changelog_entry_items_html <- function(entry) {
+  items <- entry$items
+  if (length(items) == 0) return(character(0))
+  kinds <- vapply(items, function(item) if (is.character(item)) "" else item$kind %||% NA_character_, character(1))
+  unknown <- !kinds %in% c("", names(CHANGELOG_ITEM_KINDS))
+  if (any(unknown)) {
+    stop("[changelog.R] ", entry$version, ": an item's kind must be one of ",
+      paste(names(CHANGELOG_ITEM_KINDS), collapse = ", "), "; got ",
+      paste(unique(kinds[unknown]), collapse = ", "), call. = FALSE)
+  }
+  html <- vapply(items, function(item) {
+    if (is.character(item)) return(htmltools::htmlEscape(item))
+    paste0("<strong>", CHANGELOG_ITEM_KINDS[[item$kind]], ".</strong> ", htmltools::htmlEscape(item$text))
+  }, character(1))
+  html[order(match(kinds, c("", names(CHANGELOG_ITEM_KINDS))))]
 }
 
 # The newest changelog entry is CEDAR's app-version source of truth. Keep
@@ -168,19 +206,11 @@ format_changelog_html <- function(entries = NULL, max_entries = 3) {
   html_parts <- c()
   
   for (entry in entries) {
-    # Version header with badge
-    type_class <- switch(entry$type,
-      "major" = "badge-primary",
-      "minor" = "badge-info", 
-      "patch" = "badge-secondary",
-      "badge-secondary"
-    )
-    
     version_html <- paste0(
       "<div class='changelog-entry'>",
       "<div class='changelog-date'>", entry$date, "</div>",
-      "<h4 class='changelog-title'>", entry$title, " ",
-      "<span class='badge ", type_class, "'>", entry$version, "</span>",
+      "<h4 class='changelog-title'>", htmltools::htmlEscape(entry$title), " ",
+      "<span class='changelog-version'>", htmltools::htmlEscape(entry$version), "</span>",
       "</h4>",
       "</div>"
     )
@@ -188,7 +218,7 @@ format_changelog_html <- function(entries = NULL, max_entries = 3) {
     # Items list
     items_html <- paste0(
       "<ul>",
-      paste0("<li>", entry$items, "</li>", collapse = ""),
+      paste0("<li>", changelog_entry_items_html(entry), "</li>", collapse = ""),
       "</ul>"
     )
     

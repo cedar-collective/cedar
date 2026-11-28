@@ -348,6 +348,14 @@ reading. `source_json_pointer(document, pointer)` resolves exact saved fields,
 including embedded array records. `source_sha256()`, `source_json_bytes()`, `write_source_json()` and
 `read_source_json()` supply the shared content-hash/JSON infrastructure.
 
+`R/trunk/changelog.R`: `load_changelog()` reads `config/changelog.yml`, whose
+newest entry is the app's version (`get_cedar_version_info()`).
+`get_recent_changelog()` and `get_earlier_changelog()` split it for Admin >
+Changelog; `format_changelog_html()` renders entries, each item escaped and
+labelled by its kind (`CHANGELOG_ITEM_KINDS`, `changelog_entry_items_html()`);
+`get_recent_highlights()` and `get_recent_improvements()` feed the homepage's
+What's New strip. How the file is written: [release-runbook.md](release-runbook.md#the-changelog).
+
 `R/trunk/display-format.R`: `fmt_count(x)` writes a count for a page (whole
 number, thousands separators, an em dash for NA, no padding). Every sentence,
 hover and note formats a count through it. It is apart from `utils.R`, which

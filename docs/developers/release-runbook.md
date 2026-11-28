@@ -44,8 +44,8 @@ the source of truth:
 Rscript --vanilla -e 'cedar_base_dir <- getwd(); source("R/trunk/changelog.R"); print(get_cedar_version_info())'
 ```
 
-Before each release, add its changelog entry, confirm it is shown in Data &
-Usage, and tag the final release commit.
+The changelog is written as changes merge ([The changelog](#the-changelog)).
+Confirm its newest version is the one Data & Usage shows.
 
 ## 2. Local Smoke Check
 
@@ -262,3 +262,54 @@ git checkout <known-good-tag-or-commit>
 For a data rollback, restore the previous data files from the server backup or
 snapshot process, then restart. If the issue may involve cached outputs, clear
 the affected cache family before rechecking the surface.
+
+## The changelog
+
+`config/changelog.yml` is the record of how CEDAR grows: what it can now do,
+what its analyses now account for, what its pages now explain, and what is
+easier to use. Readers see it in three places: Admin > Changelog (the latest
+release, then the earlier ones), the notice shown once when the version
+changes, and the homepage's What's New strip (the newest two releases).
+
+**Which changes get an item.** A PR adds an item when a reader would notice
+the change. Its `kind` says what the change does for the reader:
+
+| `kind` | Shown as | The change |
+|---|---|---|
+| `new` | New | a page, section, control or measure that was not there |
+| `deeper` | Deeper | an analysis that accounts for more, or counts more exactly |
+| `clearer` | Clearer | a page that says more about how it counts, whom it counts, or what it cannot tell |
+| `easier` | Easier | a page that is faster, simpler to reach or easier to use |
+| `hood` | Under the hood | internal work, summed up |
+
+Internal work (refactors, tests, tooling, the deploy, the data pipeline) gets
+no item of its own: its detail is in the PRs. A version has at most one `hood`
+item, a sentence or two on what such work means for a reader, such as a refresh
+that now stops on an export it could not read whole.
+
+**Versions.** Every merge to `main` deploys, so a version collects a week of
+changes, and the newest entry is the version in production.
+
+- A PR with a reader-facing change adds to the newest entry.
+- When the newest entry's `date` is seven or more days before the PR, the PR
+  opens the next minor version instead: `version` `"vX.Y.0"`, `date` that
+  day, `title` `"CEDAR X.Y — <theme>"` and `type` `"minor"`. The PRs that
+  follow that week add to it and may sharpen its theme.
+- A major version is the maintainer's call, and so is tagging a version's
+  commit.
+
+**Fields.**
+
+| Field | Shown | What to write |
+|---|---|---|
+| `items` | Admin > Changelog, and the notice of a new version | One per change a reader would notice: its `kind` and `text`, one or two sentences on what the reader can now do or see. They are listed in the table's order of kinds. Items written before v2.2.0 are plain strings and stay as they are. |
+| `highlights` | homepage cards | A new capability worth a card: `title`, `text`, `icon` (a Font Awesome name) and `tab` (a slug in `CEDAR_TAB_SLUGS`; a card without one opens the Changelog). |
+| `improvements` | homepage chips, under "Also improved" | A smaller gain in a few words: `title`, and `tab` when it has a page. |
+
+**Words.** Write in a chair's words, as on the pages: what changed for the
+reader, never the function, table or ISSUES number behind it. Give no
+institutional counts; the repository is public.
+
+`tests/testthat/test-changelog.R` checks every entry's fields and order, that
+every item of the newest entry names its kind, and that every link opens a
+page.

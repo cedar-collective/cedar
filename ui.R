@@ -405,8 +405,9 @@ cedar_home_ui <- function() {
 
     cedar_home_feature_spotlight(load_feature_spotlights()),
     cedar_home_whatsnew(
-      get_recent_highlights(max = 12, release_count = 1),
-      get_recent_improvements(max = 18, release_count = 1),
+      # The newest two releases, so a version opened this week still fills the strip.
+      get_recent_highlights(max = 12, release_count = 2),
+      get_recent_improvements(max = 18, release_count = 2),
       highlight_limit = 4,
       improvement_limit = 6
     ),

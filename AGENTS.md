@@ -285,6 +285,8 @@ There is one canonical way to count each thing: census `add_census_enrl()`; DFW 
 
 **Every change ships with** regression coverage for changed analytical behavior, in the existing suite, on the committed fixtures; and updated docs where its rule or table changed (here only for a rule; the inventory for a new file). Prose, CSS spacing and rearrangement need no assertions.
 
+**A change a reader would notice adds its item to `config/changelog.yml` in the same PR**, in a chair's words, saying what the reader gains: something new, an analysis that accounts for more, a page that explains more, or one that is easier to use. Internal work gets no item of its own; its detail is in the PR. Versions, kinds and fields: [release-runbook.md](docs/developers/release-runbook.md#the-changelog).
+
 ---
 
 ## Tests
