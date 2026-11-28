@@ -58,7 +58,7 @@ fix each needs, and which of them are one piece of work, are under
 | [I20](#i20--cedar_programs-holds-almost-no-branch-campus-students) | Defect | `cedar_programs` holds 1–3% of branch-campus students; branch program counts read near zero |
 | [I18](#i18--cedar_degrees-holds-no-associate-degrees-so-branch-campus-completions-read-zero) | Defect | `cedar_degrees` holds no associate degrees: branch-campus completions read zero |
 | [I4](#i4--pre-change-course-ratios-are-confounded-by-career-stage) | Defect | Pre-change course ratios confounded by career stage (deferred) |
-| M1–M82 | Improvement | See [Improvements](#improvements) |
+| M1–M83 | Improvement | See [Improvements](#improvements) |
 
 ### Resolved since the last release
 
@@ -5416,7 +5416,7 @@ this table says which entries are one piece of work, and of what kind.
 | Page standards | M4, M5, M11, M13, M14, M15, M16, M17, M18, M19, M22, M24, M29, M43, M44, M45, M46, M47, M51, M58, M80 | By page, not by standard. The pages still inline in `server.R` (Course Dynamics, Dept Dashboard, Low Enrollment, Enrollment, Admin's mappings) and `R/modules/pathways.R` hold most of every count below. One series a page makes it a module and clears every standard on it; ratchets on inline styles, bare headings and colours written in R (M17, M18, M58; in place since 2026-11-26) keep the rest from growing. |
 | How the app loads and starts | M59, M70, M75, M77 | One function that loads the tables as the app holds them, for `global.R`, the cache-warming scripts and the REPL (M59). M77's second half edits model source and goes with the projections below. |
 | The fixture and production disagree | M38, M40, M57 | One migration: each changes the counts pinned in the fixture's header. |
-| Tests, one at a time | M7, M8, M20, M42, M79 | Discrete. |
+| Tests, one at a time | M7, M8, M20, M42, M79, M83 | Discrete. |
 | A dimension not yet attached at load | M23, M37 (and defect I45) | A design decision of the kind ADR-001 made for units and course ids: campus with one vocabulary, the degree program as a grain. |
 | Projections | M31, M35, M36 | Discrete, in one model version: each edits model source, and one rebuild serves them all (M77). M2's census sum is in model source too. |
 | Stand-alone | M6 (and defects I67, I68) | Discrete. I67 and I68 are both a choice tile the degree compiler relates to no named course: no prerequisite in one, no match with the English route in the other. |
@@ -6121,6 +6121,17 @@ attempts…". `test-course-band-dfw.R` reads BD02 (graduate students, students
 of another home campus, and one student whose level changes between terms,
 in one course); 14 deliberate breaks of the change each failed a test. I86
 and M76 came out of the same work.
+
+**M83 — `./run-tests.sh --changed` runs only the edited suites when a diff
+also edits a page.** Open; found 2026-11-28 on the Bird's Eye filter bars
+(branch `birds-eye/filter-bars`). A file under `R/modules/`, `ui.R`,
+`server.R` or `www/` asks for a browser run but names no suite; the run falls
+back to `reports-smoke` only when nothing else is selected. That diff edited
+the Retention and Graduation suites, so `--changed` ran those two and none of
+the suites for the other pages it edited (DFW Rates, Gen Ed, Enrollment,
+Headcount), and said nothing about them. *Done when:* a page file selects the
+suites that open its page (by its module id), or the run says which edited
+pages no selected suite opens.
 
 **M82 — The compiled Liberal Arts and Integrative Studies board has no
 shared-rules profile, so it shows no Gen Ed cards.** Open; found 2026-11-27
