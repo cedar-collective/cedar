@@ -447,6 +447,20 @@ Retention, Graduation) has no run button: its link restores the controls, and
 that is the run. Each shows what it counted as facts under its controls
 (`filter_scope_stripe()`).
 
+- **The questions about students and terms come from
+  `cedar_rate_scope_inputs(ns, prefix, fields, choices, selected, campus,
+  widths)`** (`ui-helpers.R`): Campus, Student level, From term, To term and
+  Term type, each with one label, width and opening rule, always in the order
+  above whatever order a page names them. `campus = "home"` asks for the
+  student's home campus ("Home campus") instead of the campus that taught the
+  course; none picked reads every campus either way, and the placeholder says
+  so. Term codes are named with `fmt_term()`; Student level offers
+  `student_levels.csv`'s levels. DFW Rates, Retention, Graduation and Gen Ed
+  (its From and To) use it; a page writes its own controls (Graduation's
+  credit line, Gen Ed's area) after them. Never hand-write one of the five.
+- A page that also asks the section questions (Gen Ed) puts
+  `cedar_section_scope_inputs()` first, then these.
+
 ### A section page's filter bar
 
 Regstats, Open Seats, Waitlists, Low Enrollment, Cancellations and Enrollment

@@ -32,7 +32,6 @@ DFW_RATES_TONES <- c(quarter = "critical", half = "warning", rest = "muted",
 dfwRatesUI <- function(id, campuses, terms) {
   ns <- NS(id)
   terms <- sort(unique(as.integer(terms)))
-  term_choices <- stats::setNames(terms, vapply(terms, fmt_term, character(1)))
   # The opening values are the scope the preload builds: one source for both.
   opens_on <- dfw_rates_default_scope(campuses, terms)
   tagList(
@@ -40,14 +39,10 @@ dfwRatesUI <- function(id, campuses, terms) {
       "DFW Rates",
       "How lower-division courses are doing on D, F and withdrawal grades, and where to act.",
       fluidRow(
-        column(3, selectInput(ns("dr_campus"), "Campus", multiple = TRUE, choices = campuses,
-                              selected = opens_on$campus)),
-        column(2, selectizeInput(ns("dr_from_term"), "From term", choices = term_choices,
-                                 selected = opens_on$from_term)),
-        column(2, selectizeInput(ns("dr_to_term"), "To term", choices = term_choices,
-                                 selected = opens_on$to_term)),
-        column(3, radioButtons(ns("dr_term_type"), "Term type", choices = DFW_RATES_TERM_TYPES,
-                               selected = opens_on$term_type, inline = TRUE)),
+        cedar_rate_scope_inputs(ns, "dr", c("campus", "from_term", "to_term", "term_type"),
+          choices = list(campus = campuses, from_term = terms, to_term = terms,
+                         term_type = DFW_RATES_TERM_TYPES),
+          selected = opens_on[c("campus", "from_term", "to_term", "term_type")]),
         column(2, filter_actions(cedar_link_menu(ns("dr_copy_url"))))
       ),
       # What the page read, as facts (describe_dfw_rates_scope()).

@@ -32,20 +32,16 @@ RETENTION_TERM_TYPES <- c(Fall = "fall", Spring = "spring")
 #           (CEDAR_CAMPUS_MAIN), and none selected reads every campus.
 retentionDashboardUI <- function(id, campuses) {
   ns <- NS(id)
-  # The page opens on student_levels.csv's first level.
-  levels <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
   entering <- retentionEnteringClassesUI(ns("classes"))
   tagList(
     filter_bar(
       "Retention",
       "From the first semester on: are students coming back, are they keeping pace, and who is not?",
       fluidRow(
-        column(3, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
-                                 selected = intersect(CEDAR_CAMPUS_MAIN, campuses),
-                                 options = list(placeholder = "Every home campus"))),
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = levels[[1]])),
-        column(3, radioButtons(ns("term_type"), "Term type", choices = RETENTION_TERM_TYPES,
-                               selected = "fall", inline = TRUE)),
+        # Opens on the main campuses, student_levels.csv's first level and fall.
+        cedar_rate_scope_inputs(ns, NULL, c("campus", "level", "term_type"), campus = "home",
+          choices = list(campus = campuses, term_type = RETENTION_TERM_TYPES),
+          selected = list(campus = intersect(CEDAR_CAMPUS_MAIN, campuses), term_type = "fall")),
         column(3, filter_actions(cedar_link_menu(ns("copy_url"))))
       ),
       # Who the page counts, as facts (describe_retention_scope()).

@@ -25,7 +25,6 @@
 
 graduationUI <- function(id, campuses) {
   ns <- NS(id)
-  levels <- stats::setNames(names(CEDAR_STUDENT_LEVEL_LABELS), unname(CEDAR_STUDENT_LEVEL_LABELS))
   lines <- stats::setNames(GRADUATION_LINES, paste(GRADUATION_LINES, "credits or more"))
   # The opening values are the scope the preload builds: one source for both.
   opens_on <- graduation_default_scope(campuses)
@@ -34,10 +33,8 @@ graduationUI <- function(id, campuses) {
       "Graduation",
       "Where do students leave without a degree, and how far along were they?",
       fluidRow(
-        column(3, selectizeInput(ns("campus"), "Home campus", choices = campuses, multiple = TRUE,
-                                 selected = opens_on$campus,
-                                 options = list(placeholder = "Every home campus"))),
-        column(3, selectInput(ns("level"), "Student level", choices = levels, selected = opens_on$level)),
+        cedar_rate_scope_inputs(ns, NULL, c("campus", "level"), campus = "home",
+          choices = list(campus = campuses), selected = opens_on[c("campus", "level")]),
         column(5, radioButtons(ns("line"), "Far along means", choices = lines,
                                selected = opens_on$lines[[1]], inline = TRUE)),
         column(1, filter_actions(cedar_link_menu(ns("copy_url"))))
